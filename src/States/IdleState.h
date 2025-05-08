@@ -1,0 +1,27 @@
+#pragma once
+#include <StateMachine.h>
+#include "command.h"
+#include "media.h"
+#include "state.h"
+
+extern StateMachine mainTaskMachine;
+extern MachineState state;
+
+class IdleStateMachine : public State {
+
+   public:
+      IdleStateMachine() : State("IdleStateMachine") {}
+      virtual ~IdleStateMachine() = default;
+
+      void enter() override {
+        Serial.println("[Idle]");
+        state.current = StateType::IDLE;
+        handlePowerLoss();
+      }
+      void run() override {
+          readCommands();
+      }
+
+      void exit() override {
+      }
+};

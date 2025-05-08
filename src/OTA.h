@@ -1,0 +1,2 @@
+void handleOTA();
+void setupOTA();
