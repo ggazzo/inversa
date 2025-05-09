@@ -57,10 +57,11 @@ AsyncWebSocket ws("/ws");
 
 WebSocketBroadcastPrint wsPrint(&ws);
 
+#include "display_manager.h"
+DisplayManager displayManager;
 
 const char* ssid = STASSID;
 const char* password = STAPSK;
-
 
 #include "getTemperature.h"
 #include "setOutput.h"
@@ -86,38 +87,33 @@ void setup() {
     executeCommand(reinterpret_cast<const char *>(data), &wsPrint);
   });
 
-
   MDNS.begin("inversa");
 
-    WiFi.mode(WIFI_AP_STA);
-    preferences.begin("settings", false);
-    state.kp = preferences.getFloat("kp", 2.0);
-    state.ki = preferences.getFloat("ki", 5.0);
-    state.kd = preferences.getFloat("kd", 1.0);
-    state.pOn = preferences.getFloat("pOn", P_ON_M);
-    state.time = preferences.getFloat("time", 1000);
-    WiFi.begin(preferences.getString("ssid", ssid), preferences.getString("password", password));
-    state.volume_liters = preferences.getFloat("volume_liters", 70);
-    state.power_watts = preferences.getFloat("power_watts", 3200);
-    state.hysteresis_degrees_c = preferences.getFloat("hysteresis_degrees_c", 1);
-    state.hysteresis_seconds = preferences.getFloat("hysteresis_seconds", 10);
-    preferences.end();
+  WiFi.mode(WIFI_AP_STA);
+  preferences.begin("settings", false);
+  state.kp = preferences.getFloat("kp", 2.0);
+  state.ki = preferences.getFloat("ki", 5.0);
+  state.kd = preferences.getFloat("kd", 1.0);
+  state.pOn = preferences.getFloat("pOn", P_ON_M);
+  state.time = preferences.getFloat("time", 1000);
+  WiFi.begin(preferences.getString("ssid", ssid), preferences.getString("password", password));
+  state.volume_liters = preferences.getFloat("volume_liters", 70);
+  state.power_watts = preferences.getFloat("power_watts", 3200);
+  state.hysteresis_degrees_c = preferences.getFloat("hysteresis_degrees_c", 1);
+  state.hysteresis_seconds = preferences.getFloat("hysteresis_seconds", 10);
+  preferences.end();
 
+  pid.SetTunings(state.kp, state.ki, state.kd, P_ON_M);
+  pid.SetSampleTime(state.time);
 
-    pid.SetTunings(state.kp, state.ki, state.kd, P_ON_M);
-    pid.SetSampleTime(state.time);
-    
+  WiFi.softAP("Inversa", "12345678");
 
-    WiFi.softAP("Inversa", "12345678");
-
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      Serial.println("Connecting to WiFi..");
-    }
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println("Connecting to WiFi..");
+  }
   Serial.println("Connected to the WiFi network");
   Serial.println(WiFi.localIP());
-
-  
 
   #ifdef OTA
   setupOTA();
@@ -130,76 +126,68 @@ void setup() {
   configureTemperatureSensor();
   configureOutputs();
 
+  // Initialize display
+  displayManager.init();
 
   server.begin();
 
-    if (rtc.begin()) {
-        if (!rtc.isrunning()) {
-            timeClient.begin();
-            if(timeClient.update()){
-              rtc.adjust(DateTime(timeClient.getEpochTime()));
-            }
-            else
-            {
-              rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-            }
-        }
-        Serial.println("RTC is running!");
+  if (rtc.begin()) {
+    if (!rtc.isrunning()) {
+      timeClient.begin();
+      if(timeClient.update()){
+        rtc.adjust(DateTime(timeClient.getEpochTime()));
+      }
+      else
+      {
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+      }
     }
-    initializeSDCard();
-    Serial.println(WiFi.localIP());    
+    Serial.println("RTC is running!");
+  }
+  initializeSDCard();
+  Serial.println(WiFi.localIP());    
 }
 
 // the loop function runs over and over again forever
 extern PID pid;
 void loop()
 {
-
   mainTaskMachine.run();
   readCommandFromSerial(&Serial);
   readCommandFromSerial(&SerialBLE);
 
-#ifdef LED_BUILTIN
+  #ifdef LED_BUILTIN
   {
-  static const int interval = 1000;  // will send topic each 7s
-  static uint32_t timer = millis() + interval;
-  if (millis() > timer) {
-    pinMode(LED_BUILTIN, OUTPUT);
-    digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
-    timer += interval;
+    static const int interval = 1000;  // will send topic each 7s
+    static uint32_t timer = millis() + interval;
+    if (millis() > timer) {
+      pinMode(LED_BUILTIN, OUTPUT);
+      digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
+      timer += interval;
+    }
   }
-  }
-#endif
-
+  #endif
 
   {
     static const int interval = 1000;  // will send topic each 7s
     static uint32_t timer = millis() + interval;
 
     if (millis() > timer) {
-
       digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
-
       timer += interval;
     }
   }
 
-
-
   #ifdef OTA
     handleOTA();
-    // if (MDNS.isRunning()) MDNS.update();  // Handle MDNS
   #endif
-  
 
   ws.cleanupClients();
 
+  state.current_temperature_c = kfilter.updateEstimate(getTemperature());
+  outputControl(state);
+  setOutput(state.output_val);
 
-
-    state.current_temperature_c = kfilter.updateEstimate(getTemperature());
-
-    outputControl(state);
-
-    setOutput(state.output_val);
-
+  // Update display
+  displayManager.update(state);
 }
