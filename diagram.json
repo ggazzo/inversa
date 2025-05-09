@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "author": "Guilherme Gazzo",
+  "editor": "wokwi",
+  "parts": [
+    {
+      "type": "board-esp32-s3-devkitc-1",
+      "id": "esp",
+      "top": -172.98,
+      "left": 138.97,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-ntc-temperature-sensor",
+      "id": "temp1",
+      "top": 194.6,
+      "left": -115.8,
+      "attrs": {}
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r1",
+      "top": 61.55,
+      "left": 297.6,
+      "attrs": { "value": "100k" }
+    },
+    {
+      "type": "wokwi-led",
+      "id": "led1",
+      "top": 102,
+      "left": 349.4,
+      "attrs": { "color": "red" }
+    },
+    {
+      "type": "wokwi-resistor",
+      "id": "r2",
+      "top": 196.8,
+      "left": 335.45,
+      "rotate": 90,
+      "attrs": { "value": "220" }
+    },
+    {
+      "type": "board-ssd1306",
+      "id": "oled1",
+      "top": 22.34,
+      "left": -249.37,
+      "attrs": { "i2cAddress": "0x3c" }
+    }
+  ],
+  "connections": [
+    ["esp:TX", "$serialMonitor:RX", "", []],
+    ["esp:RX", "$serialMonitor:TX", "", []],
+    ["esp:3V3.1", "temp1:VCC", "red", []],
+    ["esp:GND.1", "temp1:GND", "black", []],
+    ["esp:A3", "temp1:OUT", "green", []],
+    ["temp1:OUT", "r1:1", "green", []],
+    ["r1:2", "esp:GND.1", "black", []],
+    ["esp:3V3.1", "led1:A", "red", []],
+    ["led1:C", "r2:1", "green", []],
+    ["r2:2", "esp:2", "green", []],
+    ["esp:3V3.1", "oled1:VCC", "red", []],
+    ["esp:GND.1", "oled1:GND", "black", []],
+    ["esp:8", "oled1:SDA", "yellow", []],
+    ["esp:10", "oled1:SCL", "white", []]
+  ],
+  "dependencies": {}
+}
