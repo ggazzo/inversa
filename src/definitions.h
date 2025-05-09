@@ -1,7 +1,7 @@
 
 #ifndef STASSID
-#define STASSID "***REMOVED***"
-#define STAPSK "***REMOVED***"
+#define STASSID "Wokwi-GUEST"
+#define STAPSK ""
 #endif
 //pid settings and gains
 

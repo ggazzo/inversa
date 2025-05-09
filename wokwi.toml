@@ -1,8 +1,8 @@
 [wokwi]
 version = 1
-firmware = "src/main.cpp"
-elf = ".pio/build/wemos_s3_mini/firmware.elf"
-firmware_format = "arduino"
+elf = ".pio/build/wemos_s3_mini_DEBUG/firmware.elf"
+firmware=".pio/build/wemos_s3_mini_DEBUG/firmware.bin"
+
 diagram = "diagram.json"
 
 [[pins]]
