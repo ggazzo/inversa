@@ -12,8 +12,8 @@
 
 #define SD_CS_PIN 10
 #define SD_MISO 13
-#define SD_MOSI 12
-#define SD_SCK  11
+#define SD_MOSI 11
+#define SD_SCK  12
 
 
 #define TX 21
