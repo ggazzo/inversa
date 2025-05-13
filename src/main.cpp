@@ -76,7 +76,10 @@ MachineState state;
 extern PID pid;
 void setup() {
 
-  Serial.begin(9600);
+  Serial.begin(115200);
+  while (!Serial); // Wait for USB Serial connection
+
+
   SerialBLE.begin("ESP32-BLE-Slave");
 
   server.addHandler(&ws);
@@ -87,7 +90,6 @@ void setup() {
     executeCommand(reinterpret_cast<const char *>(data), &wsPrint);
   });
 
-  MDNS.begin("inversa");
 
   WiFi.mode(WIFI_AP_STA);
   preferences.begin("settings", false);
@@ -96,7 +98,7 @@ void setup() {
   state.kd = preferences.getFloat("kd", 1.0);
   state.pOn = preferences.getFloat("pOn", P_ON_M);
   state.time = preferences.getFloat("time", 1000);
-  WiFi.begin(preferences.getString("ssid", ssid), preferences.getString("password", password));
+  WiFi.begin(preferences.getString("ssid", ssid), preferences.getString("password", password), 6);
   state.volume_liters = preferences.getFloat("volume_liters", 70);
   state.power_watts = preferences.getFloat("power_watts", 3200);
   state.hysteresis_degrees_c = preferences.getFloat("hysteresis_degrees_c", 1);
@@ -107,13 +109,15 @@ void setup() {
   pid.SetSampleTime(state.time);
 
   WiFi.softAP("Inversa", "12345678");
-
-  while (WiFi.status() != WL_CONNECTED) {
+// check if is ther any ssid in preferences
+  while (WiFi.status() != WL_CONNECTED && preferences.getString("ssid", ssid) != "") {
     delay(500);
-    Serial.println("Connecting to WiFi..");
+    Serial.println("Connecting to WiFi: " + String(ssid));
   }
   Serial.println("Connected to the WiFi network");
   Serial.println(WiFi.localIP());
+
+  MDNS.begin("inversa");
 
   #ifdef OTA
   setupOTA();
@@ -129,7 +133,17 @@ void setup() {
   // Initialize display
   displayManager.init();
 
+  // Initialize state machine with idle state
+  mainTaskMachine.init(&idleState);
+
   server.begin();
+
+  // Serial0.begin(115200);  // Using the pins defined in your board config
+  Serial1.begin(115200);  // Using the pins defined in your board config
+  delay(100);
+  Serial.println("\n\nESP32-S3 Mini Starting...");
+  // Serial0.println("\n\nESP32-S3 Mini Starting on Serial0...");
+  Serial1.println("\n\nESP32-S3 Mini Starting on Serial1...");
 
   if (rtc.begin()) {
     if (!rtc.isrunning()) {
@@ -190,4 +204,5 @@ void loop()
 
   // Update display
   displayManager.update(state);
+  displayManager.refresh();
 }

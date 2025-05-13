@@ -1,13 +1,22 @@
 
 #ifndef STASSID
-#define STASSID "Wokwi-GUEST"
-#define STAPSK ""
+#define STASSID "***REMOVED***"
+#define STAPSK "***REMOVED***"
 #endif
 //pid settings and gains
 
 
-#ifdef ESP32
-#include "definitions/wemos-esp32-C#-mini.h"
+#ifdef ESP32 
+
+#ifdef ARDUINO_LOLIN_S3_MINI// check the board
+    #include "definitions/wemos-esp32-S3-mini.h"
+#endif
+
+#ifdef ARDUINO_LOLIN_C3_MINI
+    #include "definitions/wemos-esp32-S3-mini.h"
+    // #include "definitions/wemos-esp32-C#-mini.h"
+#endif
+
 #else
 #define SENSOR_PIN A0
 #define SD_CS_PIN D8
