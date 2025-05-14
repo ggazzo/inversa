@@ -8,7 +8,7 @@
 #else
 
 #include <Thermistor.h>
-#include <NTC_Thermistor.h>
+#include <NTC_Thermistor_CustomFormula_ESP32.h>
 #include <AverageThermistor.h>
 /**
   How many readings are taken to determine a mean temperature.

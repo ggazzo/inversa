@@ -45,7 +45,7 @@ void configureTemperatureSensor() {
 
   #else
   #ifdef ESP32
-  Thermistor* originThermistor = new NTC_Thermistor_ESP32(
+  Thermistor* originThermistor = new NTC_Thermistor_CustomFormula_ESP32(
   SENSOR_PIN,
   REFERENCE_RESISTANCE,
   NOMINAL_RESISTANCE,
