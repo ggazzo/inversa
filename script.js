@@ -2,9 +2,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const connectButton = document.getElementById("connectButton");
   const statusArea = document.getElementById("statusArea");
   const currentTempDisplay = document.getElementById("currentTemp");
-  const targetTempDisplay = document.getElementById("targetTemp");
+  const targetTempDisplay = document.getElementById("targetTempDisplay");
   const currentStateDisplay = document.getElementById("currentState");
   const confirmActionButton = document.getElementById("confirmActionButton");
+
+  // New UI elements for Subtask 15.2
+  const setTargetTempInput = document.getElementById("setTargetTempInput");
+  const setTargetTempButton = document.getElementById("setTargetTempButton");
+  const startProcessButton = document.getElementById("startProcessButton");
+  const stopProcessButton = document.getElementById("stopProcessButton");
+  const getStatusButton = document.getElementById("getStatusButton");
 
   // TODO: Replace with the actual Service UUID from your ESP32 device
   const TARGET_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb"; // Example: Heart Rate Service
@@ -115,6 +122,36 @@ document.addEventListener("DOMContentLoaded", () => {
   // function handleTelemetry(event) { ... }
   // function updateGraph(tempData) { ... }
   // function updateConfirmButtonVisibility(state) { ... }
+
+  // Placeholder onclick handlers for new buttons (functionality in later subtasks)
+  if (setTargetTempButton) {
+    setTargetTempButton.onclick = () => {
+      const tempValue = setTargetTempInput ? setTargetTempInput.value : "N/A";
+      console.log(`Placeholder: Set Target Temperature to: ${tempValue}`);
+      // Actual BLE command to set target temperature will be in subtask 15.3/15.4
+    };
+  }
+
+  if (startProcessButton) {
+    startProcessButton.onclick = () => {
+      console.log("Placeholder: Start Process button clicked");
+      // Actual BLE command to start process will be in subtask 15.3/15.4
+    };
+  }
+
+  if (stopProcessButton) {
+    stopProcessButton.onclick = () => {
+      console.log("Placeholder: Stop Process button clicked");
+      // Actual BLE command to stop process will be in subtask 15.3/15.4
+    };
+  }
+
+  if (getStatusButton) {
+    getStatusButton.onclick = () => {
+      console.log("Placeholder: Get Device Status button clicked");
+      // Actual BLE command to get status will be in subtask 15.3/15.4
+    };
+  }
 
   console.log("BLE Control UI script loaded.");
 });

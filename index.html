@@ -45,6 +45,19 @@
       }
       .temperature-info {
         margin-top: 10px;
+        display: flex;
+        align-items: center;
+      }
+      .temperature-info label {
+        margin-right: 8px;
+        min-width: 150px;
+      }
+      .temperature-info input[type="number"] {
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        width: 80px;
+        margin-right: 8px;
       }
       .device-state {
         margin-top: 10px;
@@ -64,7 +77,14 @@
         Current Temperature: <span id="currentTemp">N/A</span> &deg;C
       </div>
       <div class="temperature-info">
-        Target Temperature: <span id="targetTemp">N/A</span> &deg;C
+        <label for="setTargetTempInput">Target Temperature:</label>
+        <input type="number" id="setTargetTempInput" placeholder="e.g., 25" />
+        <span id="targetTempDisplay" style="margin-left: 5px"
+          >(Current: N/A &deg;C)</span
+        >
+        <button id="setTargetTempButton" style="margin-left: 10px">
+          Set Target
+        </button>
       </div>
       <div class="device-state">
         Current State: <span id="currentState">N/A</span>
@@ -84,7 +104,10 @@
       <!-- Placeholder for command sending UI elements - to be detailed in subtask 15.2 -->
       <h2>Commands</h2>
       <div id="commandControls">
-        <p>Command controls will appear here.</p>
+        <button id="startProcessButton">Start Process</button>
+        <button id="stopProcessButton">Stop Process</button>
+        <button id="getStatusButton">Get Device Status</button>
+        <!-- Add more specific command buttons as needed -->
       </div>
     </div>
 
