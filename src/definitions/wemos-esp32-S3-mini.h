@@ -7,13 +7,16 @@
 
 #define HAS_CUSTOM_SPI_PINS
 
-#define SENSOR_PIN A3
-#define HEATER_PIN 2
+#define SENSOR_PIN A1
+#define HEATER_PIN 4
 
-#define SD_CS_PIN 10
-#define SD_MISO 13
-#define SD_MOSI 11
-#define SD_SCK  12
+
+
+
+#define SD_CS_PIN SS
+#define SD_MISO MISO
+#define SD_MOSI MOSI
+#define SD_SCK  SCK
 
 
 #define TX 21
