@@ -23,11 +23,24 @@ document.addEventListener("DOMContentLoaded", () => {
   const COMMAND_START_PROCESS = 0x02;
   const COMMAND_STOP_PROCESS = 0x03;
   const COMMAND_GET_STATUS = 0x04;
-  const COMMAND_CONFIRM_ACTION = 0x05; // Example if it's a new command
+  const COMMAND_CONFIRM_ACTION = 0x05; // Added for confirmation
 
   let bleDevice;
   let bleServer;
   let commandCharacteristic; // Added for NUS TX characteristic
+  let telemetryCharacteristic; // Added for NUS RX characteristic
+  let lastMessageIdRequiringConfirmation = null; // To store message ID
+
+  // Map for device states
+  const DEVICE_STATES = {
+    0: "Idle",
+    1: "Heating",
+    2: "Cooling",
+    3: "Maintaining Temp",
+    4: "Process Active",
+    5: "Error",
+    // Add more states as defined by your device firmware
+  };
 
   if (connectButton) {
     connectButton.onclick = async () => {
@@ -67,23 +80,40 @@ document.addEventListener("DOMContentLoaded", () => {
           COMMAND_CHARACTERISTIC_UUID
         );
         statusArea.textContent =
-          "Command Characteristic Obtained. Ready to send commands.";
+          "Command Characteristic Obtained. Getting Telemetry Characteristic...";
         console.log("Command Characteristic Obtained");
+
+        telemetryCharacteristic = await service.getCharacteristic(
+          TELEMETRY_CHARACTERISTIC_UUID
+        );
+        statusArea.textContent =
+          "Telemetry Characteristic Obtained. Starting notifications...";
+        console.log("Telemetry Characteristic Obtained");
+
+        await telemetryCharacteristic.startNotifications();
+        telemetryCharacteristic.addEventListener(
+          "characteristicvaluechanged",
+          handleTelemetry
+        );
+        statusArea.textContent = "Notifications started. Ready.";
+        console.log("Telemetry notifications started.");
 
         connectButton.textContent = "Disconnect";
         connectButton.onclick = disconnectDevice; // Change button action to disconnect
 
-        // Next steps (covered in subsequent subtasks):
-        // - Get Primary Service
-        // - Get Characteristics (command, telemetry)
-        // - Start notifications on telemetry characteristic
-        // - Enable UI elements for command sending / display
+        // TODO: Disable UI elements that require a connection
+        currentTempDisplay.textContent = "N/A";
+        targetTempDisplay.textContent = "N/A";
+        currentStateDisplay.textContent = "N/A";
+        confirmActionButton.style.display = "none";
+        lastMessageIdRequiringConfirmation = null;
       } catch (error) {
         statusArea.textContent = `Connection Failed: ${error.message}`;
         console.error("Connection failed:", error);
         bleDevice = null; // Reset device on error
         bleServer = null;
         commandCharacteristic = null;
+        telemetryCharacteristic = null;
       }
     };
   }
@@ -100,7 +130,13 @@ document.addEventListener("DOMContentLoaded", () => {
     bleDevice = null;
     bleServer = null;
     commandCharacteristic = null;
+    telemetryCharacteristic = null;
     // TODO: Disable UI elements that require a connection
+    currentTempDisplay.textContent = "N/A";
+    targetTempDisplay.textContent = "N/A";
+    currentStateDisplay.textContent = "N/A";
+    confirmActionButton.style.display = "none";
+    lastMessageIdRequiringConfirmation = null;
   }
 
   async function disconnectDevice() {
@@ -174,9 +210,26 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  confirmActionButton.addEventListener("click", () => {
-    // ... existing code ...
-  });
+  if (confirmActionButton) {
+    // Ensure button exists
+    confirmActionButton.onclick = () => {
+      if (lastMessageIdRequiringConfirmation !== null) {
+        console.log(
+          `Confirm Action button clicked for message ID: ${lastMessageIdRequiringConfirmation}`
+        );
+        // Send a confirmation command, possibly including the message ID
+        sendCommand(COMMAND_CONFIRM_ACTION, lastMessageIdRequiringConfirmation);
+        confirmActionButton.style.display = "none"; // Hide after click
+        lastMessageIdRequiringConfirmation = null; // Reset
+        statusArea.textContent = "Confirmation sent.";
+      } else {
+        console.warn(
+          "Confirm button clicked but no action was pending confirmation."
+        );
+        confirmActionButton.style.display = "none"; // Hide anyway
+      }
+    };
+  }
 
   // --- Command Sending Function ---
   async function sendCommand(commandId, value = null) {
@@ -216,6 +269,75 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (error) {
       statusArea.textContent = `Error sending command ${commandId}: ${error.message}`;
       console.error(`Error sending command ${commandId}:`, error);
+    }
+  }
+
+  // --- Handle Telemetry (Incoming Data) ---
+  function handleTelemetry(event) {
+    const value = event.target.value; // This is a DataView
+    if (!value || value.byteLength === 0) {
+      console.warn("Received empty telemetry data.");
+      return;
+    }
+
+    const messageType = value.getUint8(0);
+    console.log(
+      `Received Telemetry: Type=${messageType}, Data=${Array.from(
+        new Uint8Array(value.buffer)
+      )}`
+    );
+
+    try {
+      switch (messageType) {
+        case 0x10: // Device Status Update
+          if (value.byteLength < 4) {
+            console.error("Status Update (0x10) too short:", value.byteLength);
+            statusArea.textContent = "Error: Malformed status update.";
+            return;
+          }
+          const currentTemp = value.getUint8(1);
+          const targetTemp = value.getUint8(2);
+          const stateByte = value.getUint8(3);
+
+          currentTempDisplay.textContent = `${currentTemp} °C`;
+          targetTempDisplay.textContent = `${targetTemp} °C`;
+          currentStateDisplay.textContent =
+            DEVICE_STATES[stateByte] || `Unknown (${stateByte})`;
+          statusArea.textContent = "Device status updated.";
+          break;
+
+        case 0x11: // Confirmation Required
+          if (value.byteLength < 2) {
+            console.error(
+              "Confirmation Required (0x11) too short:",
+              value.byteLength
+            );
+            statusArea.textContent = "Error: Malformed confirmation request.";
+            return;
+          }
+          lastMessageIdRequiringConfirmation = value.getUint8(1);
+          confirmActionButton.style.display = "block";
+          statusArea.textContent = `Action (ID: ${lastMessageIdRequiringConfirmation}) requires confirmation.`;
+          console.log(
+            `Confirmation required for message ID: ${lastMessageIdRequiringConfirmation}`
+          );
+          break;
+
+        case 0x20: // Simple Log Message (Optional)
+          const decoder = new TextDecoder("utf-8");
+          const logMessage = decoder.decode(value.buffer.slice(1)); // Slice off the message type byte
+          statusArea.textContent = `Log: ${logMessage}`;
+          console.log(`Device Log: ${logMessage}`);
+          break;
+
+        default:
+          console.warn("Received unknown telemetry message type:", messageType);
+          statusArea.textContent = `Received unknown data type: ${messageType}`;
+          break;
+      }
+    } catch (error) {
+      console.error("Error processing telemetry:", error);
+      statusArea.textContent = `Error processing data: ${error.message}`;
     }
   }
 
