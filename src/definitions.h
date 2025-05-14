@@ -10,11 +10,8 @@
 
 #ifdef ARDUINO_LOLIN_S3_MINI// check the board
     #include "definitions/wemos-esp32-S3-mini.h"
-#endif
-
-#ifdef ARDUINO_LOLIN_C3_MINI
-    #include "definitions/wemos-esp32-S3-mini.h"
-    // #include "definitions/wemos-esp32-C#-mini.h"
+#else
+    #include "definitions/wemos-esp32-C3-mini.h"
 #endif
 
 #else
@@ -47,8 +44,8 @@
 
 // #define I2C
 
-#define REFERENCE_RESISTANCE 100000
-#define NOMINAL_RESISTANCE 100000
+#define REFERENCE_RESISTANCE 10000
+#define NOMINAL_RESISTANCE 10000
 #define NOMINAL_TEMPERATURE 25
 #define B_VALUE 3950
 
