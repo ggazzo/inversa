@@ -13,16 +13,21 @@ document.addEventListener("DOMContentLoaded", () => {
   const stopProcessButton = document.getElementById("stopProcessButton");
   const getStatusButton = document.getElementById("getStatusButton");
 
-  // TODO: Replace with the actual Service UUID from your ESP32 device
-  const TARGET_SERVICE_UUID = "0000180d-0000-1000-8000-00805f9b34fb"; // Example: Heart Rate Service
-  // TODO: Define Characteristic UUIDs that will be used later
-  // const TARGET_CHARACTERISTIC_UUID_COMMAND = 'your-command-characteristic-uuid';
-  // const TARGET_CHARACTERISTIC_UUID_TELEMETRY = 'your-telemetry-characteristic-uuid';
+  // UUIDs - Updated for Nordic UART Service (NUS)
+  const TARGET_SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+  const COMMAND_CHARACTERISTIC_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"; // NUS TX
+  const TELEMETRY_CHARACTERISTIC_UUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"; // NUS RX (for later)
+
+  // Command IDs
+  const COMMAND_SET_TARGET_TEMP = 0x01;
+  const COMMAND_START_PROCESS = 0x02;
+  const COMMAND_STOP_PROCESS = 0x03;
+  const COMMAND_GET_STATUS = 0x04;
+  const COMMAND_CONFIRM_ACTION = 0x05; // Example if it's a new command
 
   let bleDevice;
   let bleServer;
-  // let commandCharacteristic;
-  // let telemetryCharacteristic;
+  let commandCharacteristic; // Added for NUS TX characteristic
 
   if (connectButton) {
     connectButton.onclick = async () => {
@@ -38,11 +43,8 @@ document.addEventListener("DOMContentLoaded", () => {
         console.log("Requesting Bluetooth device...");
 
         bleDevice = await navigator.bluetooth.requestDevice({
-          // Option 1: Filter for a specific service UUID
           filters: [{ services: [TARGET_SERVICE_UUID] }],
-          // Option 2: Accept all devices (useful for initial discovery, less secure/efficient)
-          // acceptAllDevices: true,
-          // optionalServices: [TARGET_SERVICE_UUID] // Important if service not primary or if you need more than one
+          // optionalServices: [TARGET_SERVICE_UUID] // Can also use optionalServices if primary service is not advertised
         });
 
         statusArea.textContent = `Connecting to ${
@@ -53,12 +55,21 @@ document.addEventListener("DOMContentLoaded", () => {
         bleDevice.addEventListener("gattserverdisconnected", onDisconnected);
 
         bleServer = await bleDevice.gatt.connect();
-        statusArea.textContent = `Connected to ${
-          bleDevice.name || bleDevice.id
-        }`;
-        console.log(
-          `Connected to GATT Server on ${bleDevice.name || bleDevice.id}`
+        statusArea.textContent = "Connected to GATT Server. Getting Service...";
+        console.log("Connected to GATT Server");
+
+        const service = await bleServer.getPrimaryService(TARGET_SERVICE_UUID);
+        statusArea.textContent =
+          "Service Obtained. Getting Command Characteristic...";
+        console.log("Service Obtained");
+
+        commandCharacteristic = await service.getCharacteristic(
+          COMMAND_CHARACTERISTIC_UUID
         );
+        statusArea.textContent =
+          "Command Characteristic Obtained. Ready to send commands.";
+        console.log("Command Characteristic Obtained");
+
         connectButton.textContent = "Disconnect";
         connectButton.onclick = disconnectDevice; // Change button action to disconnect
 
@@ -72,6 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error("Connection failed:", error);
         bleDevice = null; // Reset device on error
         bleServer = null;
+        commandCharacteristic = null;
       }
     };
   }
@@ -87,8 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // Or, re-initialise the original event listener as defined above.
     bleDevice = null;
     bleServer = null;
-    // commandCharacteristic = null;
-    // telemetryCharacteristic = null;
+    commandCharacteristic = null;
     // TODO: Disable UI elements that require a connection
   }
 
@@ -126,31 +137,86 @@ document.addEventListener("DOMContentLoaded", () => {
   // Placeholder onclick handlers for new buttons (functionality in later subtasks)
   if (setTargetTempButton) {
     setTargetTempButton.onclick = () => {
-      const tempValue = setTargetTempInput ? setTargetTempInput.value : "N/A";
-      console.log(`Placeholder: Set Target Temperature to: ${tempValue}`);
-      // Actual BLE command to set target temperature will be in subtask 15.3/15.4
+      const tempValue = parseInt(setTargetTempInput.value);
+      if (isNaN(tempValue) || tempValue < 0 || tempValue > 100) {
+        // Basic validation
+        statusArea.textContent =
+          "Invalid target temperature. Please enter a value between 0 and 100.";
+        console.error(
+          "Invalid target temperature value:",
+          setTargetTempInput.value
+        );
+        return;
+      }
+      console.log("Set Target Temperature button clicked. Value:", tempValue);
+      sendCommand(COMMAND_SET_TARGET_TEMP, tempValue);
     };
   }
 
   if (startProcessButton) {
     startProcessButton.onclick = () => {
-      console.log("Placeholder: Start Process button clicked");
-      // Actual BLE command to start process will be in subtask 15.3/15.4
+      console.log("Start Process button clicked.");
+      sendCommand(COMMAND_START_PROCESS);
     };
   }
 
   if (stopProcessButton) {
     stopProcessButton.onclick = () => {
-      console.log("Placeholder: Stop Process button clicked");
-      // Actual BLE command to stop process will be in subtask 15.3/15.4
+      console.log("Stop Process button clicked.");
+      sendCommand(COMMAND_STOP_PROCESS);
     };
   }
 
   if (getStatusButton) {
     getStatusButton.onclick = () => {
-      console.log("Placeholder: Get Device Status button clicked");
-      // Actual BLE command to get status will be in subtask 15.3/15.4
+      console.log("Get Device Status button clicked.");
+      sendCommand(COMMAND_GET_STATUS);
     };
+  }
+
+  confirmActionButton.addEventListener("click", () => {
+    // ... existing code ...
+  });
+
+  // --- Command Sending Function ---
+  async function sendCommand(commandId, value = null) {
+    if (!bleDevice || !bleDevice.gatt.connected || !commandCharacteristic) {
+      statusArea.textContent =
+        "Device not connected or command characteristic not available.";
+      console.error(
+        "Error: Device not connected or command characteristic not available."
+      );
+      return;
+    }
+
+    let buffer;
+    if (value !== null) {
+      buffer = new ArrayBuffer(2);
+      const dataView = new DataView(buffer);
+      dataView.setUint8(0, commandId);
+      dataView.setUint8(1, value);
+    } else {
+      buffer = new ArrayBuffer(1);
+      const dataView = new DataView(buffer);
+      dataView.setUint8(0, commandId);
+    }
+
+    try {
+      console.log(
+        `Sending command: ID=${commandId}, Value=${value}, Buffer=${Array.from(
+          new Uint8Array(buffer)
+        )}`
+      );
+      statusArea.textContent = `Sending command ${commandId}...`;
+      await commandCharacteristic.writeValueWithResponse(buffer);
+      // For NUS, often writeWithoutResponse is used for TX, but WithResponse is safer to start with.
+      // await commandCharacteristic.writeValueWithoutResponse(buffer);
+      statusArea.textContent = `Command ${commandId} sent successfully.`;
+      console.log(`Command ${commandId} sent.`);
+    } catch (error) {
+      statusArea.textContent = `Error sending command ${commandId}: ${error.message}`;
+      console.error(`Error sending command ${commandId}:`, error);
+    }
   }
 
   console.log("BLE Control UI script loaded.");
