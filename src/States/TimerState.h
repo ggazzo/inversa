@@ -26,6 +26,7 @@ class WaitForTimerStateMachine : public State {
       void run() override {
           if(timer.isFinished()) {
               Serial.println("Timer finished");
+              mainTaskMachine.setState(&idleState);
           }
           // menuTimer.setCurrentValue(timer.timeRemaining()/60);
       }
