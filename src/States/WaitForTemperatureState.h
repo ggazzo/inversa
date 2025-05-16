@@ -8,6 +8,8 @@
 #include "calc.h"
 #include "state.h"
 #include "media.h"
+#include "Settings.h"
+
 extern MachineState state;
 
 extern IdleStateMachine idleState;
@@ -15,6 +17,8 @@ extern IdleStateMachine idleState;
 extern StateMachine mainTaskMachine;
 
 extern MachineState state;
+
+extern Settings settings;
 
 /**
  * Heating process can take a long time, so maybe you want to prepare your equipment
@@ -48,7 +52,7 @@ class WaitForTemperatureStateMachine : public State {
 
       if (is_in_hysteresis == false)
      {
-       if (temperature_diff_c <= state.hysteresis_degrees_c)
+       if (temperature_diff_c <= settings.getHysteresisDegreesC())
        {
          is_in_hysteresis = true;
          elapsed_time_after_hysteresis_seconds = current_time_seconds;
@@ -56,13 +60,13 @@ class WaitForTemperatureStateMachine : public State {
        return;
      }
 
-    if (temperature_diff_c > state.hysteresis_degrees_c)
+    if (temperature_diff_c > settings.getHysteresisDegreesC())
     {
        elapsed_time_after_hysteresis_seconds = current_time_seconds;
        return;
     }
 
-     if (current_time_seconds > elapsed_time_after_hysteresis_seconds + state.hysteresis_seconds)
+     if (current_time_seconds > elapsed_time_after_hysteresis_seconds + settings.getHysteresisSeconds())
      {
        mainTaskMachine.setState(&idleState);
        return;

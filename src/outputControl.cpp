@@ -1,6 +1,7 @@
 #include "outputControl.h"
 #include <Arduino.h>
 // #include <sTune.h>
+#include "Settings.h"
 
 #ifndef MAX
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -9,6 +10,8 @@
 #define LOW_TEMP_BAND 15 // degrees
 #define HIGH_TEMP_BAND 1 // degrees
 
+
+extern Settings settings;
 
 #define MASS 10.0         // Mass of water in kg (10L of water)
 #define CP 4186.0         // Specific heat capacity of water in J/kg°C
@@ -105,10 +108,10 @@ void outputControl(MachineState &machineState) {
   if (machineState.tuning) {
     // Run AutoTune
     if (pid_atune.Runtime()) { // AutoTune complete
-        machineState.kp = pid_atune.GetKp();
-        machineState.ki= pid_atune.GetKi();
-        machineState.kd= pid_atune.GetKd();
-        pid.SetTunings(machineState.kp, machineState.ki, machineState.kd, P_ON_M);
+        settings.setKp(pid_atune.GetKp());
+        settings.setKi(pid_atune.GetKi());
+        settings.setKd(pid_atune.GetKd());
+        pid.SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
         machineState.tuning = false;
     }
     return;
@@ -137,9 +140,9 @@ void outputControl(MachineState &machineState) {
   // we can at least guess the minimum in watts to keep the temperature
   // at the target temperature but to avoid any overheating lets slightly reduce the watts
 
-  double watts = calculateMinimumPower(machineState.volume_liters/ 1000, calculateSurfaceAreaFromVolume(machineState.volume_liters/ 1000, .30) , machineState.target_temperature_c, 25);
+  double watts = calculateMinimumPower(settings.getVolumeLiters()/ 1000, calculateSurfaceAreaFromVolume(settings.getVolumeLiters()/ 1000, .30) , state.target_temperature_c, 25);
 
-  int to_PWM = map(watts * .7, 0, machineState.power_watts, 0, 255);
+  int to_PWM = map(watts * .7, 0, settings.getPowerWatts(), 0, 255);
   machineState.output_val = constrain(MAX(machineState.output_val, to_PWM), 0, 255);
 
 }

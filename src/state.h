@@ -39,17 +39,6 @@ struct MachineState {
 
     bool started = false;
     
-    float kp;
-    float ki;
-    float kd;
-    float pOn;
-    int time;
-
-    int hysteresis_degrees_c = 1;
-    int hysteresis_seconds = 10;
-    int volume_liters = 70;
-    int power_watts = 3200;
-
 
     bool sd_present = false;
 

@@ -20,7 +20,7 @@
 #include "ArduinoJson.h"
 
 
-#include <Preferences.h>
+#include "Settings.h"
 #ifndef MAX_CMD_SIZE
 #define MAX_CMD_SIZE 128
 #endif
@@ -29,7 +29,7 @@
 #include <EasyBuzzer.h>
 #endif
 
-Preferences preferences;
+extern Settings settings;
 
 
 extern PreparingStateMachine preparingState;
@@ -240,7 +240,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
 
             float targetTemp = atof(strtok(params, " "));
             unsigned long desiredTimeHours = atol(strtok(NULL, " "));
-            prepareTemperature(targetTemp, desiredTimeHours, state.volume_liters, state.power_watts);
+            prepareTemperature(targetTemp, desiredTimeHours, settings.getVolumeLiters(), settings.getPowerWatts());
         }
 
         ptr = strstr(command, "PREPARE_ABSOLUTE");
@@ -255,7 +255,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
             float targetTemp = atof(strtok(params, " "));
             char isoDate[20];
             strcpy(isoDate, strtok(NULL, " "));
-            prepareTemperature(targetTemp, (DateTime(isoDate).secondstime() - rtc.now().secondstime())/ 60, state.volume_liters, state.power_watts);
+            prepareTemperature(targetTemp, (DateTime(isoDate).secondstime() - rtc.now().secondstime())/ 60, settings.getVolumeLiters(), settings.getPowerWatts());
         }
 
     }
@@ -308,18 +308,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
 
 
     if(strcmp(command, "SAVE") == 0) {
-
-        preferences.begin("settings", false);
-        preferences.putFloat("kp", state.kp);
-        preferences.putFloat("ki", state.ki);
-        preferences.putFloat("kd", state.kd);
-        preferences.putFloat("pOn", state.pOn);
-        preferences.putFloat("volume_liters", state.volume_liters);
-        preferences.putFloat("power_watts", state.power_watts);
-        preferences.putFloat("hysteresis_degrees_c", state.hysteresis_degrees_c);
-        preferences.putFloat("hysteresis_seconds", state.hysteresis_seconds);
-        preferences.end();
-
+        settings.save();
         return;
     
     }
@@ -333,7 +322,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         // (*doc)["kp"] = state.kp;
         // (*doc)["ki"] = state.ki;
         // (*doc)["kd"] = state.kd;
-        (*doc)["time"] = state.time;
+        (*doc)["time"] = settings.getTime();
         // (*doc)["hysteresis_degrees_c"] = state.hysteresis_degrees_c;
         // (*doc)["hysteresis_seconds"] = state.hysteresis_seconds;
         // (*doc)["volume_liters"] = state.volume_liters;
@@ -371,18 +360,14 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "SSID");
 
     if (ptr == command) {
-        preferences.begin("settings", false);
-        preferences.putString("ssid", params);
-        preferences.end();
+        settings.setWifiSsid(params);
         return;
     }
 
     ptr = strstr(command, "PASSWORD");
 
     if (ptr == command) {
-        preferences.begin("settings", false);
-        preferences.putString("password", params);
-        preferences.end();
+        settings.setWifiPassword(params);
         return;
     }
 
@@ -410,25 +395,25 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "POWER");
 
     if (ptr == command) {
-        state.power_watts = atof(params);
+        settings.setPowerWatts(atof(params));
         return;
     }
 
     ptr = strstr(command, "VOLUME");
     if (ptr == command) {
-        state.volume_liters = atof(params);
+        settings.setVolumeLiters(atof(params));
         return;
     }
 
     ptr = strstr(command, "HYSTERESIS_TIME");
     if (ptr == command) {
-        state.hysteresis_seconds = atof(params);
+        settings.setHysteresisSeconds(atof(params));
         return;
     }
 
     ptr = strstr(command, "HYSTERESIS_TEMP");
     if (ptr == command) {
-        state.hysteresis_degrees_c = atof(params);
+        settings.setHysteresisDegreesC(atof(params));
         return;
     }
 
@@ -478,12 +463,14 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         float kd = atof(strtok(NULL, " "));
         float pOn = atof(strtok(NULL, " "));
         float time = atoi(strtok(NULL, " "));
-        state.kd = kd;
-        state.ki = ki;
-        state.kp = kp;
-        state.pOn = pOn;
+
+        settings.setKp(kp);
+        settings.setKi(ki);
+        settings.setKd(kd);
+        settings.setPOn(pOn);
+        settings.setTime(time);
+
         pid.SetTunings(kp, ki, kd, pOn);
-        state.time = time;
         pid.SetSampleTime(time);
         return;
     }

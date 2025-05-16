@@ -25,7 +25,7 @@ extern SDCardState sdCardState;
 extern MachineState state;
 
 
-
+extern Settings settings;
 
 
 void initializeSDCard() {
@@ -199,7 +199,7 @@ void recoveryFromPowerLoss() {
             auto current = rtc.now().secondstime();
 
             if(current < storedState.target_preparing_time_seconds) {
-                prepareTemperature(storedState.target_temperature_c, storedState.target_preparing_time_seconds - current, storedState.volume_liters, storedState.power_watts);
+                prepareTemperature(storedState.target_temperature_c, storedState.target_preparing_time_seconds - current, settings.getVolumeLiters(), settings.getPowerWatts());
             }
             #else
 

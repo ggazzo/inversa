@@ -9,9 +9,8 @@ SimpleKalmanFilter kfilter(2, 2, 0.01);
 
 #define DEVICE_NAME "Inversa"
 
-#include <Preferences.h>
+#include <settings.h>
 
-extern Preferences preferences;
 
 #include "Arduino.h"
 #include <Wire.h>
@@ -79,6 +78,9 @@ MachineState state;
 
 // the setup function runs once when you press reset or power the board
 extern PID pid;
+
+
+Settings settings;
 void setup() {
 
   Serial.begin(115200);
@@ -99,25 +101,15 @@ void setup() {
 
 
   WiFi.mode(WIFI_AP_STA);
-  preferences.begin("settings", false);
-  state.kp = preferences.getFloat("kp", 2.0);
-  state.ki = preferences.getFloat("ki", 5.0);
-  state.kd = preferences.getFloat("kd", 1.0);
-  state.pOn = preferences.getFloat("pOn", P_ON_M);
-  state.time = preferences.getFloat("time", 1000);
-  WiFi.begin(preferences.getString("ssid", ssid), preferences.getString("password", password), 6);
-  state.volume_liters = preferences.getFloat("volume_liters", 70);
-  state.power_watts = preferences.getFloat("power_watts", 3200);
-  state.hysteresis_degrees_c = preferences.getFloat("hysteresis_degrees_c", 1);
-  state.hysteresis_seconds = preferences.getFloat("hysteresis_seconds", 10);
-  preferences.end();
 
-  pid.SetTunings(state.kp, state.ki, state.kd, P_ON_M);
-  pid.SetSampleTime(state.time);
+  WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
+
+  pid.SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
+  pid.SetSampleTime(settings.getTime());
 
   WiFi.softAP("Inversa", "12345678");
 // check if is ther any ssid in preferences
-  while (WiFi.status() != WL_CONNECTED && preferences.getString("ssid", ssid) != "") {
+  while (WiFi.status() != WL_CONNECTED && settings.getWifiSsid() != "") {
     delay(500);
     Serial.println("Connecting to WiFi: " + String(ssid));
   }
