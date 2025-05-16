@@ -7,7 +7,7 @@
 #endif
 #include "SD.h"
 #include "SPI.h"
-#include "log.h"
+#include "logs.h"
 #ifdef USE_RTC 
 #include <RTClib.h>
 extern RTC_DS1307 rtc;
@@ -25,7 +25,7 @@ extern SDCardState sdCardState;
 extern MachineState state;
 
 
-extern Settings settings;
+extern Settings preferences;
 
 
 void initializeSDCard() {
@@ -199,7 +199,7 @@ void recoveryFromPowerLoss() {
             auto current = rtc.now().secondstime();
 
             if(current < storedState.target_preparing_time_seconds) {
-                prepareTemperature(storedState.target_temperature_c, storedState.target_preparing_time_seconds - current, settings.getVolumeLiters(), settings.getPowerWatts());
+                prepareTemperature(storedState.target_temperature_c, storedState.target_preparing_time_seconds - current, preferences.getVolumeLiters(), preferences.getPowerWatts());
             }
             #else
 

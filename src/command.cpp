@@ -13,7 +13,6 @@
 #include "States/stateMachine.h"
 #include "States/TimerState.h"
 #include "logs.h"
-#include "log.h"
 #include "estimated.h"
 #include "media.h"
 #include "NTPClient.h"
@@ -79,7 +78,6 @@ void executeCommand(const char* command, Print* output) {
 }
 
 void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
-    logMessage(command);
 
     /**
      * if we are idle we accept basic all commands
@@ -521,7 +519,8 @@ void readCommandFromSerial(Stream *input) {
 
 void readCommandFromSDCard(void) {
 #ifdef HAS_MEDIA
-    if(sdCardState.isFileOpen){
+    bool isIdle = mainTaskMachine.getCurrentState() == &idleState;
+    if(sdCardState.isFileOpen && isIdle){
         if(readCommand(sdCardState.file, command, sizeof(command))){
             executeCommand(command, &Serial);
             state.file_position = sdCardState.file->position();
@@ -630,7 +629,6 @@ void skipStep() {
         char buffer[30] = "WAIT_TIMER ";
         sprintf(timer_buffer, "%lu", timer.elapsed());
         strcat(buffer, timer_buffer);
-        logMessage(buffer);
         return;
     }
 
@@ -639,7 +637,6 @@ void skipStep() {
         char buffer[30] = "WAIT_TIMER ";
         sprintf(temperature_buffer, "%f", state.current_temperature_c);
         strcat(buffer, temperature_buffer);
-        logMessage(buffer);
         return;
     }
 
