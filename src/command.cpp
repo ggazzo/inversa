@@ -18,6 +18,7 @@
 #include "media.h"
 #include "NTPClient.h"
 #include "ArduinoJson.h"
+#include <BLESerial.h>
 
 #include <Preferences.h>
 #ifndef MAX_CMD_SIZE
@@ -49,6 +50,8 @@ char buffer[10];
 
 File file;
 
+extern BLESerial<> SerialBLE;
+
 void startAutoTune();
 
 void _executeCommand(const char *command, Print *output, JsonDocument *doc);
@@ -77,6 +80,16 @@ void executeCommand(const char* command, Print* output) {
 }
 
 void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
+    logMessage(command);
+
+    /**
+     * if we are idle we accept basic all commands
+     * if we are in a different state, this means that some must be waiting
+     * in short you can not start for another command until the current one is finished
+     */
+
+    bool isIdle = mainTaskMachine.getCurrentState() == &idleState;
+
 
     // if starts with # then it is a comment lets just ignore it
     if (command[0] == '#' && !file) {
@@ -97,32 +110,16 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         *(params++);
     }
 
-    // start write to file
 
 #ifdef HAS_MEDIA
-    // stop write to file
 
-    ptr = strstr(command, "FILE_STOP");
-    if (ptr == command) {
-        
-        file.close();
-        return;
-    }
-
-
-    if (file) {
-        file.write(reinterpret_cast <const uint8_t*> (command), strlen(command));
-        file.write('\n');
-        return;
-    }
-
-    // list files
+     // list files
 
     ptr = strstr(command, "LIST_FILES");
     if (ptr == command) {
         
         
-       (* doc)["type"] = "list_files";
+    (* doc)["type"] = "list_files";
 
         JsonArray files = (*doc)["files"].to<JsonArray>();
 
@@ -137,69 +134,134 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     }
 
+    if(isIdle) {
+        if (file) {
+            ptr = strstr(command, "FILE_STOP");
+            if (ptr == command) {
+                
+                file.close();
+                return;
+            }
 
-    ptr = strstr(command, "WRITE_FILE");
-    if (ptr == command) {
-        String jsonString;
-        
-        (*doc)["type"] = "write_file";
-        file = SD.open(params, FILE_WRITE);
-        if (!file) {
-            (*doc)["status"] = "error";
+
+            file.write(reinterpret_cast <const uint8_t*> (command), strlen(command));
+            file.write('\n');
             return;
         }
-        (*doc)["status"] = "ok";
-        return;
-    }
-    // start read from file
-    ptr = strstr(command, "OPEN_FILE");
+        ptr = strstr(command, "READ_FILE");
+        if (ptr == command) {
+            (*doc)["type"] = "read_file";
+            file = SD.open(params, FILE_READ);
 
-    if (ptr == command) {
-        openFile(params);
-        return;
-    }
+            while (file.available()) {
+                Serial.write(file.read());
+            }
+            file.close();
 
-    ptr = strstr(command, "DELETE_FILE");
-    if (ptr == command) {
-        if(SD.remove(params)){
-            (*doc)["type"] = "delete_file";
+            file = SD.open(params, FILE_READ);
+
+            if (!file) {
+                (*doc)["status"] = "error";
+                return;
+            }
             (*doc)["status"] = "ok";
-        } else {
-            (*doc)["type"] = "delete_file";
-            (*doc)["status"] = "error";
+            (*doc)["file"] = file.readString();
+            return;
+        }
+
+
+        ptr = strstr(command, "WRITE_FILE");
+        if (ptr == command) {
+            String jsonString;
+            
+            (*doc)["type"] = "write_file";
+            file = SD.open(params, FILE_WRITE);
+            if (!file) {
+                (*doc)["status"] = "error";
+                return;
+            }
+            (*doc)["status"] = "ok";
+            return;
+        }
+        // start read from file
+        ptr = strstr(command, "OPEN_FILE");
+
+        if (ptr == command) {
+            openFile(params);
+            return;
+        }
+
+        ptr = strstr(command, "DELETE_FILE");
+        if (ptr == command) {
+            if(SD.remove(params)){
+                (*doc)["type"] = "delete_file";
+                (*doc)["status"] = "ok";
+            } else {
+                (*doc)["type"] = "delete_file";
+                (*doc)["status"] = "error";
+            }
         }
     }
+
+
 #endif
 
 
     /** Blocking commands */
-    
-    ptr = strstr(command, "WAIT_TIMER");
-    if (ptr == command) {
-        unsigned long duration = atol(params);
-        startTimer(duration);
-        return;
-    }
-    ptr = strstr(command, "WAIT_TEMPERATURE");
-    if (ptr == command) {
-        waitUntilTemperatureReached(atof(params));
-        return;
-    }
 
-
-
-    logMessage(command);
-
-    ptr = strstr(command, "ENTER_CONFIRM");
-    if (ptr == command) {
-        if(params == nullptr) {
+    if(isIdle) {
+        ptr = strstr(command, "WAIT_TIMER");
+        if (ptr == command) {
+            unsigned long duration = atol(params);
+            startTimer(duration);
+            return;
+        }
+        ptr = strstr(command, "WAIT_TEMPERATURE");
+        if (ptr == command) {
+            waitUntilTemperatureReached(atof(params));
+            return;
+        }
+        ptr = strstr(command, "ENTER_CONFIRM");
+        if (ptr == command) {
+            if(params == nullptr) {
+                mainTaskMachine.setState(&confirmState);
+                return;
+            }
+            strcpy(state.confirm_message, params);
             mainTaskMachine.setState(&confirmState);
             return;
         }
-        strcpy(state.confirm_message, params);
-        mainTaskMachine.setState(&confirmState);
-        return;
+
+                ptr = strstr(command, "PREPARE_RELATIVE");
+
+        if (ptr == command) {
+
+            output->print("PREPARE_RELATIVE params: ");
+            output->println(params);
+
+            float targetTemp = atof(strtok(params, " "));
+            unsigned long desiredTimeHours = atol(strtok(NULL, " "));
+            prepareTemperature(targetTemp, desiredTimeHours, state.volume_liters, state.power_watts);
+        }
+
+        ptr = strstr(command, "PREPARE_ABSOLUTE");
+
+        // PREPARE_ABSOLUTE 45 2024/10/21T23:25:00
+
+        // PREPARE_RELATIVE 25 60
+        if (ptr == command) {
+
+            
+            
+            float targetTemp = atof(strtok(params, " "));
+            char isoDate[20];
+            strcpy(isoDate, strtok(NULL, " "));
+            prepareTemperature(targetTemp, (DateTime(isoDate).secondstime() - rtc.now().secondstime())/ 60, state.volume_liters, state.power_watts);
+        }
+
     }
+    
+
 
 
     if (strcmp(command, "TOTAL_TIME_START") == 0) {
@@ -221,6 +283,14 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         startOperation();
         return;
     }
+
+
+    if (strcmp(command, "CONFIRM") == 0) {
+        mainTaskMachine.setState(&idleState);
+        return;
+    }
+    
+
     if (strcmp(command, "ABORT") == 0) {
         abortOperation();
         return;
@@ -261,23 +331,23 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["target_temperature"] = state.target_temperature_c;
         (*doc)["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
         (*doc)["started"] = state.started;
-        (*doc)["kp"] = state.kp;
-        (*doc)["ki"] = state.ki;
-        (*doc)["kd"] = state.kd;
+        // (*doc)["kp"] = state.kp;
+        // (*doc)["ki"] = state.ki;
+        // (*doc)["kd"] = state.kd;
         (*doc)["time"] = state.time;
-        (*doc)["hysteresis_degrees_c"] = state.hysteresis_degrees_c;
-        (*doc)["hysteresis_seconds"] = state.hysteresis_seconds;
-        (*doc)["volume_liters"] = state.volume_liters;
-        (*doc)["power_watts"] = state.power_watts;
+        // (*doc)["hysteresis_degrees_c"] = state.hysteresis_degrees_c;
+        // (*doc)["hysteresis_seconds"] = state.hysteresis_seconds;
+        // (*doc)["volume_liters"] = state.volume_liters;
+        // (*doc)["power_watts"] = state.power_watts;
         (*doc)["target_preparing_time"] = DateTime(state.target_preparing_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
 
-        (*doc)["confirm_message"] = state.confirm_message;
-        (*doc)["message"] = state.message;
-        (*doc)["message_line_2"] = state.message_line_2;
-        (*doc)["message_line_3"] = state.message_line_3;
+        // (*doc)["confirm_message"] = state.confirm_message;
+        // (*doc)["message"] = state.message;
+        // (*doc)["message_line_2"] = state.message_line_2;
+        // (*doc)["message_line_3"] = state.message_line_3;
         (*doc)["state"] = state.current;
         (*doc)["sd_present"] = state.sd_present;
-        (*doc)["tuning"] = state.tuning;
+        // (*doc)["tuning"] = state.tuning;
 
         return;
     }
@@ -426,36 +496,6 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     }
 
-    ptr = strstr(command, "PREPARE_RELATIVE");
-
-    if (ptr == command) {
-
-        output->print("PREPARE_RELATIVE params: ");
-        output->println(params);
-
-        float targetTemp = atof(strtok(params, " "));
-        unsigned long desiredTimeHours = atol(strtok(NULL, " "));
-        prepareTemperature(targetTemp, desiredTimeHours, state.volume_liters, state.power_watts);
-    }
-
-    ptr = strstr(command, "PREPARE_ABSOLUTE");
-
-    // PREPARE_ABSOLUTE 45 2024/10/21T23:25:00
-
-    // PREPARE_RELATIVE 25 60
-    if (ptr == command) {
-
-        
-        
-        float targetTemp = atof(strtok(params, " "));
-        char isoDate[20];
-        strcpy(isoDate, strtok(NULL, " "));
-        
-
-        
-        prepareTemperature(targetTemp, (DateTime(isoDate).secondstime() - rtc.now().secondstime())/ 60, state.volume_liters, state.power_watts);
-    }
-
     ptr = strstr(command, "SET_DATE");
 
     if (ptr == command) {
@@ -463,18 +503,6 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         strcpy(isoDate, params);
         rtc.adjust(DateTime(isoDate));
     }
-
-    ptr = strstr(command, "OPEN_FILE");
-
-    if (ptr == command) {
-        openFile(params);
-    }
-
-    ptr = strstr(command, "CONFIRM");
-    if (ptr == command) {
-        strcpy(state.confirm_message, params);
-    }
-
 };
 
 char command[MAX_CMD_SIZE];
@@ -511,8 +539,13 @@ void readCommandFromSDCard(void) {
 #endif
 }
 
-void readCommands(void) {
+void readFromSerials(void) {
     readCommandFromSerial(&Serial);
+    readCommandFromSerial(&SerialBLE);
+}
+
+void readCommands(void) {
+    readFromSerials();
     readCommandFromSDCard();
 }
 
@@ -525,11 +558,9 @@ void abortOperation()
     timer.stop();
     stopTotalTimeCounter();
     setEstimatedTime(0);
-    // display.clear();
-    // display.print_subtitle("");
     state.started = false;
     removeStateFromPowerLoss();
-    ESP.restart();
+    mainTaskMachine.setState(&idleState);
 }
 
 void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes, float volume_liters, float power_watts) {
