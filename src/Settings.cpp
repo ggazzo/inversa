@@ -3,43 +3,56 @@
 #define P_ON_M 0
 #define P_ON_E 1
 
+#define HYSTERESIS_DEGREES_C_KEY "h_d_c"
+#define HYSTERESIS_SECONDS_KEY "h_s"
 Settings::Settings() {
+    load();
+}
 
-    preferences.begin(PREFERENCES_KEY, false);
+
+void Settings::load() {
+    Serial.println("Opening preferences");
+    if(!preferences.begin(PREFERENCES_KEY, false)){
+        Serial.println("Failed to open preferences");
+    }
+
     kp = preferences.getFloat("kp", 2.0);
     ki = preferences.getFloat("ki", 5.0);
     kd = preferences.getFloat("kd", 1.0);
     pOn = preferences.getFloat("pOn", P_ON_M);
     time = preferences.getFloat("time", 1000);
-    volumeLiters = preferences.getFloat("volume_liters", 70);
-    powerWatts = preferences.getFloat("power_watts", 3200);
-    hysteresisDegreesC = preferences.getFloat("hysteresis_degrees_c", 1);
-    hysteresisSeconds = preferences.getFloat("hysteresis_seconds", 10);
+    volumeLiters = preferences.getInt("volume_liters", 70);
+    powerWatts = preferences.getInt("power_watts", 3200);
+    hysteresisDegreesC = preferences.getFloat(HYSTERESIS_DEGREES_C_KEY, 1);
+    hysteresisSeconds = preferences.getFloat(HYSTERESIS_SECONDS_KEY, 10);
+    wifiSsid = preferences.getString("wifiSsid", "");
+    wifiPassword = preferences.getString("wifiPassword", "");
 
     preferences.end();
 }
 
 // Save settings to preferences
 void Settings::save() {
-     if (!isDirty){
-        return;
-    }
-    
 
-    preferences.begin(PREFERENCES_KEY, false);
+    if(preferences.begin(PREFERENCES_KEY, false)){
+        Serial.println("Saving settings");
+    } else {
+        Serial.println("Failed to open preferences");
+    }
     preferences.putFloat("kp", kp);
     preferences.putFloat("ki", ki);
     preferences.putFloat("kd", kd);
     preferences.putFloat("pOn", pOn);
     preferences.putFloat("time", time);
-    preferences.putFloat("volumeLiters", volumeLiters);
-    preferences.putFloat("powerWatts", powerWatts);
-    preferences.putFloat("hysteresisDegreesC", hysteresisDegreesC);
-    preferences.putFloat("hysteresisSeconds", hysteresisSeconds);
+    preferences.putInt("volumeLiters", volumeLiters);
+    preferences.putInt("powerWatts", powerWatts);
+    preferences.putFloat(HYSTERESIS_DEGREES_C_KEY, hysteresisDegreesC);
+    preferences.putFloat(HYSTERESIS_SECONDS_KEY, hysteresisSeconds);
     preferences.putString("wifiSsid", wifiSsid);
     preferences.putString("wifiPassword", wifiPassword);
-
     isDirty = false;
+
+    Serial.println("Settings saved");   
 
     preferences.end();
 }

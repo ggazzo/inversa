@@ -38,6 +38,8 @@ class Settings {
 
         // Save settings to preferences
         virtual void save();
+
+        virtual void load();
         
 
     private:

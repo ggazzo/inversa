@@ -3,6 +3,7 @@
 #include "LittleFS.h" 
 #include "NuSerial.hpp"
 
+
 #include <SimpleKalmanFilter.h>
 SimpleKalmanFilter kfilter(2, 2, 0.01);
 
@@ -91,6 +92,7 @@ void setup() {
   NimBLEDevice::getAdvertising()->setName(DEVICE_NAME);
   NuSerial.begin(115200);
 
+
   server.addHandler(&ws);
   
   /* Attach Message Callback */
@@ -99,24 +101,11 @@ void setup() {
     executeCommand(reinterpret_cast<const char *>(data), &wsPrint);
   });
 
-
   WiFi.mode(WIFI_AP_STA);
 
-  WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
-
-  pid.SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
-  pid.SetSampleTime(settings.getTime());
-
   WiFi.softAP("Inversa", "12345678");
-// check if is ther any ssid in preferences
-  while (WiFi.status() != WL_CONNECTED && settings.getWifiSsid() != "") {
-    delay(500);
-    Serial.println("Connecting to WiFi: " + String(ssid));
-  }
-  Serial.println("Connected to the WiFi network");
-  Serial.println(WiFi.localIP());
 
-  MDNS.begin("inversa");
+
 
   #ifdef OTA
   setupOTA();
@@ -138,12 +127,31 @@ void setup() {
 
   server.begin();
 
-  // Serial0.begin(115200);  // Using the pins defined in your board config
-  Serial1.begin(115200);  // Using the pins defined in your board config
-  delay(100);
-  Serial.println("\n\nESP32-S3 Mini Starting...");
-  // Serial0.println("\n\nESP32-S3 Mini Starting on Serial0...");
-  Serial1.println("\n\nESP32-S3 Mini Starting on Serial1...");
+  Serial.println("\n\nESP32-S3 Mini Starting");
+
+
+  Serial.println("Starting settings");
+  settings.load();
+
+  WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
+
+  pid.SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
+  pid.SetSampleTime(settings.getTime());
+
+
+  Serial.print("Wifi SSID: "); Serial.println(settings.getWifiSsid());
+
+  if( settings.getWifiSsid().length() > 0) {
+    // check if is ther any ssid in preferences
+    while (WiFi.status() != WL_CONNECTED && settings.getWifiSsid().length() > 0) {
+      delay(500);
+      Serial.println("Connecting to WiFi: " + String(ssid));
+    }
+    Serial.println("Connected to the WiFi network");
+    Serial.println(WiFi.localIP());
+  }
+
+  MDNS.begin("inversa");
 
   if (rtc.begin()) {
     if (!rtc.isrunning()) {
@@ -159,7 +167,6 @@ void setup() {
     Serial.println("RTC is running!");
   }
   initializeSDCard();
-  Serial.println(WiFi.localIP());    
 }
 
 // the loop function runs over and over again forever
