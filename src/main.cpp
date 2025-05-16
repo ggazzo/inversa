@@ -1,11 +1,13 @@
+#include "NimBLEDevice.h"
 #include "definitions.h"
 #include "LittleFS.h" 
-#include <BLESerial.h>
+#include "NuSerial.hpp"
+
 #include <SimpleKalmanFilter.h>
 SimpleKalmanFilter kfilter(2, 2, 0.01);
-BLESerial<> SerialBLE;
 
 
+#define DEVICE_NAME "Inversa"
 
 #include <Preferences.h>
 
@@ -83,7 +85,9 @@ void setup() {
   while (!Serial); // Wait for USB Serial connection
 
 
-  SerialBLE.begin("ESP32-BLE-Slave");
+  NimBLEDevice::init(DEVICE_NAME);
+  NimBLEDevice::getAdvertising()->setName(DEVICE_NAME);
+  NuSerial.begin(115200);
 
   server.addHandler(&ws);
   

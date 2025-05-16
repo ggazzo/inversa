@@ -18,7 +18,7 @@
 #include "media.h"
 #include "NTPClient.h"
 #include "ArduinoJson.h"
-#include <BLESerial.h>
+
 
 #include <Preferences.h>
 #ifndef MAX_CMD_SIZE
@@ -49,8 +49,7 @@ extern PID_ATune pid_atune;
 char buffer[10];
 
 File file;
-
-extern BLESerial<> SerialBLE;
+#include "NuSerial.hpp";
 
 void startAutoTune();
 
@@ -541,7 +540,7 @@ void readCommandFromSDCard(void) {
 
 void readFromSerials(void) {
     readCommandFromSerial(&Serial);
-    readCommandFromSerial(&SerialBLE);
+    readCommandFromSerial(&NuSerial);
 }
 
 void readCommands(void) {
