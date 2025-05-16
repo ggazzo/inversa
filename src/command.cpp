@@ -312,6 +312,24 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     
     }
+
+    if(strcmp(command, "PREFERENCES") == 0) {
+        (*doc)["type"] = "preferences";
+        (*doc)["kp"] = settings.getKp();
+        (*doc)["ki"] = settings.getKi();
+        (*doc)["kd"] = settings.getKd();
+        (*doc)["pOn"] = settings.getPOn();
+        (*doc)["time"] = settings.getTime();
+
+        (*doc)["hysteresis_degrees_c"] = settings.getHysteresisDegreesC();
+        (*doc)["hysteresis_seconds"] = settings.getHysteresisSeconds();
+        (*doc)["volume_liters"] = settings.getVolumeLiters();
+        (*doc)["power_watts"] = settings.getPowerWatts();
+
+        (*doc)["wifi_ssid"] = settings.getWifiSsid();
+        return;
+    }
+
     if (strcmp(command, "SYNC") == 0) {
         (*doc)["type"] = "sync";
 
@@ -319,23 +337,10 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["target_temperature"] = state.target_temperature_c;
         (*doc)["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
         (*doc)["started"] = state.started;
-        // (*doc)["kp"] = state.kp;
-        // (*doc)["ki"] = state.ki;
-        // (*doc)["kd"] = state.kd;
         (*doc)["time"] = settings.getTime();
-        // (*doc)["hysteresis_degrees_c"] = state.hysteresis_degrees_c;
-        // (*doc)["hysteresis_seconds"] = state.hysteresis_seconds;
-        // (*doc)["volume_liters"] = state.volume_liters;
-        // (*doc)["power_watts"] = state.power_watts;
         (*doc)["target_preparing_time"] = DateTime(state.target_preparing_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
-
-        // (*doc)["confirm_message"] = state.confirm_message;
-        // (*doc)["message"] = state.message;
-        // (*doc)["message_line_2"] = state.message_line_2;
-        // (*doc)["message_line_3"] = state.message_line_3;
         (*doc)["state"] = state.current;
         (*doc)["sd_present"] = state.sd_present;
-        // (*doc)["tuning"] = state.tuning;
 
         return;
     }
