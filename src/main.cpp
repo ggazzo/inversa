@@ -1,10 +1,11 @@
 #include "definitions.h"
 #include "LittleFS.h" 
-#define BLESERIAL_USE_NIMBLE true
 #include <BLESerial.h>
 #include <SimpleKalmanFilter.h>
 SimpleKalmanFilter kfilter(2, 2, 0.01);
 BLESerial<> SerialBLE;
+
+
 
 #include <Preferences.h>
 
@@ -57,8 +58,10 @@ AsyncWebSocket ws("/ws");
 
 WebSocketBroadcastPrint wsPrint(&ws);
 
+#ifdef HAS_DISPLAY
 #include "display_manager.h"
 DisplayManager displayManager;
+#endif
 
 const char* ssid = STASSID;
 const char* password = STAPSK;
@@ -131,8 +134,9 @@ void setup() {
   configureOutputs();
 
   // Initialize display
+  #ifdef HAS_DISPLAY
   displayManager.init();
-
+  #endif
   // Initialize state machine with idle state
   mainTaskMachine.init(&idleState);
 
@@ -167,8 +171,6 @@ extern PID pid;
 void loop()
 {
   mainTaskMachine.run();
-  readCommandFromSerial(&Serial);
-  readCommandFromSerial(&SerialBLE);
 
   #ifdef LED_BUILTIN
   {
@@ -182,16 +184,6 @@ void loop()
   }
   #endif
 
-  {
-    static const int interval = 1000;  // will send topic each 7s
-    static uint32_t timer = millis() + interval;
-
-    if (millis() > timer) {
-      digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
-      timer += interval;
-    }
-  }
-
   #ifdef OTA
     handleOTA();
   #endif
@@ -203,6 +195,8 @@ void loop()
   setOutput(state.output_val);
 
   // Update display
+  #ifdef HAS_DISPLAY
   displayManager.update(state);
   displayManager.refresh();
+  #endif
 }
