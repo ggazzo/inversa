@@ -10,6 +10,7 @@
 #define SENSOR_PIN A1
 #define HEATER_PIN 4
 
+#define PIN_NEOPIXEL 47
 
 
 

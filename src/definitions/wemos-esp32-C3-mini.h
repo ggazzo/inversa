@@ -5,6 +5,8 @@
 
 
 
+#define PIN_NEOPIXEL 7
+
 #define HAS_CUSTOM_SPI_PINS
 
 #define SENSOR_PIN A3
