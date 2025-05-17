@@ -3,10 +3,12 @@
 #include "LittleFS.h" 
 #include "NuSerial.hpp"
 
+#include <Adafruit_NeoPixel.h>
 
-#include <SimpleKalmanFilter.h>
-SimpleKalmanFilter kfilter(2, 2, 0.01);
+// How many internal neopixels do we have? some boards have more than one!
+#define NUMPIXELS        1
 
+Adafruit_NeoPixel pixels(NUMPIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
 #define DEVICE_NAME "Inversa"
 
@@ -29,8 +31,6 @@ SimpleKalmanFilter kfilter(2, 2, 0.01);
   #include <AsyncTCP.h>
   #include <ESPmDNS.h>
 #endif
-
-#include "outputControl.h"
 #include "NTPClient.h"
 WiFiUDP ntpUDP;
 const long utcOffsetInSeconds = - 3 * 60 * 60;
@@ -68,7 +68,7 @@ DisplayManager displayManager;
 const char* ssid = STASSID;
 const char* password = STAPSK;
 
-#include "getTemperature.h"
+#include "modules.h"
 #include "setOutput.h"
 
 MachineState state;
@@ -77,16 +77,12 @@ MachineState state;
     char fileNames[MAX_FILES][30];
 #endif
 
-// the setup function runs once when you press reset or power the board
-extern PID pid;
 
 
 Settings settings;
 void setup() {
 
   Serial.begin(115200);
-  while (!Serial); // Wait for USB Serial connection
-
 
   NimBLEDevice::init(DEVICE_NAME);
   NimBLEDevice::getAdvertising()->setName(DEVICE_NAME);
@@ -111,32 +107,18 @@ void setup() {
   setupOTA();
   #endif
 
-  #ifdef I2C
-  Wire.begin();
-  #endif
-
-  configureTemperatureSensor();
-  configureOutputs();
-
-  // Initialize display
-  #ifdef HAS_DISPLAY
-  displayManager.init();
-  #endif
-  // Initialize state machine with idle state
-  mainTaskMachine.init(&idleState);
-
   server.begin();
 
   Serial.println("\n\nESP32-S3 Mini Starting");
 
-
-  Serial.println("Starting settings");
+  Serial.printf("DEBUG: temperatureSensor pointer BEFORE settings.load() = %p\n", temperatureSensor);
   settings.load();
+  Serial.printf("DEBUG: temperatureSensor pointer AFTER settings.load() = %p\n", temperatureSensor);
 
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
 
-  pid.SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
-  pid.SetSampleTime(settings.getTime());
+  pid->SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
+  pid->SetSampleTime(settings.getTime());
 
 
   Serial.print("Wifi SSID: "); Serial.println(settings.getWifiSsid());
@@ -166,11 +148,16 @@ void setup() {
     }
     Serial.println("RTC is running!");
   }
+
   initializeSDCard();
+
+  temperatureSensor->setup();
+  heater->setup();
+  // Initialize state machine with idle state12345678
+  mainTaskMachine.init(&idleState);
+
 }
 
-// the loop function runs over and over again forever
-extern PID pid;
 void loop()
 {
   mainTaskMachine.run();
@@ -178,8 +165,17 @@ void loop()
   #ifdef LED_BUILTIN
   {
     static const int interval = 1000;  // will send topic each 7s
+    static bool led_on = false;
     static uint32_t timer = millis() + interval;
     if (millis() > timer) {
+      if(led_on) {
+        pixels.fill(0xFF0000);
+      }else {
+        pixels.fill(0x000000);
+      }
+      pixels.show();
+      led_on = !led_on;
+      timer += interval;
       pinMode(LED_BUILTIN, OUTPUT);
       digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
       timer += interval;
@@ -193,13 +189,5 @@ void loop()
 
   ws.cleanupClients();
 
-  state.current_temperature_c = kfilter.updateEstimate(getTemperature());
-  outputControl(state);
-  setOutput(state.output_val);
-
-  // Update display
-  #ifdef HAS_DISPLAY
-  displayManager.update(state);
-  displayManager.refresh();
-  #endif
+  
 }

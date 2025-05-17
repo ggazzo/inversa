@@ -49,10 +49,10 @@ class Settings {
 
         String wifiSsid = "";
         String wifiPassword = "";
-        int kp = 2;
-        int ki = 5;
-        int kd = 1;
-        int pOn = 1000;
+        float kp = 2;
+        float ki = 5;
+        float kd = 1;
+        float pOn = 1000;
         int time = 1000;
         int volumeLiters = 70;
         int powerWatts = 3200;

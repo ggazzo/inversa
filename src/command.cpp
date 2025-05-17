@@ -30,6 +30,7 @@
 
 extern Settings settings;
 
+#include "modules.h"
 
 extern PreparingStateMachine preparingState;
 extern WaitForTimerStateMachine timerState;
@@ -40,7 +41,8 @@ extern RTC_DS1307 rtc;
 #endif
 
 #include <PID_v1.h>
-extern PID pid;
+
+extern PID *pid;
 
 #include <PID_AutoTune_v0.h>
 extern PID_ATune pid_atune;
@@ -473,8 +475,8 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         settings.setPOn(pOn);
         settings.setTime(time);
 
-        pid.SetTunings(kp, ki, kd, pOn);
-        pid.SetSampleTime(time);
+        pid->SetTunings(kp, ki, kd, pOn);
+        pid->SetSampleTime(time);
         return;
     }
 
