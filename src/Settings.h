@@ -38,7 +38,7 @@ class Settings {
 
         // Save settings to preferences
         virtual void save();
-
+        virtual void clear();
         virtual void load();
         
 

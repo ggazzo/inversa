@@ -142,3 +142,10 @@ void Settings::setPowerWatts(float powerWatts) {
         isDirty = true;
     }
 }
+
+void Settings::clear() {
+    preferences.begin(PREFERENCES_KEY, false);
+    preferences.clear();
+    preferences.end();
+    load();
+}
