@@ -312,6 +312,10 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     
     }
+    if(strcmp(command, "CLEAR_PREFERENCES") == 0) {
+        settings.clear();
+        return;
+    }
 
     if(strcmp(command, "PREFERENCES") == 0) {
         (*doc)["type"] = "preferences";
