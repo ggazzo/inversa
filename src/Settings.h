@@ -52,7 +52,7 @@ class Settings {
         float kp = 2;
         float ki = 5;
         float kd = 1;
-        float pOn = 1000;
+        float pOn = 1;
         int time = 1000;
         int volumeLiters = 70;
         int powerWatts = 3200;
