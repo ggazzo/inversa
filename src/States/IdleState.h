@@ -11,7 +11,7 @@ class IdleStateMachine : public State {
 
    public:
       IdleStateMachine() : State("IdleStateMachine") {}
-      virtual ~IdleStateMachine() = default;
+
 
       void enter() override {
         Serial.println("[Idle]");
@@ -20,8 +20,5 @@ class IdleStateMachine : public State {
       }
       void run() override {
           readCommands();
-      }
-
-      void exit() override {
       }
 };

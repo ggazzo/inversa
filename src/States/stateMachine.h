@@ -20,7 +20,6 @@ class NopState : public State {
 };
 
 extern IdleStateMachine idleState;
-extern NopState nopState;
 extern WaitForTemperatureStateMachine waitForTemperatureState;
 extern PreparingStateMachine preparingState;
 extern WaitForTimerStateMachine timerState;

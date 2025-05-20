@@ -1,6 +1,5 @@
 #include "stateMachine.h"
 
-NopState nopState;
 IdleStateMachine idleState;
 WaitForTemperatureStateMachine waitForTemperatureState;
 PreparingStateMachine preparingState;
