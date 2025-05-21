@@ -16,7 +16,8 @@ enum StateType {
     WAIT_TIMER,
     WAIT_CONFIRM,
     PREPARING,
-    IDLE
+    IDLE,
+    TUNING
 };
 
 #ifndef CURRENT_VERSION

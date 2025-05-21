@@ -54,7 +54,6 @@ char buffer[10];
 File file;
 #include "NuSerial.hpp";
 
-void startAutoTune();
 
 void _executeCommand(const char *command, Print *output, JsonDocument *doc);
 
@@ -467,7 +466,14 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "TUNING");
 
     if (ptr == command) {
-        startAutoTune();
+        controller->startAutotune();
+        return;
+    }
+
+    ptr = strstr(command, "STOP_TUNING");
+
+    if (ptr == command) {
+        controller->stopAutotune();
         return;
     }
 
@@ -602,13 +608,3 @@ void skipStep() {
 
     controller->skip();
 }
-
-
-void startAutoTune() {
-    pid_atune.SetOutputStep(100);
-    pid_atune.SetLookbackSec(100);
-    pid_atune.SetNoiseBand(.05);
-    pid_atune.SetControlType(1);  // PI or PID mode
-    state.tuning = true;
-  }
-  

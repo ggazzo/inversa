@@ -5,3 +5,4 @@ WaitForTemperatureStateMachine waitForTemperatureState;
 PreparingStateMachine preparingState;
 WaitForTimerStateMachine timerState;
 ConfirmStateMachine confirmState;
+TuningStateMachine tuningState;
