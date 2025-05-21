@@ -2,6 +2,7 @@
 #include "definitions.h"
 #include "LittleFS.h" 
 #include "NuSerial.hpp"
+#include "api.h"
 
 #include <Adafruit_NeoPixel.h>
 
@@ -88,6 +89,8 @@ void setup() {
     executeCommand(reinterpret_cast<const char *>(data), &wsPrint);
   });
 
+  // Setup REST API endpoints
+  setupAPI(&server, controller);
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("Inversa", "12345678");
