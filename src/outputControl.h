@@ -5,7 +5,6 @@
 #include "state.h"
 #include "setOutput.h"
 #include <PID_v1.h>
-#include <PID_AutoTune_v0.h>
 
 
 void outputControl(MachineState &machineState);

@@ -46,9 +46,6 @@ extern RTC_DS1307 rtc;
 
 extern PID *pid;
 
-#include <PID_AutoTune_v0.h>
-extern PID_ATune pid_atune;
-
 char buffer[10];
 
 File file;

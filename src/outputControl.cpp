@@ -23,13 +23,6 @@ extern Settings settings;
 
 extern MachineState state;
 
-PID_ATune pid_atune(&state.current_temperature_c, &state.output_val);
-
-
-// float Input, Output, Setpoint = 80, Kp, Ki, Kd; // sTune
-// sTune tuner = sTune(&Input, &Output, tuner.ZN_PID, tuner.directIP, tuner.printOFF);
-
-
 struct HeatLossParams {
   float diameter;     // Diameter of the vessel (m)
   float height;       // Height of the vessel (m)
