@@ -16,11 +16,6 @@ HeaterSSR::HeaterSSR(TemperatureSensor *temperatureSensor, PID *pid, uint8_t pin
 
 void HeaterSSR::setup() {
     xTaskCreate(monitorTask, "HeaterSSR::monitor", configMINIMAL_STACK_SIZE * 4, this, 1, &taskHandle);
-    #define PWM_CHANNEL 0       // LEDC channel (0-15)
-    #define PWM_RESOLUTION 7    // PWM resolution in bits (e.g., 8 bits = 0-255 duty cycle)
-    #define PWM_FREQUENCY 120   // PWM frequency in Hz
-    // ledcSetup(PWM_CHANNEL, PWM_FREQUENCY, PWM_RESOLUTION);  // Configure channel
-    // ledcAttachPin(pin, PWM_CHANNEL);  // Attach the channel to the GPIO to be controlled
     pinMode(pin, OUTPUT);
 }
 
@@ -28,6 +23,7 @@ void HeaterSSR::loop() {
     if (this->input - this->targetTemperature > LOW_TEMP_BAND) {
         pid->SetMode(MANUAL);
         *output = 255;
+        digitalWrite(pin, HIGH);
         return;
     }
 
@@ -35,25 +31,27 @@ void HeaterSSR::loop() {
     if (this->input > this->targetTemperature + HIGH_TEMP_BAND) {
         pid->SetMode(MANUAL);
         *output = 0;
+        digitalWrite(pin, LOW);
         return;
     }
-
 
     pid->SetMode(AUTOMATIC);
     pid->Compute();
 
+    uint32_t now = millis();
 
-    // lets help our PID to reach the target temperature
-    // if we know the volume, the power and the target temperature
-    // we can at least guess the minimum in watts to keep the temperature
-    // at the target temperature but to avoid any overheating lets slightly reduce the watts
+    static uint32_t windowStartTime, nextSwitchTime;
 
-    // double watts = calculateMinimumPower(settings.getVolumeLiters()/ 1000, calculateSurfaceAreaFromVolume(settings.getVolumeLiters()/ 1000, .30) , state.target_temperature_c, 25);
+    if ((now - windowStartTime) > 1000) {
+        windowStartTime += 1000;
+    }
 
-    // int to_PWM = map(watts * .7, 0, settings.getPowerWatts(), 0, 255);
-    // machineState.output_val = constrain(MAX(machineState.output_val, to_PWM), 0, 255);
+    if ((now - windowStartTime) < 1000 * (*output / 255.0)) {
+        digitalWrite(pin, HIGH);
+    } else {
+        digitalWrite(pin, LOW);
+    }
 
-    analogWrite(pin, *output);
     this->on_change();
 }
 
@@ -61,6 +59,6 @@ void HeaterSSR::loop() {
     HeaterSSR *self = (HeaterSSR *)pvParameters;
     while (true) {
         self->loop();
-        vTaskDelay(pdMS_TO_TICKS(100));
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }

@@ -25,11 +25,17 @@ public:
             state = &idle;
         }
 
-    void init(State *state) {
-        this->state = state;
-        this->previous_state = state;
-        state->enter();
-        state->run();
+        StateMachine(State *state) : state(state){}
+
+        StateMachine(State *state, void (*on_change)())
+            : on_change(on_change), state(state){}
+
+        void init(State *state)
+        {
+            this->state = state;
+            this->previous_state = state;
+            state->enter();
+            state->run();
     }
 
     void setState(State *state) {

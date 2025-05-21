@@ -1,14 +1,19 @@
 #include "definitions.h"
 
-#include <NTC_Thermistor_CustomFormula_ESP32.h>
+#include <PID_v1.h>
 
+#include <NTC_Thermistor_CustomFormula_ESP32.h>
 #include <Thermistor.h>
 #include <AverageThermistor.h>
 
-#include "Temperature.h"
-#include "Temperature/NTC_Sensor_Temperature.h"
-#include "Heater.h"
-#include "HeaterSSR.h"
+#include "Components/Temperature.h"
+#include "Components/Heater.h"
+#include "Components/Relay.h"
+
+#include "Controller/PeripheralController.h"
+#include "Controller/MainController.h"
+
+#include "state.h"
 
 /**
   How many readings are taken to determine a mean temperature.
@@ -24,6 +29,9 @@
 #define DELAY_TIME 1
 
 // Declare temperatureSensor as extern so it can be used in other files
-extern Heater *heater;
 extern PID *pid;
-extern TemperatureSensor *temperatureSensor;
+
+
+extern Settings settings;
+extern MainController<StateType> *controller;
+extern CommunicationPeripherals *communicationPeripherals;

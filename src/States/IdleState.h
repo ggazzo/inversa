@@ -14,8 +14,7 @@ class IdleStateMachine : public State {
 
 
       void enter() override {
-        Serial.println("[Idle]");
-        state.current = StateType::IDLE;
+        controller->setState(StateType::IDLE);
         handlePowerLoss();
       }
       void run() override {

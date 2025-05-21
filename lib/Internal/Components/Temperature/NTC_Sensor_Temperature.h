@@ -1,7 +1,7 @@
 #ifndef NTC_SENSOR_TEMPERATURE_H
 #define NTC_SENSOR_TEMPERATURE_H
 
-#include "Temperature.h"
+#include "Components/Temperature.h"
 
 #include <NTC_Thermistor_CustomFormula_ESP32.h>
 

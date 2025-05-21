@@ -18,7 +18,6 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 #include "Arduino.h"
 #include <Wire.h>
 
-#include <WiFiUdp.h>
 #define SKETCH_VERSION "0.0.1"
 #include "CountDown.h"
 #if defined(ESP8266)
@@ -31,10 +30,7 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
   #include <AsyncTCP.h>
   #include <ESPmDNS.h>
 #endif
-#include "NTPClient.h"
-WiFiUDP ntpUDP;
-const long utcOffsetInSeconds = - 3 * 60 * 60;
-NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
+
 
 #include <ESPAsyncWebServer.h>
 
@@ -51,7 +47,6 @@ NTPClient timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds);
 
 #include "ws.h"
 
-RTC_DS1307 rtc;
 #endif
 
 CountDown countDown(CountDown::MINUTES);
@@ -77,9 +72,6 @@ MachineState state;
     char fileNames[MAX_FILES][30];
 #endif
 
-
-
-Settings settings;
 void setup() {
 
   Serial.begin(115200);
@@ -109,16 +101,9 @@ void setup() {
 
   server.begin();
 
-  Serial.println("\n\nESP32-S3 Mini Starting");
-
-  Serial.printf("DEBUG: temperatureSensor pointer BEFORE settings.load() = %p\n", temperatureSensor);
-  settings.load();
-  Serial.printf("DEBUG: temperatureSensor pointer AFTER settings.load() = %p\n", temperatureSensor);
+  controller->setup();
 
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
-
-  pid->SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
-  pid->SetSampleTime(settings.getTime());
 
 
   Serial.print("Wifi SSID: "); Serial.println(settings.getWifiSsid());
@@ -135,32 +120,13 @@ void setup() {
 
   MDNS.begin("inversa");
 
-  if (rtc.begin()) {
-    if (!rtc.isrunning()) {
-      timeClient.begin();
-      if(timeClient.update()){
-        rtc.adjust(DateTime(timeClient.getEpochTime()));
-      }
-      else
-      {
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-      }
-    }
-    Serial.println("RTC is running!");
-  }
-
   initializeSDCard();
-
-  temperatureSensor->setup();
-  heater->setup();
-  // Initialize state machine with idle state12345678
-  mainTaskMachine.init(&idleState);
 
 }
 
 void loop()
 {
-  mainTaskMachine.run();
+  controller->loop();
 
   #ifdef LED_BUILTIN
   {

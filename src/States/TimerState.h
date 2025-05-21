@@ -3,10 +3,7 @@
 #include <Arduino.h>
 #include <CountDown.h>
 
-#include "IdleState.h"
-
 #include "timer.h"
-#include "IdleState.h"
 #include "media.h"
 
 
@@ -18,17 +15,15 @@ class WaitForTimerStateMachine : public State {
       WaitForTimerStateMachine() : State("WaitForTimerStateMachine") {}
       virtual ~WaitForTimerStateMachine() = default;
       void enter() override {
-        state.current = StateType::WAIT_TIMER;
+        controller->setState(StateType::WAIT_TIMER);
         handlePowerLoss();
       }
 
 
       void run() override {
           if(timer.isFinished()) {
-              Serial.println("Timer finished");
-              mainTaskMachine.setState(&idleState);
+              controller->skip();
           }
-          // menuTimer.setCurrentValue(timer.timeRemaining()/60);
       }
 
       void exit() override {

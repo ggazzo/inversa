@@ -1,4 +1,4 @@
-#include "Settings.h"
+#include "Components/Settings.h"
 
 #define P_ON_M 0
 #define P_ON_E 1
@@ -11,10 +11,7 @@ Settings::Settings() {
 
 
 void Settings::load() {
-    Serial.println("Opening preferences");
-    if(!preferences.begin(PREFERENCES_KEY, false)){
-        Serial.println("Failed to open preferences");
-    }
+    preferences.begin(PREFERENCES_KEY, false);
 
     kp = preferences.getFloat("kp", 2.0);
     ki = preferences.getFloat("ki", 5.0);

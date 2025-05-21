@@ -18,11 +18,13 @@
 #include "NTPClient.h"
 #include "ArduinoJson.h"
 
-
-#include "Settings.h"
+#include "Components/Settings.h"
 #ifndef MAX_CMD_SIZE
 #define MAX_CMD_SIZE 128
 #endif
+
+
+#include "modules.h"
 
 #ifdef BUZZER_PIN
 #include <EasyBuzzer.h>
@@ -217,45 +219,37 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         }
         ptr = strstr(command, "WAIT_TEMPERATURE");
         if (ptr == command) {
-            waitUntilTemperatureReached(atof(params));
+            controller->setTargetTemperatureAndWait(atof(params));
             return;
         }
         ptr = strstr(command, "ENTER_CONFIRM");
         if (ptr == command) {
             if(params == nullptr) {
-                mainTaskMachine.setState(&confirmState);
+                controller->waitConfirmation();
                 return;
             }
             strcpy(state.confirm_message, params);
-            mainTaskMachine.setState(&confirmState);
+            controller->waitConfirmation();
             return;
         }
 
-                ptr = strstr(command, "PREPARE_RELATIVE");
-
+        // PREPARE_RELATIVE 25 60
+        ptr = strstr(command, "PREPARE_RELATIVE");
         if (ptr == command) {
-
-            output->print("PREPARE_RELATIVE params: ");
-            output->println(params);
-
             float targetTemp = atof(strtok(params, " "));
-            unsigned long desiredTimeHours = atol(strtok(NULL, " "));
-            prepareTemperature(targetTemp, desiredTimeHours, settings.getVolumeLiters(), settings.getPowerWatts());
+            unsigned long minutes = atol(strtok(NULL, " "));
+
+            controller->prepareTemperature(targetTemp, minutes);
         }
 
-        ptr = strstr(command, "PREPARE_ABSOLUTE");
-
         // PREPARE_ABSOLUTE 45 2024/10/21T23:25:00
-
-        // PREPARE_RELATIVE 25 60
+        ptr = strstr(command, "PREPARE_ABSOLUTE");
         if (ptr == command) {
-
-            
-            
             float targetTemp = atof(strtok(params, " "));
             char isoDate[20];
             strcpy(isoDate, strtok(NULL, " "));
-            prepareTemperature(targetTemp, (DateTime(isoDate).secondstime() - rtc.now().secondstime())/ 60, settings.getVolumeLiters(), settings.getPowerWatts());
+            // prepareTemperature(targetTemp, (DateTime(isoDate).secondstime() - rtc.now().secondstime())/ 60, settings.getVolumeLiters(), settings.getPowerWatts());
+            controller->prepareTemperature(targetTemp, isoDate);
         }
 
     }
@@ -285,7 +279,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
 
 
     if (strcmp(command, "CONFIRM") == 0) {
-        mainTaskMachine.setState(&idleState);
+        controller->confirm();
         return;
     }
     
@@ -343,7 +337,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["started"] = state.started;
         (*doc)["time"] = settings.getTime();
         (*doc)["target_preparing_time"] = DateTime(state.target_preparing_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
-        (*doc)["state"] = state.current;
+        (*doc)["state"] = controller->getState();
         (*doc)["sd_present"] = state.sd_present;
 
         return;
@@ -404,13 +398,13 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "POWER");
 
     if (ptr == command) {
-        settings.setPowerWatts(atof(params));
+        communicationPeripherals->setPower(atof(params));   
         return;
     }
 
     ptr = strstr(command, "VOLUME");
     if (ptr == command) {
-        settings.setVolumeLiters(atof(params));
+        communicationPeripherals->setVolume(atof(params));
         return;
     }
 
@@ -425,7 +419,6 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         settings.setHysteresisDegreesC(atof(params));
         return;
     }
-
 
     ptr = strstr(command, "REMAINING");
     if (ptr == command) {
@@ -450,7 +443,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "TEMPERATURE");
 
     if (ptr == command) {
-        setTargetTemperature(atof(params));
+        controller->setTargetTemperature(atof(params));
         return;
     }
 
@@ -467,20 +460,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "PID");
     // PID 980 0.05 230 1000
     if (ptr == command) {
-        float kp = atof(strtok(params, " "));
-        float ki = atof(strtok(NULL, " "));
-        float kd = atof(strtok(NULL, " "));
-        float pOn = atof(strtok(NULL, " "));
-        float time = atoi(strtok(NULL, " "));
-
-        settings.setKp(kp);
-        settings.setKi(ki);
-        settings.setKd(kd);
-        settings.setPOn(pOn);
-        settings.setTime(time);
-
-        pid->SetTunings(kp, ki, kd, pOn);
-        pid->SetSampleTime(time);
+        communicationPeripherals->setPidParameters(atof(strtok(params, " ")), atof(strtok(NULL, " ")),atof(strtok(NULL, " ")),atof(strtok(NULL, " ")), atoi(strtok(NULL, " ")));
         return;
     }
 
@@ -556,33 +536,7 @@ void abortOperation()
     setEstimatedTime(0);
     state.started = false;
     removeStateFromPowerLoss();
-    mainTaskMachine.setState(&idleState);
-}
-
-void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes, float volume_liters, float power_watts) {
-    preparingState.volume_liters = volume_liters;
-    preparingState.power_watts = power_watts;
-    preparingState.target_temperature_c = targetTemperature_celsius;
-
-    preparingState.time_seconds = desiredTime_minutes * 60;
-    Serial.println(desiredTime_minutes);
-    Serial.println(preparingState.time_seconds);
-
-    #ifdef USE_RTC 
-        state.target_preparing_time_seconds = rtc.now().secondstime() + preparingState.time_seconds;
-    #endif
-
-
-    mainTaskMachine.setState(&preparingState);
-}
-
-void setTargetTemperature(float target_temperature_c) {
-    state.target_temperature_c = target_temperature_c;
-}
-
-void waitUntilTemperatureReached(float target_temperature_c) {
-    setTargetTemperature(target_temperature_c);
-    mainTaskMachine.setState(&waitForTemperatureState);
+    controller->abort();
 }
 
 void startTimer(unsigned long duration_seconds) {
@@ -646,7 +600,7 @@ void skipStep() {
         return;
     }
 
-    mainTaskMachine.setState(&idleState);
+    controller->skip();
 }
 
 

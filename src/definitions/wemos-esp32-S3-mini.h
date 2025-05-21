@@ -26,13 +26,13 @@
 #define SDA 35
 #define SCL 36
 
-
+#define PUMP_PIN 16
 
 
 
 // Sensors | SPI
 // { 3 2 } | { 1 0 4 5 }
 // Serial    | I2C      | ONEWIRE  | FREE
-// { 21 20 } | { 10 8 } | {7}      | 6
+// { 21 20 } | { 10 8 } | {18}      | 16
 
 #endif

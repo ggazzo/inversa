@@ -2,23 +2,10 @@
 #define WAIT_FOR_TEMPERATURE_STATE_H
 
 #include <Arduino.h>
-#include <StateMachine.h>
 #include <CountDown.h>
-#include "States/IdleState.h"
 #include "calc.h"
-#include "state.h"
+// #include "state.h"
 #include "media.h"
-#include "Settings.h"
-
-extern MachineState state;
-
-extern IdleStateMachine idleState;
-
-extern StateMachine mainTaskMachine;
-
-extern MachineState state;
-
-extern Settings settings;
 
 /**
  * Heating process can take a long time, so maybe you want to prepare your equipment
@@ -36,23 +23,20 @@ class WaitForTemperatureStateMachine : public State {
     virtual ~WaitForTemperatureStateMachine() = default;
       bool is_in_hysteresis = false;
       float elapsed_time_after_hysteresis_seconds = 0;
-      
-      double * current_temperature_c;
+      float *current_temperature_c;
 
    void enter() override {
-      Serial.println("Entering WaitForTemperatureStateMachine");
-     current_temperature_c = &state.current_temperature_c;
-     state.current = StateType::WAIT_TEMPERATURE;
+     controller->setState(StateType::WAIT_TEMPERATURE);
      handlePowerLoss();
    }
 
    void run() override {
       float current_time_seconds = MILLIS_TO_SECONDS(millis());
-      float temperature_diff_c = abs(*current_temperature_c - state.target_temperature_c);
+      float temperature_diff_c = abs(controller->getTemperature() - controller->getTargetTemperature());
 
       if (is_in_hysteresis == false)
      {
-       if (temperature_diff_c <= settings.getHysteresisDegreesC())
+       if (temperature_diff_c <= controller->getHysteresisDegreesC())
        {
          is_in_hysteresis = true;
          elapsed_time_after_hysteresis_seconds = current_time_seconds;
@@ -60,15 +44,15 @@ class WaitForTemperatureStateMachine : public State {
        return;
      }
 
-    if (temperature_diff_c > settings.getHysteresisDegreesC())
+    if (temperature_diff_c > controller->getHysteresisDegreesC())
     {
        elapsed_time_after_hysteresis_seconds = current_time_seconds;
        return;
     }
 
-     if (current_time_seconds > elapsed_time_after_hysteresis_seconds + settings.getHysteresisSeconds())
+     if (current_time_seconds > elapsed_time_after_hysteresis_seconds + controller->getHysteresisSeconds())
      {
-       mainTaskMachine.setState(&idleState);
+        controller->skip();
        return;
      }
    }

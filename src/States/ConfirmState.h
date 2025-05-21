@@ -12,7 +12,7 @@ class ConfirmStateMachine : public State {
       virtual ~ConfirmStateMachine() = default;
 
       void enter() override {
-        state.current = StateType::WAIT_CONFIRM;
+        controller->setState(StateType::WAIT_CONFIRM);
       }
       void run() override {
           readCommands();

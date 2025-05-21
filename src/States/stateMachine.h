@@ -7,17 +7,8 @@
 #include "IdleState.h"
 #include "TimerState.h"
 #include "ConfirmState.h"
+#include "WaitForTemperatureState.h"
 
-
-class NopState : public State {
-
-    public:
-        NopState() : State("NopState") {}
-        virtual ~NopState() = default;
-
-        void enter() override {
-        }
-};
 
 extern IdleStateMachine idleState;
 extern WaitForTemperatureStateMachine waitForTemperatureState;

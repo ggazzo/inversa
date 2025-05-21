@@ -4,16 +4,11 @@
 #include <Arduino.h>
 #include <StateMachine.h>
 #include <CountDown.h>
-#include "WaitForTemperatureState.h"
 #include "media.h"
-#include "state.h"
-
 #include "calc.h"
 
+#include "modules.h"
 
-extern StateMachine mainTaskMachine;
-extern MachineState state;
-extern WaitForTemperatureStateMachine waitForTemperatureState;
 /**
  * Heating process can take a long time, so maybe you want to prepare your equipment
  * to be at x time at y temperature
@@ -34,40 +29,29 @@ class PreparingStateMachine : public State {
       float volume_liters = 0;
       float power_watts = 0;
       float target_temperature_c = 0;
-      double * current_temperature_c;
-      
-      bool done = false;
-   
+
       void enter() override {
 
          if (time_seconds){
             countDown.start(time_seconds);
          }
-         current_temperature_c = &state.current_temperature_c;
 
-         state.current = StateType::PREPARING;
+         controller->setState(StateType::PREPARING);
+
          handlePowerLoss();
       }
       void run() override {
-
-         if(done){
-            return;
-         }
-
          if(countDown.isStopped())
          {
-            mainTaskMachine.setState(&idleState);
+            controller->skip();
             return;
          }
 
-         if(countDown.remaining() <= calculateHeatingTime_seconds(volume_liters, power_watts, *current_temperature_c, target_temperature_c))
+         if(countDown.remaining() <= calculateHeatingTime_seconds(volume_liters, power_watts, controller->getTemperature(), target_temperature_c))
          {
-            state.target_temperature_c = target_temperature_c;
-            if(target_temperature_c == state.target_temperature_c){
-               return;
-            }
+            controller->setTargetTemperature(target_temperature_c);
          } else {
-            state.target_temperature_c = 0;
+            controller->setTargetTemperature(0);
          }
       }
 

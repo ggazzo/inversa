@@ -5,4 +5,3 @@ WaitForTemperatureStateMachine waitForTemperatureState;
 PreparingStateMachine preparingState;
 WaitForTimerStateMachine timerState;
 ConfirmStateMachine confirmState;
-StateMachine mainTaskMachine([]() {});

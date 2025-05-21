@@ -1,7 +1,7 @@
 #include "outputControl.h"
 #include <Arduino.h>
 // #include <sTune.h>
-#include "Settings.h"
+#include "Components/Settings.h"
 
 #ifndef MAX
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
@@ -99,49 +99,4 @@ float calculateMinimumPower(float volume, float surfaceArea, float T_set, float 
   // U (W/m²·K) depends on insulation, default value assumes moderate insulation
   float P_maintain = U * surfaceArea * (T_set - T_ambient);
   return P_maintain; // Minimum watts required
-}
-
-void outputControl(MachineState &machineState) {
-
-
-  // if (machineState.tuning) {
-  //   // Run AutoTune
-  //   if (pid_atune.Runtime()) { // AutoTune complete
-  //       settings.setKp(pid_atune.GetKp());
-  //       settings.setKi(pid_atune.GetKi());
-  //       settings.setKd(pid_atune.GetKd());
-  //       pid.SetTunings(settings.getKp(), settings.getKi(), settings.getKd(), P_ON_M);
-  //       machineState.tuning = false;
-  //   }
-  //   return;
-  // }
-
-  // if (machineState.target_temperature_c  - machineState.current_temperature_c > LOW_TEMP_BAND) {
-  //   pid.SetMode(MANUAL);
-  //   machineState.output_val = 255;
-  //     return;
-  // }
-
-  // // second case, the temperature is too high
-  // if (machineState.current_temperature_c > machineState.target_temperature_c + HIGH_TEMP_BAND) {
-  //   pid.SetMode(MANUAL);
-  //   machineState.output_val = 0;
-  //     return;
-  // }
-
-
-  // pid.SetMode(AUTOMATIC);
-  // pid.Compute();
-
-
-  // // lets help our PID to reach the target temperature
-  // // if we know the volume, the power and the target temperature
-  // // we can at least guess the minimum in watts to keep the temperature
-  // // at the target temperature but to avoid any overheating lets slightly reduce the watts
-
-  // double watts = calculateMinimumPower(settings.getVolumeLiters()/ 1000, calculateSurfaceAreaFromVolume(settings.getVolumeLiters()/ 1000, .30) , state.target_temperature_c, 25);
-
-  // int to_PWM = map(watts * .7, 0, settings.getPowerWatts(), 0, 255);
-  // machineState.output_val = constrain(MAX(machineState.output_val, to_PWM), 0, 255);
-
 }

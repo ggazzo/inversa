@@ -1,8 +1,10 @@
 #ifndef HEATER_SSR_H
 #define HEATER_SSR_H
 #include <Arduino.h>
-#include "Heater.h"
-#include "Temperature.h"
+
+#include "Components/Heater.h"
+#include "Components/Temperature.h"
+
 #include <PID_v1.h>
 
 class HeaterSSR : public Heater {
