@@ -75,7 +75,6 @@ MachineState state;
 void setup() {
 
   Serial.begin(115200);
-
   NimBLEDevice::init(DEVICE_NAME);
   NimBLEDevice::getAdvertising()->setName(DEVICE_NAME);
   NuSerial.begin(115200);
@@ -89,8 +88,8 @@ void setup() {
     executeCommand(reinterpret_cast<const char *>(data), &wsPrint);
   });
 
-  WiFi.mode(WIFI_AP_STA);
 
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("Inversa", "12345678");
 
 
@@ -112,42 +111,17 @@ void setup() {
     // check if is ther any ssid in preferences
     while (WiFi.status() != WL_CONNECTED && settings.getWifiSsid().length() > 0) {
       delay(500);
-      Serial.println("Connecting to WiFi: " + String(ssid));
     }
-    Serial.println("Connected to the WiFi network");
-    Serial.println(WiFi.localIP());
   }
 
   MDNS.begin("inversa");
 
   initializeSDCard();
-
 }
 
 void loop()
 {
   controller->loop();
-
-  #ifdef LED_BUILTIN
-  {
-    static const int interval = 1000;  // will send topic each 7s
-    static bool led_on = false;
-    static uint32_t timer = millis() + interval;
-    if (millis() > timer) {
-      if(led_on) {
-        pixels.fill(0xFF0000);
-      }else {
-        pixels.fill(0x000000);
-      }
-      pixels.show();
-      led_on = !led_on;
-      timer += interval;
-      pinMode(LED_BUILTIN, OUTPUT);
-      digitalWrite(LED_BUILTIN, digitalRead(LED_BUILTIN) ^ 1);
-      timer += interval;
-    }
-  }
-  #endif
 
   #ifdef OTA
     handleOTA();
