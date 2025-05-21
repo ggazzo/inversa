@@ -6,6 +6,7 @@
 #include "Components/Temperature.h"
 
 #include <PID_v1.h>
+#include <sTune.h>
 
 class HeaterSSR : public Heater {
     public:
@@ -14,16 +15,22 @@ class HeaterSSR : public Heater {
         void loop() override;
         void setTargetTemperature(float targetTemperature) override { *this->targetTemperature = targetTemperature; }
         float getTargetTemperature() override { return *this->targetTemperature; }
+        void startAutotune() override;
+        void stopAutotune() override;
         PID *pid;
     private:
         uint8_t pin;
         TemperatureSensor *temperatureSensor;
         static void monitorTask(void *pvParameters);
-
+        void handleAutotune();
 
         double * targetTemperature;
         double * output;
         double * input;
+        bool isAutotuning;
+        sTune tuner;
+
+        float kp, ki, kd = 50;
 
     protected:
         xTaskHandle taskHandle;

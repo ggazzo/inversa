@@ -107,3 +107,11 @@ float LocalController::getHysteresisDegreesC() {
 float LocalController::getHysteresisSeconds() {
     return this->settings->getHysteresisSeconds();
 }
+
+void LocalController::startAutotune() {
+    this->communicationPeripherals->startAutotune();
+}
+
+void LocalController::stopAutotune() {
+    this->communicationPeripherals->stopAutotune();
+}

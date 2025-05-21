@@ -33,6 +33,10 @@ class LocalController : public MainController<StateType> {
         float getPower() override;
         float getHysteresisDegreesC() override;
         float getHysteresisSeconds() override;
+
+        void startAutotune() override;
+        void stopAutotune() override;
+
         StateType getState() override;
 
 

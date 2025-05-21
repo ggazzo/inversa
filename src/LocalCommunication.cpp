@@ -3,7 +3,7 @@
 LocalCommunication::LocalCommunication() {
 }
 
-LocalCommunication::LocalCommunication(temp_read_callback_t tempReadCallback, pid_parameters_callback_t pidParametersCallback, volume_callback_t volumeCallback, power_callback_t powerCallback) {
+LocalCommunication::LocalCommunication(temp_read_callback_t tempReadCallback, pid_parameters_callback_t pidParametersCallback, volume_callback_t volumeCallback, power_callback_t powerCallback, autotune_callback_t autotuneCallback, stop_autotune_callback_t stopAutotuneCallback) {
     this->tempReadCallback = tempReadCallback;
     this->pidParametersCallback = pidParametersCallback;
     this->volumeCallback = volumeCallback;
@@ -37,19 +37,14 @@ void LocalCommunication::setPower(float power) {
     }
 }
 
-void LocalCommunication::setTempReadCallback(temp_read_callback_t callback) {
-    tempReadCallback = callback;
+void LocalCommunication::startAutotune() {
+    if (autotuneCallback) {
+        autotuneCallback();
+    }
 }
 
-void LocalCommunication::setPidParametersCallback(pid_parameters_callback_t callback) {
-    pidParametersCallback = callback;
-}
-
-
-void LocalCommunication::setVolumeCallback(volume_callback_t callback) {
-    volumeCallback = callback;
-}
-
-void LocalCommunication::setPowerCallback(power_callback_t callback) {
-    powerCallback = callback;
+void LocalCommunication::stopAutotune() {
+    if (stopAutotuneCallback) {
+        stopAutotuneCallback();
+    }
 }

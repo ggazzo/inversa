@@ -46,6 +46,9 @@ class MainController : public Controller {
         virtual float getTargetTemperature() = 0;
         virtual float getVolume() = 0;
         virtual float getPower() = 0;
+
+        virtual void startAutotune() = 0;
+        virtual void stopAutotune() = 0;
         virtual T getState() = 0;
 
     protected:

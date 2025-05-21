@@ -9,6 +9,9 @@ class Heater : public Base {
         virtual void setTargetTemperature(float targetTemperature) = 0;
         virtual float getTargetTemperature() = 0;
 
+        virtual void startAutotune() = 0;
+        virtual void stopAutotune() = 0;
+
 };
 
 #endif

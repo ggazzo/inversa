@@ -94,6 +94,12 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
   },
   [](float power) {
     settings.setPowerWatts(power);
+  },
+  []() {
+    heater->startAutotune();
+  },
+  []() {
+    heater->stopAutotune();
   }
 );
 
