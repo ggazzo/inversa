@@ -197,6 +197,7 @@
         >
           List Files
         </button>
+        <button id="getPreferencesButton" style="margin-left: 10px; background-color: #fd7e14;">Show Preferences</button>
         <!-- Add more specific command buttons as needed -->
       </div>
 
@@ -219,6 +220,89 @@
             border-radius: 4px;
           "
         />
+      </div>
+
+      <details id="preferencesSection" style="margin-top: 20px;">
+        <summary
+          style="
+            font-weight: bold;
+            cursor: pointer;
+            padding: 5px;
+            background-color: #e9ecef; /* Slightly different background for summary */
+            border: 1px solid #ccc;
+            border-radius: 4px;
+          "
+        >
+          Device Preferences & Settings (Editable)
+        </summary>
+        <div
+          id="editablePreferencesContainer" /* Changed ID for clarity */
+          style="
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-top: none;
+            border-radius: 0 0 4px 4px;
+            background-color: #fdfdff; /* Slightly different background for content */
+          "
+        >
+          <div class="config-item">
+            <label for="prefSsidInput">WiFi SSID:</label>
+            <input type="text" id="prefSsidInput" placeholder="WiFi Network Name" style="width: 200px;" />
+          </div>
+          <div class="config-item">
+            <label for="prefPasswordInput">WiFi Password:</label>
+            <input type="password" id="prefPasswordInput" placeholder="Leave blank to keep current" style="width: 200px;" />
+          </div>
+          <div class="config-item">
+            <label for="prefVolumeInput">Volume (Liters):</label>
+            <input type="number" id="prefVolumeInput" step="0.1" placeholder="e.g., 70.0" />
+          </div>
+          <div class="config-item">
+            <label for="prefPowerInput">Power (Watts):</label>
+            <input type="number" id="prefPowerInput" step="10" placeholder="e.g., 3200" />
+          </div>
+          <div class="config-item">
+            <label for="prefHysteresisTempInput">Hysteresis Temp (°C):</label>
+            <input type="number" id="prefHysteresisTempInput" step="0.1" placeholder="e.g., 1.0" />
+          </div>
+          <div class="config-item">
+            <label for="prefHysteresisTimeInput\">Hysteresis Time (s):</label>
+            <input type="number" id="prefHysteresisTimeInput" step="1" placeholder="e.g., 10" />
+          </div>
+
+          <h4 style="margin-top: 20px; margin-bottom: 10px; color: #007bff;">PID Settings</h4>
+          <div class="config-item">
+            <label for="prefPidKpInput">PID Kp:</label>
+            <input type="number" id="prefPidKpInput" step="0.01" placeholder="e.g., 1.2" />
+          </div>
+          <div class="config-item">
+            <label for="prefPidKiInput">PID Ki:</label>
+            <input type="number" id="prefPidKiInput" step="0.01" placeholder="e.g., 0.5" />
+          </div>
+          <div class="config-item">
+            <label for="prefPidKdInput\">PID Kd:</label>
+            <input type="number" id="prefPidKdInput" step="0.01" placeholder="e.g., 0.1" />
+          </div>
+          <div class="config-item">
+            <label for="prefPidPonInput\">PID P On Mode (0/1):</label>
+            <input type="number" id="prefPidPonInput" step=".01" min="0" max="1" placeholder="e.g., 0.5" />
+          </div>
+          <div class="config-item">
+            <label for="prefPidSampleTimeInput\">PID Sample Time (ms):</label>
+            <input type="number" id="prefPidSampleTimeInput" step="100" placeholder="e.g., 1000" />
+          </div>
+
+          <button id="applyPreferencesButton" style="margin-top: 15px; background-color: #28a745;">Apply & Save All Preferences</button>
+          <p style="font-size: 0.9em; margin-top: 10px; color: #6c757d;">Note: Click "Show Preferences" button first to load current values into these fields before editing. Password field is for setting a new password; leave blank to keep the existing one.</p>
+        </div>
+      </details>
+
+      <div id="preferencesDisplayContainer_OLD" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; background-color: #f9f9f9; display: none;">
+        <h3>Current Preferences (Raw Display):</h3>
+        <div id="preferencesValues" style="display: grid; grid-template-columns: auto 1fr; gap: 5px 10px;">
+          <!-- This div is still used by the existing JS to display raw data if getPreferencesButton is clicked without opening the details -->
+          <p>Click "Show Preferences" to load.</p>
+        </div>
       </div>
 
       <h2>Device Logs & Status</h2>
@@ -280,80 +364,6 @@ Waiting for commands...</pre
 
       <div>Message L2: <span id="messageL2">N/A</span></div>
       <div>Message L3: <span id="messageL3">N/A</span></div>
-
-      <details id="advancedConfigSection" style="margin-top: 20px">
-        <summary
-          style="
-            font-weight: bold;
-            cursor: pointer;
-            padding: 5px;
-            background-color: #f0f0f0;
-            border-radius: 4px;
-          "
-        >
-          Advanced PID Configuration
-        </summary>
-        <div
-          style="
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-top: none;
-            border-radius: 0 0 4px 4px;
-          "
-        >
-          <div class="config-item">
-            <label for="pidKpInput">Kp:</label>
-            <input
-              type="number"
-              id="pidKpInput"
-              step="0.01"
-              placeholder="e.g., 1.2"
-            />
-          </div>
-          <div class="config-item">
-            <label for="pidKiInput">Ki:</label>
-            <input
-              type="number"
-              id="pidKiInput"
-              step="0.01"
-              placeholder="e.g., 0.5"
-            />
-          </div>
-          <div class="config-item">
-            <label for="pidKdInput">Kd:</label>
-            <input
-              type="number"
-              id="pidKdInput"
-              step="0.01"
-              placeholder="e.g., 0.1"
-            />
-          </div>
-          <div class="config-item">
-            <label for="pidPonInput">P On (0=Error, 1=Meas.):</label>
-            <!-- Clarified P On meaning based on common PID usage -->
-            <input
-              type="number"
-              id="pidPonInput"
-              step="0.1"
-              min="0"
-              max="1"
-              placeholder="0 or 1"
-            />
-          </div>
-          <div class="config-item">
-            <label for="pidSampleTimeInput">Sample Time (ms):</label>
-            <input
-              type="number"
-              id="pidSampleTimeInput"
-              step="100"
-              placeholder="e.g., 1000"
-            />
-          </div>
-          <button id="applyPidSettingsButton" style="margin-top: 10px">
-            Apply PID Settings
-          </button>
-        </div>
-      </details>
     </div>
 
     <script src="script.js"></script>

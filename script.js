@@ -43,6 +43,40 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   const listFilesButton = document.getElementById("listFilesButton");
   const fileListOutput = document.getElementById("fileListOutput");
+
+  // Preferences UI
+  const getPreferencesButton = document.getElementById("getPreferencesButton");
+  const preferencesValuesDiv = document.getElementById("preferencesValues");
+  const editablePreferencesContainer = document.getElementById(
+    "editablePreferencesContainer"
+  );
+  const applyPreferencesButton = document.getElementById(
+    "applyPreferencesButton"
+  );
+
+  // Input field references for editable preferences
+  const prefSsidInput = document.getElementById("prefSsidInput");
+  const prefPasswordInput = document.getElementById("prefPasswordInput");
+  const prefVolumeInput = document.getElementById("prefVolumeInput");
+  const prefPowerInput = document.getElementById("prefPowerInput");
+  const prefHysteresisTempInput = document.getElementById(
+    "prefHysteresisTempInput"
+  );
+  const prefHysteresisTimeInput = document.getElementById(
+    "prefHysteresisTimeInput"
+  );
+  const prefPidKpInput = document.getElementById("prefPidKpInput");
+  const prefPidKiInput = document.getElementById("prefPidKiInput");
+  const prefPidKdInput = document.getElementById("prefPidKdInput");
+  const prefPidPonInput = document.getElementById("prefPidPonInput");
+  const prefPidSampleTimeInput = document.getElementById(
+    "prefPidSampleTimeInput"
+  );
+
+  // The <details> element for preferences
+  const preferencesSectionDetails =
+    document.getElementById("preferencesSection");
+
   let autoSyncIntervalMs = 5000; // Default 5 seconds
   let isAutoSyncEnabled = false;
   let autoSyncTimerId = null;
@@ -122,16 +156,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const stateTimerLabel = document.getElementById("stateTimerLabel");
   const stateTimerValue = document.getElementById("stateTimerValue");
   let stateCountdownIntervalId = null;
-
-  // Advanced PID Config UI elements
-  const pidKpInput = document.getElementById("pidKpInput");
-  const pidKiInput = document.getElementById("pidKiInput");
-  const pidKdInput = document.getElementById("pidKdInput");
-  const pidPonInput = document.getElementById("pidPonInput");
-  const pidSampleTimeInput = document.getElementById("pidSampleTimeInput");
-  const applyPidSettingsButton = document.getElementById(
-    "applyPidSettingsButton"
-  );
 
   // Store last known sample time
   let lastKnownSampleTime = 1000; // Default if not received
@@ -510,19 +534,19 @@ document.addEventListener("DOMContentLoaded", () => {
             messageL3Display.textContent = response.message_line_3 || "N/A";
 
           // Populate PID config inputs
-          if (pidKpInput && response.kp !== undefined)
-            pidKpInput.value = response.kp;
-          if (pidKiInput && response.ki !== undefined)
-            pidKiInput.value = response.ki;
-          if (pidKdInput && response.kd !== undefined)
-            pidKdInput.value = response.kd;
-          if (pidPonInput && response.pOn !== undefined)
-            pidPonInput.value = response.pOn; // Assuming ESP32 sends pOn
-          if (pidSampleTimeInput && response.time !== undefined) {
-            pidSampleTimeInput.value = response.time;
+          if (prefPidKpInput && response.kp !== undefined)
+            prefPidKpInput.value = response.kp;
+          if (prefPidKiInput && response.ki !== undefined)
+            prefPidKiInput.value = response.ki;
+          if (prefPidKdInput && response.kd !== undefined)
+            prefPidKdInput.value = response.kd;
+          if (prefPidPonInput && response.pOn !== undefined)
+            prefPidPonInput.value = response.pOn; // Assuming ESP32 sends pOn
+          if (prefPidSampleTimeInput && response.time !== undefined) {
+            prefPidSampleTimeInput.value = response.time;
             lastKnownSampleTime = response.time; // Store for sending PID command
-          } else if (pidSampleTimeInput) {
-            pidSampleTimeInput.value = lastKnownSampleTime; // Use default/last known
+          } else if (prefPidSampleTimeInput) {
+            prefPidSampleTimeInput.value = lastKnownSampleTime; // Use default/last known
           }
 
           if (response.id && response.confirm_message) {
@@ -737,109 +761,235 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Handle Telemetry (Incoming Data) ---
   function handleTelemetry(event) {
-    const value = event.target.value;
-    const decoder = new TextDecoder();
-    const jsonString = decoder.decode(value);
-    // statusArea.textContent = `Received: ${jsonString}`; // Keep this for brief status
-    console.log("Received Telemetry String:", jsonString); // Log raw string
+    // Determine if event is from BLE (event.target.value) or WebSocket (event.data)
+    let dataViewOrString;
+    let isWebSocket = false;
+    if (event.target && event.target.value) {
+      dataViewOrString = event.target.value; // BLE
+    } else if (event.data) {
+      dataViewOrString = event.data; // WebSocket
+      isWebSocket = true;
+    } else {
+      console.warn("Received telemetry event with no data.");
+      return;
+    }
 
     try {
-      const data = JSON.parse(jsonString);
-      console.log("Parsed Telemetry Data:", data); // Log parsed object
-
-      // Check if this response corresponds to a sent command
-      if (data.id !== undefined && pendingCommands.has(data.id)) {
-        const callback = pendingCommands.get(data.id);
-        // The callback itself will call appendToCommandOutput for command-specific responses
-        callback(data);
-        pendingCommands.delete(data.id);
-        return; // Handled as a specific command response
+      let jsonData;
+      if (isWebSocket) {
+        if (typeof dataViewOrString === "string") {
+          jsonData = JSON.parse(dataViewOrString);
+        } else {
+          // Assuming it might be ArrayBuffer or Blob from WebSocket, needs decoding
+          // This part might need adjustment based on how your WS sends data
+          console.warn(
+            "Received non-string data from WebSocket, decoding not implemented here."
+          );
+          return;
+        }
+      } else {
+        // BLE: Assuming DataView, needs TextDecoder
+        const decoder = new TextDecoder("utf-8");
+        const receivedString = decoder.decode(dataViewOrString);
+        jsonData = JSON.parse(receivedString);
       }
 
-      // --- Fallback to general telemetry handling if no ID or no pending command ---
-      // Log general telemetry to the command output area as well
-      appendToCommandOutput(`General Telemetry: ${jsonString}`, "telemetry");
+      appendToCommandOutput(
+        `Received: ${JSON.stringify(jsonData)}`,
+        "response"
+      );
 
-      // Example of handling specific telemetry messages if not tied to a command ID
-      if (
-        data.type === "status_update" ||
-        data.current_temperature_c !== undefined
-      ) {
-        // Adjusted for new C++ output
-        if (data.current_temperature_c !== undefined) {
-          currentTempDisplay.textContent = `${data.current_temperature_c}°C`;
-        }
-        if (data.target_temperature_c !== undefined) {
-          targetTempDisplay.textContent = `${data.target_temperature_c}°C`;
-        }
-        if (data.state !== undefined) {
-          currentStateDisplay.textContent =
-            DEVICE_STATES[data.state] || `Unknown (${data.state})`;
-          // Show/Hide modal based on state during general telemetry too
-          if (data.state === 2) {
-            // WAIT_CONFIRM state
-            // Assumes response.confirm_message is now sent by the device in SYNC / general status
-            showConfirmModal(
-              data.confirm_message || "Please confirm the pending action."
+      // Handle command-specific responses based on 'id' if present
+      if (jsonData.id && pendingCommands.has(jsonData.id)) {
+        const callback = pendingCommands.get(jsonData.id);
+        callback(jsonData); // Resolve the promise/execute callback
+        pendingCommands.delete(jsonData.id); // Clean up
+      }
+
+      // Update UI based on jsonData.type
+      if (jsonData.type) {
+        switch (jsonData.type) {
+          case "status_update": // Existing status update
+            if (currentTempDisplay && jsonData.current_temp !== undefined) {
+              currentTempDisplay.textContent =
+                jsonData.current_temp.toFixed(2) + " °C";
+            }
+            if (targetTempDisplay && jsonData.target_temp !== undefined) {
+              targetTempDisplay.textContent = `(Current: ${jsonData.target_temp.toFixed(
+                2
+              )} °C)`;
+            }
+            if (currentStateDisplay && jsonData.current_state !== undefined) {
+              currentStateDisplay.textContent =
+                DEVICE_STATES[jsonData.current_state] || "Unknown";
+            }
+            // ... any other fields from status_update ...
+            break;
+          case "preferences":
+            if (preferencesValuesDiv) {
+              // This part is for the OLD raw display, can be kept or removed if not needed.
+              // We will now primarily populate the input fields.
+              preferencesValuesDiv.innerHTML = ""; // Clear previous values
+              const ul = document.createElement("ul");
+              ul.style.listStyleType = "none";
+              ul.style.paddingLeft = "0";
+              for (const key in jsonData) {
+                if (key !== "type" && key !== "status" && key !== "id") {
+                  const li = document.createElement("li");
+                  const strong = document.createElement("strong");
+                  strong.textContent =
+                    key
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (l) => l.toUpperCase()) + ": ";
+                  li.appendChild(strong);
+                  const span = document.createElement("span");
+                  span.textContent = jsonData[key];
+                  li.appendChild(span);
+                  ul.appendChild(li);
+                }
+              }
+              preferencesValuesDiv.appendChild(ul);
+            }
+
+            // Populate the new input fields
+            if (prefSsidInput && jsonData.ssid !== undefined)
+              prefSsidInput.value = jsonData.ssid;
+            // Do not populate password field for security: prefPasswordInput.value = jsonData.password;
+            if (prefVolumeInput && jsonData.volume_liters !== undefined)
+              prefVolumeInput.value = jsonData.volume_liters;
+            if (prefPowerInput && jsonData.power_watts !== undefined)
+              prefPowerInput.value = jsonData.power_watts;
+            if (
+              prefHysteresisTempInput &&
+              jsonData.hysteresis_degrees_c !== undefined
+            )
+              prefHysteresisTempInput.value = jsonData.hysteresis_degrees_c;
+            if (
+              prefHysteresisTimeInput &&
+              jsonData.hysteresis_seconds !== undefined
+            )
+              prefHysteresisTimeInput.value = jsonData.hysteresis_seconds;
+
+            if (prefPidKpInput && jsonData.kp !== undefined)
+              prefPidKpInput.value = jsonData.kp;
+            if (prefPidKiInput && jsonData.ki !== undefined)
+              prefPidKiInput.value = jsonData.ki;
+            if (prefPidKdInput && jsonData.kd !== undefined)
+              prefPidKdInput.value = jsonData.kd;
+            if (prefPidPonInput && jsonData.pOn !== undefined)
+              prefPidPonInput.value = jsonData.pOn;
+            if (prefPidSampleTimeInput && jsonData.time !== undefined)
+              prefPidSampleTimeInput.value = jsonData.time;
+
+            appendToCommandOutput(
+              "Preferences loaded into editable fields.",
+              "info"
             );
-          } else {
-            hideConfirmModal();
-          }
-        }
+            break;
+          case "list_files":
+            console.log("Files listed:", jsonData.files);
+            // You'll need to add UI elements to display these files
+            // For example, populate a <ul> list
+            const fileListElement = document.getElementById("fileList"); // Assuming you add this to HTML
+            if (fileListElement) {
+              fileListElement.innerHTML = ""; // Clear previous list
+              jsonData.files.forEach((file) => {
+                const listItem = document.createElement("li");
+                listItem.textContent = `${file.name} (${file.size} bytes)`;
+                li.style.padding = "2px 0";
+                li.style.cursor = "pointer";
+                li.setAttribute("data-filename", file.name);
+                li.addEventListener("mouseover", () => {
+                  li.style.textDecoration = "underline";
+                });
+                li.addEventListener("mouseout", () => {
+                  li.style.textDecoration = "none";
+                });
 
-        // Update graph if temperature data is present
-        if (
-          data.current_temperature_c !== undefined // Target temp is now passed explicitly
-        ) {
-          updateTemperatureGraph(
-            data.current_temperature_c,
-            data.target_temperature_c,
-            data.output
-          );
+                li.addEventListener("click", async (event) => {
+                  const filename = event.target.getAttribute("data-filename");
+                  if (filename) {
+                    appendToCommandOutput(
+                      `Attempting to open file: ${filename}`,
+                      "info"
+                    );
+                    // Highlight clicked item briefly (optional)
+                    event.target.style.backgroundColor = "#e0e0e0";
+                    setTimeout(() => {
+                      event.target.style.backgroundColor = "";
+                    }, 300);
+
+                    await sendCommand(
+                      `OPEN_FILE ${filename}`,
+                      (openResponse) => {
+                        if (openResponse.error) {
+                          console.error(
+                            `Error sending OPEN_FILE ${filename}:`,
+                            openResponse.error
+                          );
+                          appendToCommandOutput(
+                            `Error for OPEN_FILE ${filename}: ${openResponse.error}`,
+                            "error"
+                          );
+                        } else {
+                          // The OPEN_FILE command in C++ doesn't send specific JSON back on success via the command channel.
+                          // It changes the device state to start reading from the file.
+                          // Success here means the command was acknowledged by the BLE characteristic.
+                          console.log(
+                            `OPEN_FILE ${filename} command sent successfully. Response:`,
+                            openResponse
+                          );
+                          appendToCommandOutput(
+                            `OPEN_FILE ${filename} command sent. Device will attempt to open.`,
+                            "response"
+                          );
+                          // Further confirmation of file opening would come from device behavior (e.g., logs or state changes).
+                        }
+                      }
+                    );
+                  }
+                });
+                ul.appendChild(li);
+              });
+              fileListOutput.appendChild(ul);
+            }
+            break;
+          case "confirmation_required":
+            // This logic seems to be for a different flow, adapt if needed
+            // For instance, if the device sends a "CONFIRM_ACTION <id>" message
+            // that your script needs to respond to with $id CONFIRM.
+            // The current `confirmActionButton.onclick` handles sending a confirm.
+            // This section might be for unsolicited requests for confirmation.
+            lastMessageIdRequiringConfirmation = jsonData.messageId; // Assuming `data.messageId` comes from device
+            statusArea.textContent = `Action Required: ${
+              jsonData.message
+            } (ID: 0x${jsonData.messageId.toString(16)})`;
+            confirmActionButton.style.display = "block";
+            rejectActionButton.style.display = "block";
+            console.log(
+              `Confirmation required for message ID: 0x${jsonData.messageId.toString(
+                16
+              )}`
+            );
+            break;
+          case "error_message":
+            statusArea.textContent = `Device Error: ${jsonData.message}`;
+            console.error(
+              `Device Error: ${jsonData.message} (Code: ${jsonData.errorCode})`
+            );
+            break;
+          case "utc":
+            // Handling GET_TIME response
+            const date = new Date(jsonData.utc * 1000); // Convert seconds to milliseconds
+            console.log("Device time (UTC):", date.toUTCString());
+            statusArea.textContent = `Device Time: ${date.toLocaleString()}`;
+            // You could display this time in a dedicated UI element
+            break;
+          default:
+            console.log("Received unhandled telemetry structure:", jsonData);
         }
-      } else if (data.type === "confirmation_required") {
-        // This logic seems to be for a different flow, adapt if needed
-        // For instance, if the device sends a "CONFIRM_ACTION <id>" message
-        // that your script needs to respond to with $id CONFIRM.
-        // The current `confirmActionButton.onclick` handles sending a confirm.
-        // This section might be for unsolicited requests for confirmation.
-        lastMessageIdRequiringConfirmation = data.messageId; // Assuming `data.messageId` comes from device
-        statusArea.textContent = `Action Required: ${
-          data.message
-        } (ID: 0x${data.messageId.toString(16)})`;
-        confirmActionButton.style.display = "block";
-        rejectActionButton.style.display = "block";
-        console.log(
-          `Confirmation required for message ID: 0x${data.messageId.toString(
-            16
-          )}`
-        );
-      } else if (data.type === "error_message") {
-        statusArea.textContent = `Device Error: ${data.message}`;
-        console.error(
-          `Device Error: ${data.message} (Code: ${data.errorCode})`
-        );
-      } else if (data.type === "list_files") {
-        console.log("Files listed:", data.files);
-        // You'll need to add UI elements to display these files
-        // For example, populate a <ul> list
-        const fileListElement = document.getElementById("fileList"); // Assuming you add this to HTML
-        if (fileListElement) {
-          fileListElement.innerHTML = ""; // Clear previous list
-          data.files.forEach((file) => {
-            const listItem = document.createElement("li");
-            listItem.textContent = `${file.name} (${file.size} bytes)`;
-            fileListElement.appendChild(listItem);
-          });
-        }
-      } else if (data.utc !== undefined) {
-        // Handling GET_TIME response
-        const date = new Date(data.utc * 1000); // Convert seconds to milliseconds
-        console.log("Device time (UTC):", date.toUTCString());
-        statusArea.textContent = `Device Time: ${date.toLocaleString()}`;
-        // You could display this time in a dedicated UI element
       } else {
-        console.log("Received unhandled telemetry structure:", data);
+        console.log("Received unhandled telemetry structure:", jsonData);
       }
     } catch (error) {
       console.error("Error parsing telemetry JSON or handling data:", error);
@@ -1363,54 +1513,166 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Apply PID Settings Button Handler
-  if (applyPidSettingsButton) {
-    applyPidSettingsButton.onclick = async () => {
-      const kp = parseFloat(pidKpInput.value);
-      const ki = parseFloat(pidKiInput.value);
-      const kd = parseFloat(pidKdInput.value);
-      const pOn = parseFloat(pidPonInput.value); // Ensure this is what your C++ expects (e.g., 0 or 1)
-      const sampleTime = parseInt(pidSampleTimeInput.value, 10);
-
-      if (
-        isNaN(kp) ||
-        isNaN(ki) ||
-        isNaN(kd) ||
-        isNaN(pOn) ||
-        isNaN(sampleTime)
-      ) {
-        appendToCommandOutput(
-          "Invalid PID input. Please enter numbers.",
-          "error"
-        );
-        statusArea.textContent = "Error: Invalid PID input.";
+  // Add event listener for the Get Preferences button
+  if (getPreferencesButton) {
+    getPreferencesButton.onclick = async () => {
+      if (!commandCharacteristic && !ws) {
+        // Check if connected (BLE or WS)
+        appendToCommandOutput("Not connected to device.", "error");
         return;
       }
-      // Additional validation for pOn if it must be 0 or 1
-      if (pOn !== 0 && pOn !== 1) {
-        appendToCommandOutput(
-          "P On value must be 0 (Error) or 1 (Measurement).",
-          "error"
-        );
-        statusArea.textContent = "Error: Invalid P On value.";
-        return;
-      }
+      appendToCommandOutput(
+        "Sending PREFERENCES command (via button)...",
+        "info"
+      );
+      // Use existing sendCommand if it's suitable for commands expecting JSON response
+      // or implement a direct send if needed. Assuming sendCommand handles it:
+      sendCommand("PREFERENCES");
+    };
+  }
 
-      const commandStr = `PID ${kp} ${ki} ${kd} ${pOn} ${sampleTime}`;
-      appendToCommandOutput(`Sending PID command: ${commandStr}`, "info");
-      await sendCommand(commandStr, (response) => {
-        if (response.error) {
-          console.error("Error applying PID settings:", response.error);
-          appendToCommandOutput(`PID Error: ${response.error}`, "error");
-          statusArea.textContent = `PID Error: ${response.error}`;
-        } else {
-          console.log("PID settings applied successfully:", response);
-          appendToCommandOutput("PID settings applied.", "response");
-          statusArea.textContent = "PID settings sent.";
-          // Optionally, trigger a SYNC to confirm changes are reflected
-          // if (isAutoSyncEnabled) performSync(); else if (getStatusButton) getStatusButton.onclick();
+  // Add event listener for the preferences <details> toggle
+  if (preferencesSectionDetails) {
+    preferencesSectionDetails.addEventListener("toggle", async (event) => {
+      if (preferencesSectionDetails.open) {
+        // Details section was opened
+        if (!commandCharacteristic && !ws) {
+          appendToCommandOutput(
+            "Not connected. Cannot fetch preferences for details section.",
+            "error"
+          );
+          return;
         }
-      });
+        appendToCommandOutput(
+          "Preferences section opened. Sending PREFERENCES command...",
+          "info"
+        );
+        sendCommand("PREFERENCES");
+      }
+    });
+  }
+
+  // Add event listener for Apply Preferences button
+  if (applyPreferencesButton) {
+    applyPreferencesButton.onclick = async () => {
+      if (!commandCharacteristic && !ws) {
+        appendToCommandOutput("Not connected to device.", "error");
+        return;
+      }
+      appendToCommandOutput("Applying preferences...", "info");
+
+      let commandsSent = 0;
+      let commandsSuccessfullyAcknowledged = 0;
+
+      // Helper to send and track commands
+      const sendPreferenceCommand = async (cmd) => {
+        commandsSent++;
+        const success = await sendCommand(cmd, (response) => {
+          if (response && !response.error) {
+            commandsSuccessfullyAcknowledged++;
+            appendToCommandOutput(`Command \"${cmd}\" ACK.`, "response");
+          } else {
+            appendToCommandOutput(
+              `Command \"${cmd}\" failed or no ACK: ${
+                response ? response.error : "Unknown"
+              }.`,
+              "error"
+            );
+          }
+        });
+        if (!success) {
+          // sendCommand itself failed (e.g. BLE write error)
+          appendToCommandOutput(`Failed to send command \"${cmd}\".`, "error");
+        }
+      };
+
+      // SSID (only if not empty)
+      if (prefSsidInput && prefSsidInput.value.trim() !== "") {
+        await sendPreferenceCommand(`SSID ${prefSsidInput.value.trim()}`);
+      }
+      // Password (only if not empty - implies user wants to change it)
+      if (prefPasswordInput && prefPasswordInput.value !== "") {
+        // Don't trim password, spaces can be valid
+        await sendPreferenceCommand(`PASSWORD ${prefPasswordInput.value}`);
+        prefPasswordInput.value = ""; // Clear after sending for security
+      }
+      // Volume
+      if (prefVolumeInput && prefVolumeInput.value !== "") {
+        await sendPreferenceCommand(
+          `VOLUME ${parseFloat(prefVolumeInput.value)}`
+        );
+      }
+      // Power
+      if (prefPowerInput && prefPowerInput.value !== "") {
+        await sendPreferenceCommand(
+          `POWER ${parseFloat(prefPowerInput.value)}`
+        );
+      }
+      // Hysteresis Temp
+      if (prefHysteresisTempInput && prefHysteresisTempInput.value !== "") {
+        await sendPreferenceCommand(
+          `HYSTERESIS_TEMP ${parseFloat(prefHysteresisTempInput.value)}`
+        );
+      }
+      // Hysteresis Time
+      if (prefHysteresisTimeInput && prefHysteresisTimeInput.value !== "") {
+        await sendPreferenceCommand(
+          `HYSTERESIS_TIME ${parseInt(prefHysteresisTimeInput.value, 10)}`
+        );
+      }
+
+      // PID settings (sent as one command)
+      if (
+        prefPidKpInput &&
+        prefPidKiInput &&
+        prefPidKdInput &&
+        prefPidPonInput &&
+        prefPidSampleTimeInput
+      ) {
+        const kp = parseFloat(prefPidKpInput.value);
+        const ki = parseFloat(prefPidKiInput.value);
+        const kd = parseFloat(prefPidKdInput.value);
+        const pOn = parseInt(prefPidPonInput.value, 10); // Ensure it's int 0 or 1
+        const sampleTime = parseInt(prefPidSampleTimeInput.value, 10);
+
+        if (![kp, ki, kd, pOn, sampleTime].some(isNaN)) {
+          // Check if all are valid numbers
+          if (pOn === 0 || pOn === 1) {
+            await sendPreferenceCommand(
+              `PID ${kp} ${ki} ${kd} ${pOn} ${sampleTime}`
+            );
+          } else {
+            appendToCommandOutput(
+              "Invalid PID P On value (must be 0 or 1). PID settings not sent.",
+              "error"
+            );
+          }
+        } else {
+          appendToCommandOutput(
+            "Invalid PID numeric values. PID settings not sent.",
+            "error"
+          );
+        }
+      }
+
+      // After sending all individual preference commands, send SAVE
+      // Wait a brief moment to allow previous commands to be processed by ESP32 if sent rapidly
+      setTimeout(async () => {
+        appendToCommandOutput(
+          "Sending SAVE command to persist settings...",
+          "info"
+        );
+        await sendPreferenceCommand("SAVE");
+
+        // Optionally, refresh preferences display after saving
+        setTimeout(() => {
+          if (getPreferencesButton) getPreferencesButton.click();
+          appendToCommandOutput(
+            `Preference update attempt finished. Sent ${commandsSent} commands, ${commandsSuccessfullyAcknowledged} acknowledged.`,
+            "info"
+          );
+        }, 1000); // Wait a bit more before refreshing
+      }, 500); // Adjust delay as needed
     };
   }
 });
