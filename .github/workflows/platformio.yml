@@ -2,11 +2,43 @@ name: PlatformIO CI
 
 on:
   push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+    tags:
+      - "*" # Trigger only on version tags
 
 jobs:
+  publish:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          body: ""
+
+          draft: false
+          prerelease: false
+
+  upload:
+    runs-on: ubuntu-latest
+    needs: build
+    strategy:
+      matrix:
+        env: [wemos_s3_mini]
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.env }}
+          path: .pio/build/${{ matrix.env }}
+      - name: Upload artifacts to releases
+        run: |
+          gh release upload ${{ github.ref }} .pio/build/${{ matrix.env }}
+
   build:
     runs-on: ubuntu-latest
     strategy:
@@ -27,10 +59,18 @@ jobs:
       - name: Build for ${{ matrix.env }}
         run: pio run -e ${{ matrix.env }}
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+      - name: Get release info
+        id: get_release
+        uses: actions/github-script@v7
         with:
-          name: ${{ matrix.env }}
-          path: .pio/build/${{ matrix.env }}
-          overwrite: true
-          include-hidden-files: true
+          script: |
+            const tag = context.ref.split('/').pop();
+            const release = await github.rest.repos.getReleaseByTag({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag: tag
+            });
+            return release.data.upload_url;
+      - name: Upload artifacts to releases
+        run: |
+          gh release upload ${{ steps.create_release.outputs.upload_url }} .pio/build/${{ matrix.env }}
