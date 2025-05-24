@@ -12,7 +12,7 @@ class LocalCommunication : public CommunicationPeripherals {
         void setTargetTemperature(float temperature) override;
         void setPidParameters(float Kp, float Ki, float Kd, float pOn, float sampleTime) override;
 
-        void startAutotune() override;
+        void startAutotune(float targetTemperature, int samples) override;
         void stopAutotune() override;
 
         void setVolume(float volume) override;

@@ -16,6 +16,7 @@ class NTC_Sensor_Temperature : public TemperatureSensor {
         virtual void loop() override;
 
     private:
+        float temperature;
         Thermistor* thermistor;
         xTaskHandle taskHandle;
         static void monitorTask(void *pvParameters);

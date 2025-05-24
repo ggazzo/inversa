@@ -6,19 +6,25 @@
 #include "Components/Temperature.h"
 
 #include <PID_v1.h>
-#include <sTune.h>
+#include <pidautotuner.h>
 
+typedef void (*on_autotune_ends_callback_t)();
 class HeaterSSR : public Heater {
     public:
-        HeaterSSR(TemperatureSensor *temperatureSensor, PID *pid, uint8_t pin, double *targetTemperature, double *output, double *input, on_change_callback_t on_change);
+        HeaterSSR(TemperatureSensor *temperatureSensor, PID *pid, uint8_t pin, double *targetTemperature, double *output, double *input, on_change_callback_t on_change, on_autotune_ends_callback_t on_autotune_ends);
         void setup() override;
         void loop() override;
         void setTargetTemperature(float targetTemperature) override { *this->targetTemperature = targetTemperature; }
         float getTargetTemperature() override { return *this->targetTemperature; }
-        void startAutotune() override;
+        void startAutotune(int tuningTemp, int samples) override;
         void stopAutotune() override;
+
+        float softPwm(uint32_t windowSize, uint8_t debounce);
         PID *pid;
     private:
+
+        void loopAutotune();
+
         uint8_t pin;
         TemperatureSensor *temperatureSensor;
         static void monitorTask(void *pvParameters);
@@ -27,11 +33,11 @@ class HeaterSSR : public Heater {
         double * targetTemperature;
         double * output;
         double * input;
+
         bool isAutotuning;
-        sTune tuner;
 
-        float kp, ki, kd = 50;
-
+        PIDAutotuner *tuner = nullptr;
+        on_autotune_ends_callback_t on_autotune_ends;
     protected:
         xTaskHandle taskHandle;
 };

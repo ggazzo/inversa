@@ -1,16 +1,11 @@
 #include "HeaterSSR.h"
 
-#define LOW_TEMP_BAND 15 // degrees
-#define HIGH_TEMP_BAND 1.0f // degrees
-#define AUTOTUNE_INPUT_SPAN 100.0f // degrees
-#define AUTOTUNE_OUTPUT_SPAN 1000 // degrees
-#define AUTOTUNE_OUTPUT_START 0.0f // degrees
-#define AUTOTUNE_OUTPUT_STEP 1.0f // degrees
-#define AUTOTUNE_TIME_STEP 1.0f // interval = testTimeSec / samples
-#define AUTOTUNE_SETTLE_TIME_SECONDS 120.0f // seconds
-#define AUTOTUNE_SAMPLES 500 // samples
+constexpr float TUNER_INPUT_SPAN = 160.0f;
+constexpr float TUNER_OUTPUT_SPAN = 255;
 
-HeaterSSR::HeaterSSR(TemperatureSensor *temperatureSensor, PID *pid, uint8_t pin, double *targetTemperature, double *output, double *input, on_change_callback_t on_change) {
+const char *TAG = "HeaterSSR";
+
+HeaterSSR::HeaterSSR(TemperatureSensor *temperatureSensor, PID *pid, uint8_t pin, double *targetTemperature, double *output, double *input, on_change_callback_t on_change, on_autotune_ends_callback_t on_autotune_ends) {
     this->temperatureSensor = temperatureSensor;
     this->pid = pid;
     this->pin = pin;
@@ -18,8 +13,10 @@ HeaterSSR::HeaterSSR(TemperatureSensor *temperatureSensor, PID *pid, uint8_t pin
     this->output = output;
     this->input = input;
     this->on_change = on_change;
-
+    this->on_autotune_ends = on_autotune_ends;
     this->isAutotuning = false;
+
+    this->tuner = new PIDAutotuner();
 }
 
 void HeaterSSR::setup() {
@@ -27,10 +24,15 @@ void HeaterSSR::setup() {
     pinMode(pin, OUTPUT);
 }
 
-void HeaterSSR::startAutotune() {
+void HeaterSSR::startAutotune(int tuningTemp, int samples) {
     if (!isAutotuning) {
         isAutotuning = true;
-        tuner.Configure(AUTOTUNE_INPUT_SPAN, AUTOTUNE_OUTPUT_SPAN, AUTOTUNE_OUTPUT_START, AUTOTUNE_OUTPUT_STEP, AUTOTUNE_TIME_STEP, AUTOTUNE_SETTLE_TIME_SECONDS, AUTOTUNE_SAMPLES);
+        *targetTemperature = tuningTemp;
+        tuner->setOutputRange(0, TUNER_OUTPUT_SPAN);
+        tuner->setTargetInputValue(tuningTemp);
+        tuner->setTuningCycles(samples);
+        tuner->setLoopInterval((TUNER_OUTPUT_SPAN - 1) * 1000);
+        tuner->setZNMode(PIDAutotuner::ZNModeLessOvershoot);
         pid->SetMode(MANUAL);
     }
 }
@@ -39,62 +41,93 @@ void HeaterSSR::stopAutotune() {
     if (isAutotuning) {
         isAutotuning = false;
         pid->SetMode(AUTOMATIC);
+        *targetTemperature = 0;
+        ESP_LOGI(TAG, "stopAutotune");
+        this->on_autotune_ends();
     }
 }
 
-void HeaterSSR::loop() {
-    this->tuner.softPwm(pin, *input, *output, *targetTemperature, AUTOTUNE_OUTPUT_SPAN, 1);
+void HeaterSSR::loopAutotune() {
+    static unsigned long lastMicros = 0;
+    static bool tuningStarted = false;
+    static long loopInterval = (static_cast<long>(TUNER_OUTPUT_SPAN) - 1L) * 1000L;
 
-    switch (this->tuner.Run()) {
-        case tuner.sample:
-            tuner.plotter(*input, *output, *targetTemperature,  0.1f, 3);
-            break;
-        case tuner.tunings:
-            this->tuner.GetAutoTunings(&kp, &ki, &kd); // sketch variables updated by sTune
-            pid->SetOutputLimits(0, 255);
-            pid->SetSampleTime(255 - 1);
-            pid->SetMode(AUTOMATIC); // the PID is turned on
-            pid->SetTunings(kp, ki, kd); // update PID with the new tunings
-            break;
-        case tuner.runPid:
-            this->isAutotuning = false;
-            pid->Compute();
-            break;
+    if (!tuningStarted) {
+        tuner->startTuningLoop(micros());
+        tuningStarted = true;
+        lastMicros = micros();
+        return;
     }
 
-    // if (this->input - this->targetTemperature > LOW_TEMP_BAND) {
-    //     pid->SetMode(MANUAL);
-    //     *output = 255;
-    //     digitalWrite(pin, HIGH);
-    //     return;
-    // }
+    if (tuner->isFinished()) {
+        *this->output = 0;
+        softPwm(TUNER_OUTPUT_SPAN, 1);
+        this->pid->SetTunings(tuner->getKp(), tuner->getKi(), tuner->getKd());
+        ESP_LOGI("sTune", "Kp: %.2f, Ki: %.2f, Kd: %.2f", tuner->getKp(), tuner->getKi(), tuner->getKd());
+        this->on_autotune_ends();
+        isAutotuning = false;
+        tuningStarted = false;
+        return;
+    }
 
-    // // second case, the temperature is too high
-    // if (this->input > this->targetTemperature + HIGH_TEMP_BAND) {
-    //     pid->SetMode(MANUAL);
-    //     *output = 0;
-    //     digitalWrite(pin, LOW);
-    //     return;
-    // }
+    unsigned long currentMicros = micros();
+    if (currentMicros - lastMicros >= loopInterval) {
+        *this->output = tuner->tunePID(*this->input, currentMicros);
+        softPwm(TUNER_OUTPUT_SPAN, 1);
+        ESP_LOGI("sTune", "Setpoint: %.2f, Input: %.2f, Output: %.2f", *this->targetTemperature, *this->input, *this->output * 1.0);
+        lastMicros = currentMicros;
+    }
 
-    // pid->SetMode(AUTOMATIC);
-    // pid->Compute();
+    softPwm(TUNER_OUTPUT_SPAN, 1);
+}
 
-    // uint32_t now = millis();
+float HeaterSSR::softPwm(uint32_t windowSize, uint8_t debounce) {
+    // software PWM timer
+    uint32_t msNow = millis();
+    static uint32_t windowStartTime, nextSwitchTime;
+    if (msNow - windowStartTime >= windowSize) {
+        windowStartTime = msNow;
+    }
+    // SSR optimum AC half-cycle controller
+    /*
+    static float optimumOutput;
+    static bool reachedSetpoint;
 
-    // static uint32_t windowStartTime, nextSwitchTime;
+    if (temperature > setpoint) reachedSetpoint = true;
+    if (reachedSetpoint && !debounce && setpoint > 0 && temperature > setpoint) optimumOutput = output - 8;
+    else if (reachedSetpoint && !debounce && setpoint > 0 && temperature < setpoint) optimumOutput = output + 8;
+    else  optimumOutput = output;
+    if (optimumOutput < 0) optimumOutput = 0;
+    */
 
-    // if ((now - windowStartTime) > 1000) {
-    //     windowStartTime += 1000;
-    // }
+    float optimumOutput = *this->output;
 
-    // if ((now - windowStartTime) < 1000 * (*output / 255.0)) {
-    //     digitalWrite(pin, HIGH);
-    // } else {
-    //     digitalWrite(pin, LOW);
-    // }
+    // PWM relay output
+    static bool relayStatus;
+    if (!relayStatus && optimumOutput > (msNow - windowStartTime)) {
+        if (msNow > nextSwitchTime) {
+            nextSwitchTime = msNow + debounce;
+            relayStatus = true;
+            digitalWrite(this->pin, HIGH);
+        }
+    } else if (relayStatus && optimumOutput < (msNow - windowStartTime)) {
+        if (msNow > nextSwitchTime) {
+            nextSwitchTime = msNow + debounce;
+            relayStatus = false;
+            digitalWrite(this->pin, LOW);
+        }
+    }
+    return optimumOutput;
+}
 
-    this->on_change();
+
+void HeaterSSR::loop() {
+    if (isAutotuning) {
+        this->loopAutotune();
+        return;
+    }
+    softPwm(TUNER_OUTPUT_SPAN, 1);
+    pid->Compute();
 }
 
 [[noreturn]] void HeaterSSR::monitorTask(void *pvParameters) {

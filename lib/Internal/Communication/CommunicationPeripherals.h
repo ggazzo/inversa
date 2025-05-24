@@ -6,7 +6,7 @@ using temp_read_callback_t = std::function<void(float temperature)>;
 using pid_parameters_callback_t = std::function<void(float Kp, float Ki, float Kd, float pOn, float sampleTime)>;
 using volume_callback_t = std::function<void(float volume)>;
 using power_callback_t = std::function<void(float power)>;
-using autotune_callback_t = std::function<void(void)>;
+using autotune_callback_t = std::function<void(float targetTemperature, int samples)>;
 using stop_autotune_callback_t = std::function<void(void)>;
 class CommunicationPeripherals {
     public:
@@ -15,7 +15,7 @@ class CommunicationPeripherals {
         virtual void setTargetTemperature(float temperature) = 0;
         virtual void setPidParameters(float Kp, float Ki, float Kd, float pOn, float sampleTime) = 0;
 
-        virtual void startAutotune() = 0;
+        virtual void startAutotune(float targetTemperature, int samples) = 0;
         virtual void stopAutotune() = 0;
 
         virtual void setVolume(float volume) = 0;

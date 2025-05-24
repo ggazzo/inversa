@@ -76,6 +76,8 @@ MachineState state;
 void setup() {
 
   Serial.begin(115200);
+
+  Serial.println("Starting setup");
   NimBLEDevice::init(DEVICE_NAME);
   NimBLEDevice::getAdvertising()->setName(DEVICE_NAME);
   NuSerial.begin(115200);

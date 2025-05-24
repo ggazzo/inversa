@@ -34,7 +34,7 @@ class LocalController : public MainController<StateType> {
         float getHysteresisDegreesC() override;
         float getHysteresisSeconds() override;
 
-        void startAutotune() override;
+        void startAutotune(float targetTemperature, int samples) override;
         void stopAutotune() override;
 
         StateType getState() override;

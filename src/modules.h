@@ -4,7 +4,6 @@
 
 #include <NTC_Thermistor_CustomFormula_ESP32.h>
 #include <Thermistor.h>
-#include <AverageThermistor.h>
 
 #include "Components/Temperature.h"
 #include "Components/Heater.h"

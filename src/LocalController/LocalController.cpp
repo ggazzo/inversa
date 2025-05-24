@@ -108,8 +108,8 @@ float LocalController::getHysteresisSeconds() {
     return this->settings->getHysteresisSeconds();
 }
 
-void LocalController::startAutotune() {
-    this->communicationPeripherals->startAutotune();
+void LocalController::startAutotune(float targetTemperature, int samples) {
+    this->communicationPeripherals->startAutotune(targetTemperature, samples);
 }
 
 void LocalController::stopAutotune() {

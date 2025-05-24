@@ -463,7 +463,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "TUNING");
 
     if (ptr == command) {
-        controller->startAutotune();
+        communicationPeripherals->startAutotune(atof(strtok(params, " ")), atoi(strtok(NULL, " ")));
         return;
     }
 

@@ -1,12 +1,14 @@
 #include "NTC_Sensor_Temperature.h"
 
+constexpr int AVERAGE_SAMPLES = 50;
+
 NTC_Sensor_Temperature::NTC_Sensor_Temperature(Thermistor *thermistor, on_change_callback_t on_change) {
     this->thermistor = thermistor;
     this->on_change = on_change;
 }
 
 float NTC_Sensor_Temperature::getTemperature() {
-    return thermistor->readCelsius();
+    return this->temperature;
 }
 
 
@@ -19,14 +21,19 @@ void NTC_Sensor_Temperature::setup() {
 [[noreturn]] void NTC_Sensor_Temperature::monitorTask(void *pvParameters) {
     NTC_Sensor_Temperature *self = (NTC_Sensor_Temperature *)pvParameters;
     while (true) {
-        self->loop();
-        vTaskDelay(pdMS_TO_TICKS(100));
+        float temperature = self->thermistor->readCelsius();
+        for (int i = 0; i < AVERAGE_SAMPLES; i++) {
+            temperature += round(self->thermistor->readCelsius() * 100) / 100.0;
+            vTaskDelay(pdMS_TO_TICKS(10));
+        }
+
+        self->temperature = round(temperature *100 / AVERAGE_SAMPLES  ) / 100.0;
+        self->on_change();
     }
 }
 
 void NTC_Sensor_Temperature::loop() {
-    this->getTemperature();
-    this->on_change();
+    
 }
 
 NTC_Sensor_Temperature::~NTC_Sensor_Temperature() {

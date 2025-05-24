@@ -42,23 +42,32 @@ NTC_Thermistor thermistor(
 
 #endif
 
-Thermistor * averageThermistor = new AverageThermistor(
-  &thermistor,
-  READINGS_NUMBER,
-  DELAY_TIME
-  );
-
 #include <SimpleKalmanFilter.h>
-SimpleKalmanFilter kfilter(2, 2, 0.01);
+SimpleKalmanFilter kfilter(1, 1, 0.01);
 
-TemperatureSensor * temperatureSensor = new NTC_Sensor_Temperature(averageThermistor, []() {
+TemperatureSensor * temperatureSensor = new NTC_Sensor_Temperature(&thermistor, []() {
   state.current_temperature_c = kfilter.updateEstimate(temperatureSensor->getTemperature());
 });
 
 PID *pid = new PID(&state.current_temperature_c, &state.output_val, &state.target_temperature_c,KP, KI,KD, DIRECT);
 
 Heater *heater = new HeaterSSR(temperatureSensor, pid, HEATER_PIN, &state.target_temperature_c, &state.output_val, &state.current_temperature_c, []() {
-  // TODO: send output to server 
+
+  
+
+}, []() {
+  settings.setKp(
+    ((HeaterSSR*)heater)->pid->GetKp()
+  );
+  settings.setKi(
+    ((HeaterSSR*)heater)->pid->GetKi()
+  );
+  settings.setKd(
+    ((HeaterSSR*)heater)->pid->GetKd()
+  );
+
+  mainTaskMachine.setState(&idleState);
+
 });
 
 Relay *pump = new Relay(PUMP_PIN, 0, []() {
@@ -95,12 +104,13 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
   [](float power) {
     settings.setPowerWatts(power);
   },
-  []() {
+  [](float targetTemperature, int samples) {
+    Serial.println("Starting autotune");
     mainTaskMachine.setState(&tuningState);
-    heater->startAutotune();
+    heater->startAutotune(targetTemperature, samples);
   },
   []() {
-    mainTaskMachine.setState(&idleState);
+    Serial.println("Stopping autotune");
     heater->stopAutotune();
   }
 );

@@ -1,4 +1,5 @@
 #include "LocalCommunication.h"
+#include <Arduino.h>
 
 LocalCommunication::LocalCommunication() {
 }
@@ -8,6 +9,8 @@ LocalCommunication::LocalCommunication(temp_read_callback_t tempReadCallback, pi
     this->pidParametersCallback = pidParametersCallback;
     this->volumeCallback = volumeCallback;
     this->powerCallback = powerCallback;
+    this->autotuneCallback = autotuneCallback;
+    this->stopAutotuneCallback = stopAutotuneCallback;
 }
 
 LocalCommunication::~LocalCommunication() {
@@ -37,9 +40,11 @@ void LocalCommunication::setPower(float power) {
     }
 }
 
-void LocalCommunication::startAutotune() {
+void LocalCommunication::startAutotune(float targetTemperature, int samples) {
+    Serial.println(" autotune");
     if (autotuneCallback) {
-        autotuneCallback();
+        Serial.println("Starting autotune");
+        autotuneCallback(targetTemperature, samples);
     }
 }
 
