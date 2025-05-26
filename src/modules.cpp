@@ -66,6 +66,7 @@ Heater *heater = new HeaterSSR(temperatureSensor, pid, HEATER_PIN, &state.target
     ((HeaterSSR*)heater)->pid->GetKd()
   );
 
+
   mainTaskMachine.setState(&idleState);
 
 });
@@ -97,6 +98,7 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
     settings.setTime(sampleTime);
     pid->SetTunings(kp, ki, kd, pOn);
     pid->SetSampleTime(sampleTime);
+    pid->SetMode(AUTOMATIC);
   },
   [](float volume) {
     settings.setVolumeLiters(volume);

@@ -84,31 +84,35 @@ void Settings::setWifiPassword(String wifiPassword) {
 }
 
 void Settings::setKp(float kp) { 
-
+    ESP_LOGI("Settings", "Setting kp to %f", kp);
     if(this->kp != kp) {
         this->kp = kp;
         isDirty = true;
     }
 } 
 void Settings::setKi(float ki) { 
+    ESP_LOGI("Settings", "Setting ki to %f", ki);
     if(this->ki != ki) {
         this->ki = ki;
         isDirty = true;
     }
 }
 void Settings::setKd(float kd) { 
+    ESP_LOGI("Settings", "Setting kd to %f", kd);
     if(this->kd != kd) {
         this->kd = kd;
         isDirty = true;
     }
 }
 void Settings::setPOn(float pOn) { 
+    ESP_LOGI("Settings", "Setting pOn to %f", pOn);
     if(this->pOn != pOn) {
         this->pOn = pOn;
         isDirty = true;
     }
 }
 void Settings::setTime(float time) { 
+    ESP_LOGI("Settings", "Setting time to %f", time);
     if(this->time != time) {
         this->time = time;
         isDirty = true;

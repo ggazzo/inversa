@@ -19,10 +19,10 @@ class HeaterSSR : public Heater {
         void startAutotune(int tuningTemp, int samples) override;
         void stopAutotune() override;
 
-        float softPwm(uint32_t windowSize, uint8_t debounce);
         PID *pid;
     private:
 
+        void softPwm();
         void loopAutotune();
 
         uint8_t pin;
@@ -38,6 +38,8 @@ class HeaterSSR : public Heater {
 
         PIDAutotuner *tuner = nullptr;
         on_autotune_ends_callback_t on_autotune_ends;
+
+        int8_t pwmFrequency = 10;
     protected:
         xTaskHandle taskHandle;
 };
