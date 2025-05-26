@@ -6,6 +6,19 @@
     <title>BLE Control UI</title>
     <link rel="manifest" href="/manifest.json" />
     <meta name="theme-color" content="#007bff" />
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('ServiceWorker registration successful');
+            })
+            .catch(err => {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+        });
+      }
+    </script>
     <style>
       body {
         font-family: sans-serif;
@@ -302,6 +315,27 @@
         <div id="preferencesValues" style="display: grid; grid-template-columns: auto 1fr; gap: 5px 10px;">
           <!-- This div is still used by the existing JS to display raw data if getPreferencesButton is clicked without opening the details -->
           <p>Click "Show Preferences" to load.</p>
+        </div>
+      </div>
+
+      <h2>Tuning Command</h2>
+      <div id="tuningCommandSection" style="margin-top: 20px">
+        <div class="config-item">
+          <label for="tuningTempInput">Target Temperature (°C):</label>
+          <input type="number" id="tuningTempInput" step="0.1" placeholder="e.g., 25.0" style="width: 100px;" />
+        </div>
+        <div class="config-item">
+          <label for="tuningStepsInput">Number of Steps:</label>
+          <input type="number" id="tuningStepsInput" min="1" max="100" value="10" style="width: 100px;" />
+        </div>
+        <button id="startTuningButton" style="margin-top: 10px; background-color: #28a745;">Start Tuning</button>
+        <button id="stopTuningButton" style="margin-top: 10px; margin-left: 10px; background-color: #dc3545; display: none;">Stop Tuning</button>
+        <div id="tuningStatus" style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f8f9fa; display: none;">
+          <h4>Tuning Status:</h4>
+          <div>Current Step: <span id="currentStep">0</span>/<span id="totalSteps">0</span></div>
+          <div>Current Temperature: <span id="tuningCurrentTemp">N/A</span>°C</div>
+          <div>Target Temperature: <span id="tuningTargetTemp">N/A</span>°C</div>
+          <div>Time Remaining: <span id="tuningTimeRemaining">N/A</span></div>
         </div>
       </div>
 

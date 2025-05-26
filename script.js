@@ -160,6 +160,90 @@ document.addEventListener("DOMContentLoaded", () => {
   // Store last known sample time
   let lastKnownSampleTime = 1000; // Default if not received
 
+  // Tuning Command Variables
+  let tuningInterval = null;
+  let currentTuningStep = 0;
+  let totalTuningSteps = 0;
+  let tuningTargetTemp = 0;
+
+  // Tuning Command Functions
+  function startTuning() {
+    const targetTemp = parseFloat(
+      document.getElementById("tuningTempInput").value
+    );
+    const steps = parseInt(document.getElementById("tuningStepsInput").value);
+
+    if (isNaN(targetTemp) || isNaN(steps)) {
+      alert("Please enter valid values for all tuning parameters");
+      return;
+    }
+
+    if (steps < 1 || steps > 100) {
+      alert("Number of steps must be between 1 and 100");
+      return;
+    }
+
+    currentTuningStep = 0;
+    totalTuningSteps = steps;
+    tuningTargetTemp = targetTemp;
+
+    // Update UI
+    document.getElementById("startTuningButton").style.display = "none";
+    document.getElementById("stopTuningButton").style.display = "inline-block";
+    document.getElementById("tuningStatus").style.display = "block";
+    document.getElementById("totalSteps").textContent = steps;
+    document.getElementById("tuningTargetTemp").textContent =
+      targetTemp.toFixed(1);
+
+    // Start tuning process
+    executeTuningStep();
+  }
+
+  function stopTuning() {
+    if (tuningInterval) {
+      clearInterval(tuningInterval);
+      tuningInterval = null;
+    }
+
+    // Reset UI
+    document.getElementById("startTuningButton").style.display = "inline-block";
+    document.getElementById("stopTuningButton").style.display = "none";
+    document.getElementById("tuningStatus").style.display = "none";
+
+    // Send stop command to device
+    sendCommand("STOP_TUNING");
+  }
+
+  function executeTuningStep() {
+    if (currentTuningStep >= totalTuningSteps) {
+      stopTuning();
+      return;
+    }
+
+    // Calculate temperature for this step
+    const stepTemp = tuningTargetTemp;
+
+    // Send command to device
+    sendCommand(
+      `TUNING_STEP:${stepTemp.toFixed(1)}:${
+        currentTuningStep + 1
+      }:${totalTuningSteps}`
+    );
+
+    // Update UI
+    document.getElementById("currentStep").textContent = currentTuningStep + 1;
+
+    currentTuningStep++;
+  }
+
+  // Add event listeners for tuning controls
+  document
+    .getElementById("startTuningButton")
+    .addEventListener("click", startTuning);
+  document
+    .getElementById("stopTuningButton")
+    .addEventListener("click", stopTuning);
+
   // Helper function to append to command output area
   function appendToCommandOutput(message, type = "info") {
     if (!commandOutputArea) return;
@@ -1570,10 +1654,10 @@ document.addEventListener("DOMContentLoaded", () => {
         const success = await sendCommand(cmd, (response) => {
           if (response && !response.error) {
             commandsSuccessfullyAcknowledged++;
-            appendToCommandOutput(`Command \"${cmd}\" ACK.`, "response");
+            appendToCommandOutput(`Command "${cmd}" ACK.`, "response");
           } else {
             appendToCommandOutput(
-              `Command \"${cmd}\" failed or no ACK: ${
+              `Command "${cmd}" failed or no ACK: ${
                 response ? response.error : "Unknown"
               }.`,
               "error"
@@ -1582,7 +1666,7 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         if (!success) {
           // sendCommand itself failed (e.g. BLE write error)
-          appendToCommandOutput(`Failed to send command \"${cmd}\".`, "error");
+          appendToCommandOutput(`Failed to send command "${cmd}".`, "error");
         }
       };
 
