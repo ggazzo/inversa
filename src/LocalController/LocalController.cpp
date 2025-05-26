@@ -25,6 +25,7 @@ void LocalController::setTargetTemperatureAndWait(float target_temperature_c) {
 
 void LocalController::abort() {
     this->task->setState(&idleState);
+    this->stopTotalTimeCounter();
 }
 
 void LocalController::skip() {
@@ -114,4 +115,40 @@ void LocalController::startAutotune(float targetTemperature, int samples) {
 
 void LocalController::stopAutotune() {
     this->communicationPeripherals->stopAutotune();
+}
+
+void LocalController::startTotalTimeCounter(unsigned long start_time_seconds) {
+    this->totalTimeStart = start_time_seconds;
+}
+
+void LocalController::startTotalTimeCounter() {
+    this->startTotalTimeCounter(this->rtc->now().secondstime());
+}
+
+unsigned long LocalController::getTimeStart() {
+    return this->totalTimeStart;
+}
+
+void LocalController::stopTotalTimeCounter() {
+    this->totalTimeStart = 0;
+    this->setEstimatedTime(0);
+}
+
+void LocalController::resetTotalTimeCounter() { 
+    this->totalTimeStart = 0;
+}
+
+unsigned long LocalController::getElapsedTime() {
+    if (this->totalTimeStart == 0) {
+        return 0;
+    }
+    return this->rtc->now().secondstime() - this->totalTimeStart;
+}
+
+void LocalController::setEstimatedTime(unsigned long estimatedTime_seconds) {
+    this->estimatedTime = estimatedTime_seconds;
+}
+
+unsigned long LocalController::getEstimatedTime() {
+    return this->estimatedTime;
 }

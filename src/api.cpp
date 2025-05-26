@@ -49,8 +49,8 @@ void setupAPI(AsyncWebServer *server, MainController<StateType> *controller) {
     });
 
     // POST /api/start
-    server->on("/api/start", HTTP_POST, [](AsyncWebServerRequest *request) {
-        startOperation();
+    server->on("/api/start", HTTP_POST, [controller](AsyncWebServerRequest *request) {
+        controller->startTotalTimeCounter();
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 

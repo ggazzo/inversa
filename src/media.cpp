@@ -17,7 +17,6 @@ extern RTC_DS1307 rtc;
 #include "media.h"
 #include "state.h"
 #include "command.h"
-#include "total_time_counter.h"
 
 extern char fileNames[MAX_FILES][30];
 extern SDCardState sdCardState;
@@ -86,7 +85,7 @@ void saveStateToPowerLoss() {
 
     #ifndef USE_RTC 
     unsigned long timer_current_seconds = timer.timeRemaining();
-    unsigned long total_timer_count_seconds = getTotalTimeCounter();
+    unsigned long total_timer_count_seconds = getElapsedTime();
     state.total_timer_count_seconds = total_timer_count_seconds;
     state.timer_current_seconds = timer_current_seconds;
 
@@ -166,7 +165,7 @@ void recoveryFromPowerLoss() {
         if(storedState.start_total_time_seconds) {
             LOG_SERIAL("Resuming total time counter ");
             LOG_SERIAL_L(storedState.start_total_time_seconds);
-            startTotalTimeCounter(storedState.start_total_time_seconds * 1000);
+            controller->setEstimatedTime(storedState.start_total_time_seconds);
         }
         #else
         if(storedState.total_timer_count_seconds) {
@@ -251,9 +250,9 @@ void recoveryFromPowerLoss() {
         LOG_SERIAL_L(POWER_LOSS_RECOVERY_FILE);
         SD.remove(POWER_LOSS_RECOVERY_FILE);
 
-        startOperation();
+        controller->startTotalTimeCounter();
     }
-    
+
 #endif
 }
 

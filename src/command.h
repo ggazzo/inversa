@@ -31,7 +31,6 @@ void readCommandFromSerial(Stream *input);
 void readCommands(void);
 
 void abortOperation();
-void startOperation();
 
 void setTargetTemperature(float target_temperature_c);
 

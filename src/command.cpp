@@ -9,7 +9,6 @@
 #include <string.h>
 #include "media.h"
 #include "timer.h"
-#include "total_time_counter.h"
 #include "States/stateMachine.h"
 #include "States/TimerState.h"
 #include "logs.h"
@@ -252,26 +251,21 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     
 
 
-
-    if (strcmp(command, "TOTAL_TIME_START") == 0) {
-        startTotalTimeCounter();
+    if (strcmp(command, "START") == 0) {
+        controller->startTotalTimeCounter();
         return;
     }
 
     if (strcmp(command, "TOTAL_TIME_RESET") == 0) {
-        resetTotalTimeCounter();
+        controller->resetTotalTimeCounter();
     }
 
     if (strcmp(command, "TOTAL_TIME_STOP") == 0) {
-        stopTotalTimeCounter();
+        controller->stopTotalTimeCounter();
         return;
     }
 
 
-    if (strcmp(command, "START") == 0) {
-        startOperation();
-        return;
-    }
 
 
     if (strcmp(command, "CONFIRM") == 0) {
@@ -326,15 +320,16 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
 
     if (strcmp(command, "SYNC") == 0) {
         (*doc)["type"] = "sync";
-
         (*doc)["temperature"] = state.current_temperature_c;
         (*doc)["target_temperature"] = state.target_temperature_c;
         (*doc)["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
-        (*doc)["started"] = state.started;
-        (*doc)["time"] = settings.getTime();
-        (*doc)["target_preparing_time"] = DateTime(state.target_preparing_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
-        (*doc)["state"] = controller->getState();
         (*doc)["sd_present"] = state.sd_present;
+        (*doc)["state"] = controller->getState();
+
+
+        (*doc)["started_at"] = controller->getTimeStart();
+        (*doc)["elapsed_time"] = controller->getElapsedTime();
+        (*doc)["estimated_time"] = controller->getEstimatedTime();
 
         return;
     }
@@ -370,18 +365,6 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     }
 
-    ptr = strstr(command, "TOTAL_TIME_MILESTONE");
-    if (ptr == command) {
-        formatTotalTime(buffer, sizeof(buffer));
-        output->print(buffer);
-         if(params != nullptr) {
-            output->print(" ");
-            output->println(params);
-        } else {
-            output->println();
-        }
-        return;
-    }
 
 #ifdef HAS_MEDIA
     ptr = strstr(command, "LOGFILE");
@@ -528,15 +511,10 @@ void readCommands(void) {
     readCommandFromSDCard();
 }
 
-void startOperation() {
-    state.started = true;
-};
 
 void abortOperation()
 {
     timer.stop();
-    stopTotalTimeCounter();
-    setEstimatedTime(0);
     state.started = false;
     removeStateFromPowerLoss();
     controller->abort();

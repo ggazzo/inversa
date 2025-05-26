@@ -37,14 +37,26 @@ class LocalController : public MainController<StateType> {
         void startAutotune(float targetTemperature, int samples) override;
         void stopAutotune() override;
 
+        void startTotalTimeCounter() override;
+        unsigned long getTimeStart() override;
+        void startTotalTimeCounter(unsigned long start_time_seconds) override;
+        void stopTotalTimeCounter() override;
+        void resetTotalTimeCounter() override;
+        void setEstimatedTime(unsigned long estimatedTime_seconds) override;
+        unsigned long getEstimatedTime() override;
+
+        unsigned long getElapsedTime() override;
+
         StateType getState() override;
-
-
         MachineState *state;
     private:
         RTC_DS1307 *rtc;
         NTPClient timeClient;
         PeripheralController *peripheralController;
+
+
+        unsigned long totalTimeStart = 0;
+        unsigned long estimatedTime = 0;
 };
 
 #endif

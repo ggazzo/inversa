@@ -39,23 +39,9 @@ struct MachineState {
     double output_val;
 
     bool started = false;
-    
-
+    bool tuning = false;
     bool sd_present = false;
 
-
-
-    size_t file_position = 0;
-    char file_name[30];
-
-    char log_file_name[30];
-
-    char confirm_message[20];
-    char message[20] = "";
-    char message_line_2[20] = "";
-    char message_line_3[20] = "";
-
-    bool tuning = false;
 
     #if defined(USE_RTC)
     uint32_t target_preparing_time_seconds = 0;
@@ -68,6 +54,18 @@ struct MachineState {
     unsigned long total_timer_count_seconds = 0;
 
     #endif
+
+
+
+
+    size_t file_position = 0;
+    char file_name[30];
+    char log_file_name[30];
+
+    char confirm_message[20];
+    char message[20] = "";
+    char message_line_2[20] = "";
+    char message_line_3[20] = "";
 };
 
 #endif

@@ -51,10 +51,20 @@ class MainController : public Controller {
         virtual void stopAutotune() = 0;
         virtual T getState() = 0;
 
+        virtual void startTotalTimeCounter() = 0;
+        virtual unsigned long getTimeStart() = 0;
+        virtual void startTotalTimeCounter(unsigned long start_time_seconds) = 0;
+        virtual void stopTotalTimeCounter() = 0;
+        virtual void resetTotalTimeCounter() = 0;
+        virtual unsigned long getElapsedTime() = 0;
+        virtual void setEstimatedTime(unsigned long estimatedTime_seconds) = 0;
+        virtual unsigned long getEstimatedTime() = 0;
+
     protected:
         StateMachine *task;
         Settings *settings;
         CommunicationPeripherals *communicationPeripherals;
+
 };
 
 #endif
