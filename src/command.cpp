@@ -318,6 +318,11 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     }
 
+    if(strcmp(command, "SET_STEP") == 0) {
+        controller->setStep((Steps)atoi(params));
+        return;
+    }
+
     if (strcmp(command, "SYNC") == 0) {
         (*doc)["type"] = "sync";
         (*doc)["temperature"] = state.current_temperature_c;
@@ -328,7 +333,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["state"] = controller->getState();
         (*doc)["step"] = controller->getStep();
 
-        (*doc)["started_at"] = controller->getTimeStart();
+        (*doc)["started_at"] = controller->getTimeStart() + SECONDS_FROM_1970_TO_2000;
         (*doc)["elapsed_time"] = controller->getElapsedTime();
         (*doc)["estimated_time"] = controller->getEstimatedTime();
 
