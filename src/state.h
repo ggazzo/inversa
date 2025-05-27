@@ -12,9 +12,11 @@
 
 enum Steps
 {
+    IDLE,
     PRE_HEATING,
     MASHING,
     MASH_OUT,
+    SPARGE,
     BOILING,
     COOLING,
     DONE,
