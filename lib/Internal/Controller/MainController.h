@@ -50,7 +50,13 @@ class MainController : public Controller {
         virtual void startAutotune(float targetTemperature, int samples) = 0;
         virtual void stopAutotune() = 0;
         virtual T getState() = 0;
-        virtual S getStep() = 0;
+        virtual S getStep() {
+            return this->state;
+        }
+
+        virtual void setStep(S step) {
+            this->state = step;
+        }
 
         virtual void startTotalTimeCounter() = 0;
         virtual unsigned long getTimeStart() = 0;

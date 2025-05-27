@@ -326,7 +326,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["sd_present"] = state.sd_present;
         
         (*doc)["state"] = controller->getState();
-
+        (*doc)["step"] = controller->getStep();
 
         (*doc)["started_at"] = controller->getTimeStart();
         (*doc)["elapsed_time"] = controller->getElapsedTime();

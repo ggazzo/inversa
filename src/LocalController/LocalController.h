@@ -48,7 +48,6 @@ class LocalController : public MainController<StateType, Steps> {
         unsigned long getElapsedTime() override;
 
         StateType getState() override;
-        Steps getStep() override;
 
         MachineState *state;
     private:

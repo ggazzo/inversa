@@ -93,9 +93,6 @@ StateType LocalController::getState() {
     return this->state->current;
 }
 
-Steps LocalController::getStep() {
-    return this->currentStep;
-}
 
 void LocalController::setState(StateType state) {
     this->state->current = state;
