@@ -2,6 +2,7 @@
 #define LOCAL_CONTROLLER_H
 #include <RTClib.h>
 #include <NTPClient.h>
+#include "ESP32FtpServer.h"
 
 #include "Controller/PeripheralController.h"
 #include "Controller/MainController.h"
@@ -56,6 +57,7 @@ class LocalController : public MainController<StateType, Steps> {
         PeripheralController *peripheralController;
 
         Steps currentStep;
+        FtpServer ftpSrv;
 
 
         unsigned long totalTimeStart = 0;

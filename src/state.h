@@ -12,7 +12,7 @@
 
 enum Steps
 {
-    IDLE,
+    NONE,
     PRE_HEATING,
     MASHING,
     MASH_OUT,
