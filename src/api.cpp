@@ -173,4 +173,30 @@ void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controll
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
     #endif
+
+    // GET /api/file
+    server->on("/api/file", HTTP_GET, [](AsyncWebServerRequest *request) {
+        if (request->hasParam("filename")) {
+            String filename = request->getParam("filename")->value();
+            File file = SD.open("/" + filename, FILE_READ);
+            
+            if (!file) {
+                request->send(404, "application/json", "{\"error\":\"File not found\"}");
+                return;
+            }
+
+            String content = file.readString();
+            file.close();
+
+            JsonDocument doc;
+            doc["filename"] = filename;
+            doc["content"] = content;
+            
+            String response;
+            serializeJson(doc, response);
+            request->send(200, "application/json", response);
+        } else {
+            request->send(400, "application/json", "{\"error\":\"Missing filename parameter\"}");
+        }
+    });
 } 
