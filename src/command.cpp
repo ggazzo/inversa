@@ -217,7 +217,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
             controller->setTargetTemperatureAndWait(atof(params));
             return;
         }
-        ptr = strstr(command, "ENTER_CONFIRM");
+        ptr = strstr(command, "WAIT_CONFIRM");
         if (ptr == command) {
             if(params == nullptr) {
                 controller->waitConfirmation();
