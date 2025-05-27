@@ -33,7 +33,6 @@ extern Settings settings;
 
 #include "modules.h"
 
-extern PreparingStateMachine preparingState;
 extern WaitForTimerStateMachine timerState;
 extern SDCardState sdCardState;
 
@@ -233,8 +232,10 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         if (ptr == command) {
             float targetTemp = atof(strtok(params, " "));
             unsigned long minutes = atol(strtok(NULL, " "));
-
             controller->prepareTemperature(targetTemp, minutes);
+            (*doc)["status"] = "ok";
+            ESP_LOGI("PREPARE_RELATIVE", "Preparing for %d minutes", minutes);
+            return;
         }
 
         // PREPARE_ABSOLUTE 45 2024/10/21T23:25:00
@@ -243,8 +244,8 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
             float targetTemp = atof(strtok(params, " "));
             char isoDate[20];
             strcpy(isoDate, strtok(NULL, " "));
-            // prepareTemperature(targetTemp, (DateTime(isoDate).secondstime() - rtc.now().secondstime())/ 60, settings.getVolumeLiters(), settings.getPowerWatts());
             controller->prepareTemperature(targetTemp, isoDate);
+            return;
         }
 
     }
@@ -258,6 +259,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
 
     if (strcmp(command, "TOTAL_TIME_RESET") == 0) {
         controller->resetTotalTimeCounter();
+        return;
     }
 
     if (strcmp(command, "TOTAL_TIME_STOP") == 0) {

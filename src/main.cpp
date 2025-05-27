@@ -126,13 +126,15 @@ void setup() {
 
 void loop()
 {
-  controller->loop();
+  static unsigned long lastLoopTime = 0;
+  if (millis() - lastLoopTime > 100) {
+    lastLoopTime = millis();
+    controller->loop();
+  }
 
   #ifdef OTA
     handleOTA();
   #endif
 
   ws.cleanupClients();
-
-  
 }

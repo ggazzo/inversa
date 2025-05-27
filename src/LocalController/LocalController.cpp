@@ -34,13 +34,13 @@ void LocalController::skip() {
     this->task->setState(&idleState);
 }
 
-void LocalController::prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_seconds) {
+void LocalController::prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_minutes) {
 
     preparingState.volume_liters = settings->getVolumeLiters();
     preparingState.power_watts = settings->getPowerWatts();
     preparingState.target_temperature_c = targetTemperature_celsius;
 
-    preparingState.time_seconds = desiredTime_minutes_from_now_seconds;
+    preparingState.time_seconds = desiredTime_minutes_from_now_minutes * 60;
 
     // #ifdef USE_RTC 
     //     state.target_preparing_time_seconds = rtc->now().secondstime() + preparingState.time_seconds;

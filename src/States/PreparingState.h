@@ -6,7 +6,7 @@
 #include <CountDown.h>
 #include "media.h"
 #include "calc.h"
-
+#include "command.h"
 #include "modules.h"
 
 /**
@@ -19,44 +19,46 @@
  */
 
 class PreparingStateMachine : public State {
-
+   private:
+      xTaskHandle taskHandle;
+      static void monitorTask(void *pvParameters);
    public:
       virtual ~PreparingStateMachine() = default;
       PreparingStateMachine() : State("PreparingStateMachine") {}
       CountDown countDown = CountDown(CountDown::SECONDS);
       float time_seconds = 0;
-
       float volume_liters = 0;
       float power_watts = 0;
       float target_temperature_c = 0;
 
       void enter() override {
-
-         if (time_seconds){
+         if (time_seconds) {
             countDown.start(time_seconds);
          }
 
          controller->setState(StateType::PREPARING);
-
          handlePowerLoss();
-      }
-      void run() override {
-         if(countDown.isStopped())
-         {
-            controller->skip();
-            return;
-         }
 
-         if(countDown.remaining() <= calculateHeatingTime_seconds(volume_liters, power_watts, controller->getTemperature(), target_temperature_c))
-         {
-            controller->setTargetTemperature(target_temperature_c);
-         } else {
-            controller->setTargetTemperature(0);
-         }
+         xTaskCreate(
+            monitorTask,
+            "PreparingStateMachine::monitor",
+            configMINIMAL_STACK_SIZE * 4,
+            this,
+            1,
+            &taskHandle
+         );
+      }
+
+      void run() override {
+         readCommands();
       }
 
       void exit() override {
          countDown.stop();
+         if (taskHandle != NULL) {
+            vTaskDelete(taskHandle);
+            taskHandle = NULL;
+         }
       }
 };
 
