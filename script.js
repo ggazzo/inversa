@@ -846,38 +846,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // --- Handle Telemetry (Incoming Data) ---
   function handleTelemetry(event) {
     // Determine if event is from BLE (event.target.value) or WebSocket (event.data)
-    let dataViewOrString;
-    let isWebSocket = false;
-    if (event.target && event.target.value) {
-      dataViewOrString = event.target.value; // BLE
-    } else if (event.data) {
-      dataViewOrString = event.data; // WebSocket
-      isWebSocket = true;
-    } else {
-      console.warn("Received telemetry event with no data.");
-      return;
-    }
+    const data = event.target?.value || event.data;
+    if (!data) return;
 
     try {
-      let jsonData;
-      if (isWebSocket) {
-        if (typeof dataViewOrString === "string") {
-          jsonData = JSON.parse(dataViewOrString);
-        } else {
-          // Assuming it might be ArrayBuffer or Blob from WebSocket, needs decoding
-          // This part might need adjustment based on how your WS sends data
-          console.warn(
-            "Received non-string data from WebSocket, decoding not implemented here."
-          );
-          return;
-        }
-      } else {
-        // BLE: Assuming DataView, needs TextDecoder
-        const decoder = new TextDecoder("utf-8");
-        const receivedString = decoder.decode(dataViewOrString);
-        jsonData = JSON.parse(receivedString);
+      // Convert data to string if it's not already
+      const dataStr =
+        typeof data === "string" ? data : new TextDecoder().decode(data);
+      console.log("Received telemetry:", dataStr);
+
+      // Try to parse as JSON
+      const jsonData = JSON.parse(dataStr);
+
+      // Handle timer updates
+      if (jsonData) {
+        updateTimersDisplay(jsonData);
       }
 
+      // Handle other telemetry data
       appendToCommandOutput(
         `Received: ${JSON.stringify(jsonData)}`,
         "response"
@@ -1758,6 +1744,76 @@ document.addEventListener("DOMContentLoaded", () => {
         }, 1000); // Wait a bit more before refreshing
       }, 500); // Adjust delay as needed
     };
+  }
+
+  // Timer handling functions
+  function updateTimersDisplay({
+    started_at,
+    elapsed_time,
+    estimated_time,
+    step,
+  }) {
+    const container = document.getElementById("activeTimersContainer");
+    if (!container) return;
+
+    // Clear existing timers
+    container.innerHTML = "";
+
+    const timerElement = document.createElement("div");
+    timerElement.className = "timer-item";
+    timerElement.style.display = "block";
+    timerElement.style.marginBottom = "5px";
+    timerElement.style.padding = "5px";
+    timerElement.style.backgroundColor = "#f8f9fa";
+    timerElement.style.borderRadius = "4px";
+
+    const stepSpan = document.createElement("span");
+    stepSpan.className = "timer-step";
+    stepSpan.textContent = `Step: ${step || "N/A"}`;
+    stepSpan.style.fontWeight = "bold";
+    stepSpan.style.marginRight = "10px";
+    stepSpan.style.color = "#28a745";
+
+    const startedSpan = document.createElement("span");
+    startedSpan.className = "timer-started";
+    startedSpan.textContent = `Started: ${new Date(
+      started_at * 1000
+    ).toLocaleTimeString()}`;
+    startedSpan.style.fontWeight = "bold";
+    startedSpan.style.marginRight = "10px";
+
+    const elapsedSpan = document.createElement("span");
+    elapsedSpan.className = "timer-elapsed";
+    elapsedSpan.textContent = `Elapsed: ${formatTime(elapsed_time)}`;
+    elapsedSpan.style.marginRight = "10px";
+    elapsedSpan.style.color = "#666";
+
+    const remainingSpan = document.createElement("span");
+    remainingSpan.className = "timer-remaining";
+    if (estimated_time > 0) {
+      remainingSpan.textContent = `Remaining: ${formatTime(estimated_time)}`;
+    } else {
+      remainingSpan.textContent = "No time estimate";
+    }
+    remainingSpan.style.color = "#007bff";
+
+    timerElement.appendChild(stepSpan);
+    timerElement.appendChild(startedSpan);
+    timerElement.appendChild(elapsedSpan);
+    timerElement.appendChild(remainingSpan);
+
+    container.appendChild(timerElement);
+  }
+
+  function formatTime(seconds) {
+    if (!seconds || seconds < 0) return "00:00:00";
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(
+      2,
+      "0"
+    )}:${String(secs).padStart(2, "0")}`;
   }
 });
 
