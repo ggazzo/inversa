@@ -70,8 +70,21 @@ SET_TEMP 100
 # Wait for temperature to reach target
 WAIT_TEMP 100
 
-# Start a timer for 60 minutes
-WAIT_TIMER 3600
+# Start a timer for 15 minutes
+WAIT_TIMER 900
+
+# Wait for hop addition confirmation
+WAIT_CONFIRM "Hop addition confirmation. Proceed to next step?"
+
+# Wait for 10 minutes and add hops
+WAIT_TIMER 600
+
+WAIT_CONFIRM "Add hops, proceed to next step?"
+
+# Wait for 45 minutes
+WAIT_TIMER 2700
+
+WAIT_CONFIRM "Add hops, proceed to next step?"
 
 # Wait for confirmation before proceeding
 WAIT_CONFIRM "Boil completed. Proceed to next step?"
