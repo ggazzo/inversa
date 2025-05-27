@@ -32,5 +32,5 @@ extern PID *pid;
 
 
 extern Settings settings;
-extern MainController<StateType> *controller;
+extern MainController<StateType, Steps> *controller;
 extern CommunicationPeripherals *communicationPeripherals;

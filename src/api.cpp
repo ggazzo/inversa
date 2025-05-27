@@ -9,7 +9,7 @@ extern Settings settings;
 
 #define SECONDS_FROM_1970_TO_2000 946684800
 
-void setupAPI(AsyncWebServer *server, MainController<StateType> *controller) {
+void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controller) {
     // GET /api/temperature
     server->on("/api/temperature", HTTP_GET, [](AsyncWebServerRequest *request) {
         JsonDocument doc;

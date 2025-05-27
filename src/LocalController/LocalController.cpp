@@ -8,7 +8,7 @@ const long utcOffsetInSeconds = - 3 * 60 * 60;
 
 WiFiUDP ntpUDP;
 
-LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController): MainController<StateType>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController) {}
+LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController) {}
 
 void LocalController::confirm() {
     Serial.println("LocalController::confirm");
@@ -91,6 +91,10 @@ float LocalController::getPower() {
 
 StateType LocalController::getState() {
     return this->state->current;
+}
+
+Steps LocalController::getStep() {
+    return this->currentStep;
 }
 
 void LocalController::setState(StateType state) {

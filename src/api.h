@@ -7,6 +7,6 @@
 #include "Controller/MainController.h"
 #include "state.h"
 
-void setupAPI(AsyncWebServer *server, MainController<StateType> *controller);
+void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controller);
 
 #endif 

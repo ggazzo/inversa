@@ -119,4 +119,4 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
 
 RTC_DS1307 *rtc = new RTC_DS1307(); 
 
-MainController<StateType> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController);
+MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController);

@@ -324,6 +324,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["target_temperature"] = state.target_temperature_c;
         (*doc)["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
         (*doc)["sd_present"] = state.sd_present;
+        
         (*doc)["state"] = controller->getState();
 
 

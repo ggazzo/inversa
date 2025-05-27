@@ -10,6 +10,15 @@
  * later we can use it to restore the state and continue from there
  */
 
+enum Steps
+{
+    PRE_HEATING,
+    MASHING,
+    MASH_OUT,
+    BOILING,
+    COOLING,
+    DONE,
+};
 
 enum StateType {
     WAIT_TEMPERATURE,

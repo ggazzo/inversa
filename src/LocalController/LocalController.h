@@ -9,7 +9,7 @@
 
 #include "state.h"
 
-class LocalController : public MainController<StateType> {
+class LocalController : public MainController<StateType, Steps> {
     public:
         LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController);
         void setTargetTemperature(float target_temperature_c) override;
@@ -48,11 +48,15 @@ class LocalController : public MainController<StateType> {
         unsigned long getElapsedTime() override;
 
         StateType getState() override;
+        Steps getStep() override;
+
         MachineState *state;
     private:
         RTC_DS1307 *rtc;
         NTPClient timeClient;
         PeripheralController *peripheralController;
+
+        Steps currentStep;
 
 
         unsigned long totalTimeStart = 0;

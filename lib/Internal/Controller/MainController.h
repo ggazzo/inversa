@@ -7,7 +7,7 @@
 
 #include "StateMachine.h"
 
-template <typename T>
+template <typename T, typename S>
 class MainController : public Controller {
     public:
         MainController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals):
@@ -50,6 +50,7 @@ class MainController : public Controller {
         virtual void startAutotune(float targetTemperature, int samples) = 0;
         virtual void stopAutotune() = 0;
         virtual T getState() = 0;
+        virtual S getStep() = 0;
 
         virtual void startTotalTimeCounter() = 0;
         virtual unsigned long getTimeStart() = 0;
@@ -61,6 +62,7 @@ class MainController : public Controller {
         virtual unsigned long getEstimatedTime() = 0;
 
     protected:
+        S state;
         StateMachine *task;
         Settings *settings;
         CommunicationPeripherals *communicationPeripherals;
