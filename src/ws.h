@@ -27,29 +27,25 @@ public:
         return size;
     }
 
-     // Método para configurar o callback de mensagens
     void onMessage(std::function<void(uint8_t* data, size_t len)> callback) {
         onMessageCallback = callback;
     }
 
-    // Gerenciamento de eventos do WebSocket
     void handleWebSocketEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, 
                               AwsEventType type, uint8_t* data, size_t len) {
         switch (type) {
             case WS_EVT_CONNECT:
-                Serial.printf("Cliente %u conectado\n", client->id());  
                 break;
             case WS_EVT_DISCONNECT:
-                Serial.printf("Cliente %u desconectado\n", client->id());
+
                 break;
             case WS_EVT_DATA:
                 if (onMessageCallback) {
-                    onMessageCallback(data, len); // Chama o callback configurado
+                    onMessageCallback(data, len);
                 }
                 break;
             case WS_EVT_PONG:
             case WS_EVT_ERROR:
-                // Tratar eventos de PONG ou ERRO se necessário
                 break;
         }
     }
