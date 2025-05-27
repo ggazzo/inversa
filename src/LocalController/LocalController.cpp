@@ -9,7 +9,7 @@ const long utcOffsetInSeconds = - 3 * 60 * 60;
 WiFiUDP ntpUDP;
 
 LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController) {
-    this->state = 0;
+    this->step = Steps::NONE;
 }
 
 void LocalController::confirm() {
@@ -68,11 +68,13 @@ void LocalController::setup() {
             }
         }
     }
+    this->ftpSrv.begin("esp32", "esp32");
 }
 
 void LocalController::loop() {
     MainController::loop();
     peripheralController->loop();
+    this->ftpSrv.handleFTP();
 }
 
 void LocalController::waitConfirmation() {

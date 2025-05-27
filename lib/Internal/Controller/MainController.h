@@ -51,11 +51,11 @@ class MainController : public Controller {
         virtual void stopAutotune() = 0;
         virtual T getState() = 0;
         virtual S getStep() {
-            return this->state;
+            return this->step;
         }
 
         virtual void setStep(S step) {
-            this->state = step;
+            this->step = step;
         }
 
         virtual void startTotalTimeCounter() = 0;
@@ -68,7 +68,7 @@ class MainController : public Controller {
         virtual unsigned long getEstimatedTime() = 0;
 
     protected:
-        S state;
+        S step;
         StateMachine *task;
         Settings *settings;
         CommunicationPeripherals *communicationPeripherals;
