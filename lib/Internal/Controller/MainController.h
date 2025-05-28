@@ -59,13 +59,28 @@ class MainController : public Controller {
         }
 
         virtual void startTotalTimeCounter() = 0;
-        virtual unsigned long getTimeStart() = 0;
         virtual void startTotalTimeCounter(unsigned long start_time_seconds) = 0;
         virtual void stopTotalTimeCounter() = 0;
         virtual void resetTotalTimeCounter() = 0;
+        virtual unsigned long getTimeStart() = 0;
         virtual unsigned long getElapsedTime() = 0;
         virtual void setEstimatedTime(unsigned long estimatedTime_seconds) = 0;
         virtual unsigned long getEstimatedTime() = 0;
+
+
+        virtual void startStepTimeCounter() = 0;
+        virtual void startStepTimeCounter(unsigned long start_time_seconds) = 0;
+        virtual void stopStepTimeCounter() = 0;
+        virtual void resetStepTimeCounter() = 0;
+        virtual unsigned long getStepTimeStart() = 0;
+        virtual unsigned long getStepElapsedTime() = 0;
+        virtual void setStepEstimatedTime(unsigned long estimatedTime_seconds) = 0;
+
+        virtual void waitForStepTime() = 0;
+        virtual void waitForTimer(unsigned long duration_seconds) = 0;
+        virtual void stopTimer() = 0;
+        virtual bool isTimeFinished() = 0;
+
 
     protected:
         S step;

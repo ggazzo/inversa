@@ -102,10 +102,10 @@ void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controll
     });
 
     // POST /api/wait_timer
-    server->on("/api/wait_timer", HTTP_POST, [](AsyncWebServerRequest *request) {
+    server->on("/api/wait_timer", HTTP_POST, [controller](AsyncWebServerRequest *request) {
         if (request->hasParam("duration", true)) {
             unsigned long duration = request->getParam("duration", true)->value().toInt();
-            startTimer(duration);
+            controller->waitForTimer(duration);
             request->send(200, "application/json", "{\"status\":\"ok\"}");
         } else {
             request->send(400, "application/json", "{\"error\":\"Missing duration parameter\"}");
@@ -129,7 +129,7 @@ void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controll
             float temp = request->getParam("temperature", true)->value().toFloat();
             unsigned long minutes = request->getParam("minutes", true)->value().toInt();
             controller->setTargetTemperature(temp);
-            startTimer(minutes * 60);
+            controller->waitForTimer(minutes * 60);
             request->send(200, "application/json", "{\"status\":\"ok\"}");
         } else {
             request->send(400, "application/json", "{\"error\":\"Missing temperature or minutes parameter\"}");

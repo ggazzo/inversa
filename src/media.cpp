@@ -100,9 +100,9 @@ void saveStateToPowerLoss() {
         // Write state to file
 
 
-        if(timer.isFinished()) {
-            LOG_SERIAL_L("Timer finished");
-        }
+        // if(timer.isFinished()) {
+        //     LOG_SERIAL_L("Timer finished");
+        // }
 
         // Copy state to file
         file.write((uint8_t*)&state, sizeof(state));
@@ -123,7 +123,7 @@ void removeStateFromPowerLoss() {
 }
 
 void recoveryFromPowerLoss() {
-#ifdef HAS_MEDIA
+#ifdef HAS_MEDIAasd
     if(sdCardState.isMounted){
         File file = SD.open(POWER_LOSS_RECOVERY_FILE, FILE_READ);
         if(!file){

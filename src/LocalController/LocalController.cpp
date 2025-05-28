@@ -28,6 +28,7 @@ void LocalController::setTargetTemperatureAndWait(float target_temperature_c) {
 void LocalController::abort() {
     this->task->setState(&idleState);
     this->stopTotalTimeCounter();
+    this->stopTimer();
 }
 
 void LocalController::skip() {
@@ -156,4 +157,57 @@ void LocalController::setEstimatedTime(unsigned long estimatedTime_seconds) {
 
 unsigned long LocalController::getEstimatedTime() {
     return this->estimatedTime;
+}
+
+void LocalController::startStepTimeCounter() {
+    this->stepTimeStart = this->rtc->now().secondstime();
+}
+
+void LocalController::startStepTimeCounter(unsigned long start_time_seconds) {
+    this->stepTimeStart = start_time_seconds;
+}
+
+void LocalController::stopStepTimeCounter() {
+    this->stepTimeStart = 0;
+}
+
+void LocalController::resetStepTimeCounter() {
+    this->stepTimeStart = 0;
+}
+
+unsigned long LocalController::getStepTimeStart() {
+    return this->stepTimeStart;
+}
+
+unsigned long LocalController::getStepElapsedTime() {
+    if (this->stepTimeStart == 0) {
+        return 0;
+    }
+    return this->rtc->now().secondstime() - this->stepTimeStart;
+}
+
+void LocalController::setStepEstimatedTime(unsigned long estimatedTime_seconds) {
+    this->stepEstimatedTime = estimatedTime_seconds;
+}
+
+void LocalController::waitForStepTime() {
+    this->waitForTimer(this->stepEstimatedTime - this->getStepElapsedTime());
+}
+
+void LocalController::waitForTimer(unsigned long duration_seconds) {
+    timer.start(duration_seconds);
+    this->task->setState(&timerState);
+
+    #ifdef USE_RTC
+    auto current = this->rtc->now().secondstime();
+    this->state->target_timer_time_seconds = current + duration_seconds;
+    #endif
+}
+
+void LocalController::stopTimer() {
+    timer.stop();
+}
+
+bool LocalController::isTimeFinished() {
+    return timer.isFinished();
 }

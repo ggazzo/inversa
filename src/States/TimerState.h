@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <CountDown.h>
 #include "command.h"
-#include "timer.h"
 #include "media.h"
 
 
@@ -22,12 +21,12 @@ class WaitForTimerStateMachine : public State {
 
       void run() override {
           readCommands();
-          if(timer.isFinished()) {
+          if(controller->isTimeFinished()) {
               controller->skip();
           }
       }
 
       void exit() override {
-        timer.stop();
+        controller->stopTimer();
       }
 };

@@ -94,7 +94,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     // commands with no parameters
 
     if (strcmp(command, "BREAK") == 0 && !file) {
-        skipStep();
+        controller->skip();
         return;
     }
 
@@ -208,9 +208,16 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         ptr = strstr(command, "WAIT_TIMER");
         if (ptr == command) {
             unsigned long duration = atol(params);
-            startTimer(duration);
+            controller->waitForTimer(duration);
             return;
         }
+
+        ptr = strstr(command, "WAIT_STEP_TIME");
+        if (ptr == command) {
+            controller->waitForStepTime();
+            return;
+        }
+
         ptr = strstr(command, "WAIT_TEMPERATURE");
         if (ptr == command) {
             controller->setTargetTemperatureAndWait(atof(params));
@@ -522,19 +529,9 @@ void readCommands(void) {
 
 void abortOperation()
 {
-    timer.stop();
     state.started = false;
     removeStateFromPowerLoss();
     controller->abort();
-}
-
-void startTimer(unsigned long duration_seconds) {
-    timer.start(duration_seconds);
-    mainTaskMachine.setState(&timerState);
-    #ifdef USE_RTC
-    auto current = rtc.now().secondstime();
-    state.target_timer_time_seconds = current + duration_seconds;
-    #endif
 }
 
 void openFile(const char* filename) {
@@ -567,27 +564,4 @@ void openFile(const char* filename) {
     }
 
     mainTaskMachine.setState(&idleState);
-}
-
-void skipStep() {
-    State* currentState = mainTaskMachine.getCurrentState();
-    const char* stateName = currentState->name;
-
-    if (strcmp(stateName, "WaitForTimerStateMachine") == 0) {
-        char timer_buffer[8];
-        char buffer[30] = "WAIT_TIMER ";
-        sprintf(timer_buffer, "%lu", timer.elapsed());
-        strcat(buffer, timer_buffer);
-        return;
-    }
-
-    if (strcmp(stateName, "WaitForTemperatureStateMachine") == 0) {
-        char temperature_buffer[8];
-        char buffer[30] = "WAIT_TIMER ";
-        sprintf(temperature_buffer, "%f", state.current_temperature_c);
-        strcat(buffer, temperature_buffer);
-        return;
-    }
-
-    controller->skip();
 }

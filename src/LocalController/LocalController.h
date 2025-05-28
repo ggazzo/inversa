@@ -1,5 +1,6 @@
 #ifndef LOCAL_CONTROLLER_H
 #define LOCAL_CONTROLLER_H
+#include "timer.h"
 #include <RTClib.h>
 #include <NTPClient.h>
 #include "ESP32FtpServer.h"
@@ -48,6 +49,20 @@ class LocalController : public MainController<StateType, Steps> {
 
         unsigned long getElapsedTime() override;
 
+        void startStepTimeCounter() override;
+        void startStepTimeCounter(unsigned long start_time_seconds) override;
+        void stopStepTimeCounter() override;
+        void resetStepTimeCounter() override;
+        unsigned long getStepTimeStart() override;
+        unsigned long getStepElapsedTime() override;
+        void setStepEstimatedTime(unsigned long estimatedTime_seconds) override;
+
+        void waitForStepTime() override;
+
+        void waitForTimer(unsigned long duration_seconds) override;
+        void stopTimer() override;
+        bool isTimeFinished() override;
+
         StateType getState() override;
 
         MachineState *state;
@@ -62,6 +77,13 @@ class LocalController : public MainController<StateType, Steps> {
 
         unsigned long totalTimeStart = 0;
         unsigned long estimatedTime = 0;
+
+        unsigned long stepTimeStart = 0;
+        unsigned long stepEstimatedTime = 0;
+
+        
+
+        Timer timer;
 };
 
 #endif
