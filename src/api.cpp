@@ -40,7 +40,10 @@ void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controll
         doc["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
         doc["started"] = state.started;
         doc["time"] = settings.getTime();
-        doc["target_preparing_time"] = DateTime(state.target_preparing_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
+        doc["started_at"] = DateTime(state.total_time_seconds_start + SECONDS_FROM_1970_TO_2000).timestamp();
+        doc["target_timer_time_seconds"] = DateTime(state.target_timer_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
+        doc["step_time_seconds_start"] = DateTime(state.step_time_seconds_start + SECONDS_FROM_1970_TO_2000).timestamp();
+        doc["step_time_seconds_estimated"] = DateTime(state.step_time_seconds_estimated + SECONDS_FROM_1970_TO_2000).timestamp();
         doc["state"] = controller->getState();
         doc["sd_present"] = state.sd_present;
         String response;
@@ -55,8 +58,8 @@ void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controll
     });
 
     // POST /api/abort
-    server->on("/api/abort", HTTP_POST, [](AsyncWebServerRequest *request) {
-        abortOperation();
+    server->on("/api/abort", HTTP_POST, [controller](AsyncWebServerRequest *request) {
+        controller->abort();
         request->send(200, "application/json", "{\"status\":\"ok\"}");
     });
 

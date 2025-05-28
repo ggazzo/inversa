@@ -20,8 +20,6 @@ void waitUntilTemperatureReached(float temp);
 // void waitUntilTemperatureReached(float temp, float timeout);
 void startTimer(unsigned long duration);
 
-void abortOperation();
-
 void executeCommand(const char *command, Print* output);
 
 bool readCommand(Stream *input, char *buffer, int length);
@@ -30,7 +28,6 @@ void readCommandFromSerial(Stream *input);
 
 void readCommands(void);
 
-void abortOperation();
 
 void setTargetTemperature(float target_temperature_c);
 

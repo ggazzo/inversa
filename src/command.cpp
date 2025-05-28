@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "media.h"
-#include "timer.h"
 #include "States/stateMachine.h"
 #include "States/TimerState.h"
 #include "logs.h"
@@ -33,7 +32,6 @@ extern Settings settings;
 
 #include "modules.h"
 
-extern WaitForTimerStateMachine timerState;
 extern SDCardState sdCardState;
 
 #ifdef USE_RTC
@@ -47,8 +45,41 @@ extern PID *pid;
 char buffer[10];
 
 File file;
-#include "NuSerial.hpp";
+#include "NuSerial.hpp"
 
+// Simple base64 encoding
+const char base64_table[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+String base64_encode(const uint8_t* data, size_t length) {
+    String result;
+    result.reserve(((length + 2) / 3) * 4);
+    
+    for (size_t i = 0; i < length; i += 3) {
+        uint32_t octet_a = i < length ? data[i] : 0;
+        uint32_t octet_b = i + 1 < length ? data[i + 1] : 0;
+        uint32_t octet_c = i + 2 < length ? data[i + 2] : 0;
+
+        uint32_t triple = (octet_a << 16) + (octet_b << 8) + octet_c;
+
+        result += base64_table[(triple >> 18) & 0x3F];
+        result += base64_table[(triple >> 12) & 0x3F];
+        result += base64_table[(triple >> 6) & 0x3F];
+        result += base64_table[triple & 0x3F];
+    }
+
+    // Add padding
+    switch (length % 3) {
+        case 1:
+            result[result.length() - 2] = '=';
+            result[result.length() - 1] = '=';
+            break;
+        case 2:
+            result[result.length() - 1] = '=';
+            break;
+    }
+
+    return result;
+}
 
 void _executeCommand(const char *command, Print *output, JsonDocument *doc);
 
@@ -229,7 +260,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
                 controller->waitConfirmation();
                 return;
             }
-            strcpy(state.confirm_message, params);
+            strcpy(state.message, params);
             controller->waitConfirmation();
             return;
         }
@@ -284,12 +315,12 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     
 
     if (strcmp(command, "ABORT") == 0) {
-        abortOperation();
+        controller->abort();
         return;
     }
 
     if (strcmp(command, "END") == 0) {
-        abortOperation();
+        controller->abort();
         return;
     }
 
@@ -333,19 +364,46 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     }
 
     if (strcmp(command, "SYNC") == 0) {
-        (*doc)["type"] = "sync";
-        (*doc)["temperature"] = state.current_temperature_c;
-        (*doc)["target_temperature"] = state.target_temperature_c;
-        (*doc)["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
-        (*doc)["sd_present"] = state.sd_present;
+        // Binary data format (24 bytes):
+        // 4 bytes: current temp (float)
+        // 4 bytes: target temp (float)
+        // 1 byte: output (0-100)
+        // 1 byte: sd present (0/1)
+        // 1 byte: state
+        // 1 byte: step
+        // 4 bytes: started_at (uint32_t)
+        // 4 bytes: estimated_time (uint32_t)
+        // 4 bytes: target_timer_time_seconds (uint32_t)
+        // 4 bytes: step_time_seconds_start (uint32_t)
+        // 4 bytes: step_time_seconds_estimated (uint32_t)
         
-        (*doc)["state"] = controller->getState();
-        (*doc)["step"] = controller->getStep();
+        uint8_t binaryData[32];
+        float current_temp = state.current_temperature_c;
+        float target_temp = state.target_temperature_c;
+        memcpy(binaryData, &current_temp, 4);
+        memcpy(binaryData + 4, &target_temp, 4);
+        
+        binaryData[8] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
+        binaryData[9] = state.sd_present ? 1 : 0;
+        binaryData[10] = controller->getState();
+        binaryData[11] = controller->getStep();
+        
+        uint32_t started_at = controller->getTimeStart() != 0 ? controller->getTimeStart() + SECONDS_FROM_1970_TO_2000 : 0;
+        uint32_t estimated_time = controller->getEstimatedTime();
+        uint32_t target_timer_time_seconds = state.target_timer_time_seconds > 0 ? state.target_timer_time_seconds + SECONDS_FROM_1970_TO_2000 : 0;
+        uint32_t step_time_seconds_start = state.step_time_seconds_start != 0 ? state.step_time_seconds_start + SECONDS_FROM_1970_TO_2000 : 0;
+        uint32_t step_time_seconds_estimated = state.step_time_seconds_estimated != 0 ? state.step_time_seconds_estimated : 0;
 
-        (*doc)["started_at"] = controller->getTimeStart() + SECONDS_FROM_1970_TO_2000;
-        (*doc)["elapsed_time"] = controller->getElapsedTime();
-        (*doc)["estimated_time"] = controller->getEstimatedTime();
+        
+        memcpy(binaryData + 12, &started_at, 4);
+        memcpy(binaryData + 16, &estimated_time, 4);
+        memcpy(binaryData + 20, &target_timer_time_seconds, 4);
+        memcpy(binaryData + 24, &step_time_seconds_start, 4);
+        memcpy(binaryData + 28, &step_time_seconds_estimated, 4);
 
+        // Create JSON with type and binary data
+        (*doc)["type"] = "sync";
+        (*doc)["data"] = base64_encode(binaryData, 32);
         return;
     }
 #ifdef BUZZER_PIN
@@ -381,13 +439,13 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     }
 
 
-#ifdef HAS_MEDIA
-    ptr = strstr(command, "LOGFILE");
-    if (ptr == command) {
-        setLogFile(params);
-        return;
-    } 
-#endif
+// #ifdef HAS_MEDIA
+//     ptr = strstr(command, "LOGFILE");
+//     if (ptr == command) {
+//         setLogFile(params);
+//         return;
+//     } 
+// #endif
 
     ptr = strstr(command, "POWER");
 
@@ -444,9 +502,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     ptr = strstr(command, "GET_TIME");
     if (ptr == command) {
 
-        DateTime now = rtc.now();
-
-        (*doc)["utc"] = now.timestamp();;
+        (*doc)["utc"] = controller->getTimeString();
     
         return;
     }
@@ -477,7 +533,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
     if (ptr == command) {
         char isoDate[20];
         strcpy(isoDate, params);
-        rtc.adjust(DateTime(isoDate));
+        controller->setTime(isoDate);
     }
 };
 
@@ -527,12 +583,6 @@ void readCommands(void) {
 }
 
 
-void abortOperation()
-{
-    state.started = false;
-    removeStateFromPowerLoss();
-    controller->abort();
-}
 
 void openFile(const char* filename) {
     if (!sdCardState.isMounted) {

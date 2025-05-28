@@ -9,15 +9,13 @@
 extern IdleStateMachine idleState;
 
 class WaitForTimerStateMachine : public State {
-
    public:
       WaitForTimerStateMachine() : State("WaitForTimerStateMachine") {}
       virtual ~WaitForTimerStateMachine() = default;
       void enter() override {
         controller->setState(StateType::WAIT_TIMER);
-        handlePowerLoss();
+        // controller->saveMilestoneToPowerLoss();
       }
-
 
       void run() override {
           readCommands();

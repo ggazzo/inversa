@@ -41,8 +41,6 @@ void IRAM_ATTR ISR();
 void setLogFile(const char *fileName);
 
 #endif
-void handlePowerLoss();
+// void handlePowerLoss();
 void saveStateToPowerLoss();
-void removeStateFromPowerLoss();
-void recoveryFromPowerLoss();
 #endif

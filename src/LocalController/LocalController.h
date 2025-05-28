@@ -1,6 +1,5 @@
 #ifndef LOCAL_CONTROLLER_H
 #define LOCAL_CONTROLLER_H
-#include "timer.h"
 #include <RTClib.h>
 #include <NTPClient.h>
 #include "ESP32FtpServer.h"
@@ -8,6 +7,7 @@
 #include "Controller/PeripheralController.h"
 #include "Controller/MainController.h"
 
+#include "PowerRecovery.h"
 
 #include "state.h"
 
@@ -52,7 +52,6 @@ class LocalController : public MainController<StateType, Steps> {
         void startStepTimeCounter() override;
         void startStepTimeCounter(unsigned long start_time_seconds) override;
         void stopStepTimeCounter() override;
-        void resetStepTimeCounter() override;
         unsigned long getStepTimeStart() override;
         unsigned long getStepElapsedTime() override;
         void setStepEstimatedTime(unsigned long estimatedTime_seconds) override;
@@ -63,7 +62,12 @@ class LocalController : public MainController<StateType, Steps> {
         void stopTimer() override;
         bool isTimeFinished() override;
 
+        void saveMilestoneToPowerLoss() override;
+        void deleteMilestoneFromPowerLoss() override;
+
         StateType getState() override;
+        String getTimeString() override;
+        void setTime(char* isoDate) override;
 
         MachineState *state;
     private:
@@ -81,9 +85,15 @@ class LocalController : public MainController<StateType, Steps> {
         unsigned long stepTimeStart = 0;
         unsigned long stepEstimatedTime = 0;
 
-        
 
-        Timer timer;
+        PowerRecovery<MachineState> powerRecovery;
+
+
+
+        void restoreStateFromPowerLoss();
+
+        uint32_t now();
+
 };
 
 #endif

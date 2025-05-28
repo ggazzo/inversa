@@ -56,6 +56,7 @@ class MainController : public Controller {
 
         virtual void setStep(S step) {
             this->step = step;
+            this->stopStepTimeCounter();
         }
 
         virtual void startTotalTimeCounter() = 0;
@@ -71,7 +72,6 @@ class MainController : public Controller {
         virtual void startStepTimeCounter() = 0;
         virtual void startStepTimeCounter(unsigned long start_time_seconds) = 0;
         virtual void stopStepTimeCounter() = 0;
-        virtual void resetStepTimeCounter() = 0;
         virtual unsigned long getStepTimeStart() = 0;
         virtual unsigned long getStepElapsedTime() = 0;
         virtual void setStepEstimatedTime(unsigned long estimatedTime_seconds) = 0;
@@ -80,6 +80,12 @@ class MainController : public Controller {
         virtual void waitForTimer(unsigned long duration_seconds) = 0;
         virtual void stopTimer() = 0;
         virtual bool isTimeFinished() = 0;
+
+        virtual void saveMilestoneToPowerLoss() = 0;
+        virtual void deleteMilestoneFromPowerLoss() = 0;
+
+        virtual String getTimeString() = 0;
+        virtual void setTime(char* isoDate) = 0;
 
 
     protected:

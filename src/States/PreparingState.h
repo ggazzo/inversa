@@ -37,7 +37,7 @@ class PreparingStateMachine : public State {
          }
 
          controller->setState(StateType::PREPARING);
-         handlePowerLoss();
+         // controller->saveMilestoneToPowerLoss();
 
          xTaskCreate(
             monitorTask,

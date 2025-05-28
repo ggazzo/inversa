@@ -27,7 +27,7 @@ class WaitForTemperatureStateMachine : public State {
 
    void enter() override {
      controller->setState(StateType::WAIT_TEMPERATURE);
-     handlePowerLoss();
+    //  controller->saveMilestoneToPowerLoss();
    }
 
    void run() override {

@@ -44,39 +44,42 @@ enum StateType {
 struct MachineState {
     int version = CURRENT_VERSION;
     StateType current = StateType::IDLE;
+    Steps step = Steps::NONE;
 
-    double target_temperature_c;
+    double target_temperature_c = 0;
     double current_temperature_c = 0;
-    double output_val;
+    double output_val = 0;
 
     bool started = false;
     bool tuning = false;
     bool sd_present = false;
 
-
-    #if defined(USE_RTC)
-    uint32_t target_preparing_time_seconds = 0;
-    uint32_t target_timer_time_seconds = 0;
-    uint32_t start_total_time_seconds = 0;
-    #else
-
-    unsigned long estimated_time_minutes;
-    unsigned long timer_current_seconds = 0;
-    unsigned long total_timer_count_seconds = 0;
-
-    #endif
-
-
-
-
     size_t file_position = 0;
     char file_name[30];
-    char log_file_name[30];
 
-    char confirm_message[20];
+    uint32_t total_time_seconds_start = 0;
+    uint32_t total_time_seconds_estimated = 0;
+
+    uint32_t step_time_seconds_start = 0;
+    uint32_t step_time_seconds_estimated = 0;
+
+    uint32_t target_timer_time_seconds = 0;
+
     char message[20] = "";
-    char message_line_2[20] = "";
-    char message_line_3[20] = "";
+
+
+
+    // #if defined(USE_RTC)
+    // uint32_t target_preparing_time_seconds = 0;
+    // uint32_t target_timer_time_seconds = 0;
+    // uint32_t start_total_time_seconds = 0;
+    // #else
+
+    // unsigned long estimated_time_minutes;
+    // unsigned long timer_current_seconds = 0;
+    // unsigned long total_timer_count_seconds = 0;
+
+    // #endif
 };
 
 #endif

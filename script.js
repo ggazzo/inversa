@@ -1,29 +1,33 @@
 document.addEventListener("DOMContentLoaded", () => {
   const connectButton = document.getElementById("connectButton");
   const statusArea = document.getElementById("statusArea");
-  const currentTempDisplay = document.getElementById("currentTemp");
-  const targetTempDisplay = document.getElementById("targetTempDisplay");
+  const currentTemperatureDisplay = document.getElementById("currentTemp");
+  const targetTemperatureDisplay = document.getElementById("targetTempDisplay");
   const currentStateDisplay = document.getElementById("currentState");
   const confirmActionButton = document.getElementById("confirmActionButton");
   const rejectActionButton = document.getElementById("rejectActionButton");
 
   // New UI elements for SYNC data
-  const kpDisplay = document.getElementById("kp");
-  const kiDisplay = document.getElementById("ki");
-  const kdDisplay = document.getElementById("kd");
-  const hysteresisTempDisplay = document.getElementById("hysteresisTemp");
+  const proportionalGainDisplay = document.getElementById("kp");
+  const integralGainDisplay = document.getElementById("ki");
+  const derivativeGainDisplay = document.getElementById("kd");
+  const hysteresisTemperatureDisplay =
+    document.getElementById("hysteresisTemp");
   const hysteresisTimeDisplay = document.getElementById("hysteresisTime");
   const volumeDisplay = document.getElementById("volume");
   const powerDisplay = document.getElementById("power");
   const tuningDisplay = document.getElementById("tuning");
   const confirmMessageDisplay = document.getElementById("confirmMessage");
   const messageDisplay = document.getElementById("message");
-  const messageL2Display = document.getElementById("messageL2");
-  const messageL3Display = document.getElementById("messageL3");
+  const messageLine2Display = document.getElementById("messageL2");
+  const messageLine3Display = document.getElementById("messageL3");
 
   // New UI elements for Subtask 15.2
-  const setTargetTempInput = document.getElementById("setTargetTempInput");
-  const setTargetTempButton = document.getElementById("setTargetTempButton");
+  const setTargetTemperatureInput =
+    document.getElementById("setTargetTempInput");
+  const setTargetTemperatureButton = document.getElementById(
+    "setTargetTempButton"
+  );
   const startProcessButton = document.getElementById("startProcessButton");
   const stopProcessButton = document.getElementById("stopProcessButton");
   const getStatusButton = document.getElementById("getStatusButton");
@@ -55,21 +59,25 @@ document.addEventListener("DOMContentLoaded", () => {
   );
 
   // Input field references for editable preferences
-  const prefSsidInput = document.getElementById("prefSsidInput");
-  const prefPasswordInput = document.getElementById("prefPasswordInput");
-  const prefVolumeInput = document.getElementById("prefVolumeInput");
-  const prefPowerInput = document.getElementById("prefPowerInput");
-  const prefHysteresisTempInput = document.getElementById(
+  const preferenceSsidInput = document.getElementById("prefSsidInput");
+  const preferencePasswordInput = document.getElementById("prefPasswordInput");
+  const preferenceVolumeInput = document.getElementById("prefVolumeInput");
+  const preferencePowerInput = document.getElementById("prefPowerInput");
+  const preferenceHysteresisTemperatureInput = document.getElementById(
     "prefHysteresisTempInput"
   );
-  const prefHysteresisTimeInput = document.getElementById(
+  const preferenceHysteresisTimeInput = document.getElementById(
     "prefHysteresisTimeInput"
   );
-  const prefPidKpInput = document.getElementById("prefPidKpInput");
-  const prefPidKiInput = document.getElementById("prefPidKiInput");
-  const prefPidKdInput = document.getElementById("prefPidKdInput");
-  const prefPidPonInput = document.getElementById("prefPidPonInput");
-  const prefPidSampleTimeInput = document.getElementById(
+  const preferencePidProportionalGainInput =
+    document.getElementById("prefPidKpInput");
+  const preferencePidIntegralGainInput =
+    document.getElementById("prefPidKiInput");
+  const preferencePidDerivativeGainInput =
+    document.getElementById("prefPidKdInput");
+  const preferencePidProportionalOnInput =
+    document.getElementById("prefPidPonInput");
+  const preferencePidSampleTimeInput = document.getElementById(
     "prefPidSampleTimeInput"
   );
 
@@ -78,7 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("preferencesSection");
 
   let autoSyncIntervalMs = 5000; // Default 5 seconds
-  let isAutoSyncEnabled = false;
+  let isAutoSyncEnabled = true; // Changed to true by default
   let autoSyncTimerId = null;
 
   // Temperature Chart
@@ -327,23 +335,25 @@ document.addEventListener("DOMContentLoaded", () => {
         );
 
         // TODO: Disable UI elements that require a connection
-        currentTempDisplay.textContent = "N/A";
-        targetTempDisplay.textContent = "N/A";
+        currentTemperatureDisplay.textContent = "N/A";
+        targetTemperatureDisplay.textContent = "N/A";
         currentStateDisplay.textContent = "N/A";
 
         // Reset new SYNC data displays
-        if (kpDisplay) kpDisplay.textContent = "N/A";
-        if (kiDisplay) kiDisplay.textContent = "N/A";
-        if (kdDisplay) kdDisplay.textContent = "N/A";
-        if (hysteresisTempDisplay) hysteresisTempDisplay.textContent = "N/A";
+        if (proportionalGainDisplay)
+          proportionalGainDisplay.textContent = "N/A";
+        if (integralGainDisplay) integralGainDisplay.textContent = "N/A";
+        if (derivativeGainDisplay) derivativeGainDisplay.textContent = "N/A";
+        if (hysteresisTemperatureDisplay)
+          hysteresisTemperatureDisplay.textContent = "N/A";
         if (hysteresisTimeDisplay) hysteresisTimeDisplay.textContent = "N/A";
         if (volumeDisplay) volumeDisplay.textContent = "N/A";
         if (powerDisplay) powerDisplay.textContent = "N/A";
         if (tuningDisplay) tuningDisplay.textContent = "N/A";
         if (confirmMessageDisplay) confirmMessageDisplay.textContent = "N/A";
         if (messageDisplay) messageDisplay.textContent = "N/A";
-        if (messageL2Display) messageL2Display.textContent = "N/A";
-        if (messageL3Display) messageL3Display.textContent = "N/A";
+        if (messageLine2Display) messageLine2Display.textContent = "N/A";
+        if (messageLine3Display) messageLine3Display.textContent = "N/A";
 
         clearStateTimer(); // Clear and hide state timer
 
@@ -381,23 +391,24 @@ document.addEventListener("DOMContentLoaded", () => {
     commandCharacteristic = null;
     telemetryCharacteristic = null;
     // TODO: Disable UI elements that require a connection
-    currentTempDisplay.textContent = "N/A";
-    targetTempDisplay.textContent = "N/A";
+    currentTemperatureDisplay.textContent = "N/A";
+    targetTemperatureDisplay.textContent = "N/A";
     currentStateDisplay.textContent = "N/A";
 
     // Reset new SYNC data displays on disconnect
-    if (kpDisplay) kpDisplay.textContent = "N/A";
-    if (kiDisplay) kiDisplay.textContent = "N/A";
-    if (kdDisplay) kdDisplay.textContent = "N/A";
-    if (hysteresisTempDisplay) hysteresisTempDisplay.textContent = "N/A";
+    if (proportionalGainDisplay) proportionalGainDisplay.textContent = "N/A";
+    if (integralGainDisplay) integralGainDisplay.textContent = "N/A";
+    if (derivativeGainDisplay) derivativeGainDisplay.textContent = "N/A";
+    if (hysteresisTemperatureDisplay)
+      hysteresisTemperatureDisplay.textContent = "N/A";
     if (hysteresisTimeDisplay) hysteresisTimeDisplay.textContent = "N/A";
     if (volumeDisplay) volumeDisplay.textContent = "N/A";
     if (powerDisplay) powerDisplay.textContent = "N/A";
     if (tuningDisplay) tuningDisplay.textContent = "N/A";
     if (confirmMessageDisplay) confirmMessageDisplay.textContent = "N/A";
     if (messageDisplay) messageDisplay.textContent = "N/A";
-    if (messageL2Display) messageL2Display.textContent = "N/A";
-    if (messageL3Display) messageL3Display.textContent = "N/A";
+    if (messageLine2Display) messageLine2Display.textContent = "N/A";
+    if (messageLine3Display) messageLine3Display.textContent = "N/A";
 
     clearStateTimer(); // Clear and hide state timer on disconnect
 
@@ -439,9 +450,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // function updateConfirmButtonVisibility(state) { ... }
 
   // Placeholder onclick handlers for new buttons (functionality in later subtasks)
-  if (setTargetTempButton) {
-    setTargetTempButton.onclick = async () => {
-      const tempValue = parseInt(setTargetTempInput.value, 10);
+  if (setTargetTemperatureButton) {
+    setTargetTemperatureButton.onclick = async () => {
+      const tempValue = parseInt(setTargetTemperatureInput.value, 10);
       if (isNaN(tempValue) || tempValue < 0 || tempValue > 150) {
         statusArea.textContent =
           "Invalid Target Temperature. Must be a number between 0 and 150.";
@@ -465,7 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
           );
           // Update UI based on response if needed, e.g., if device confirms the set temp
           if (response.target_temperature !== undefined) {
-            targetTempDisplay.textContent = `${response.target_temperature}°C`;
+            targetTemperatureDisplay.textContent = `${response.target_temperature}°C`;
           }
         }
       });
@@ -540,57 +551,63 @@ document.addEventListener("DOMContentLoaded", () => {
             "response"
           );
           // Update UI elements with the response data
-          if (response.temperature !== undefined) {
-            currentTempDisplay.textContent = `${response.temperature}°C`;
+          if (response.current_temperature !== undefined) {
+            currentTemperatureDisplay.textContent = `${response.current_temperature}°C`;
           }
           if (response.target_temperature !== undefined) {
-            targetTempDisplay.textContent = `${response.target_temperature}°C`;
+            targetTemperatureDisplay.textContent = `${response.target_temperature}°C`;
           }
-          if (response.state !== undefined) {
+          if (response.device_state !== undefined) {
             currentStateDisplay.textContent =
-              DEVICE_STATES[response.state] || `Unknown (${response.state})`;
+              DEVICE_STATES[response.device_state] ||
+              `Unknown (${response.device_state})`;
             // Show/Hide modal based on state
-            if (response.state === 2) {
+            if (response.device_state === 2) {
               // WAIT_CONFIRM state
-              // Assumes response.confirm_message is now sent by the device in SYNC
               showConfirmModal(
-                response.confirm_message || "Please confirm the pending action."
+                response.confirmation_message ||
+                  "Please confirm the pending action."
               );
             } else {
               hideConfirmModal();
             }
           }
-          // Potentially update temperature graph here too
           if (
-            response.temperature !== undefined &&
+            response.current_temperature !== undefined &&
             response.target_temperature !== undefined
           ) {
             updateTemperatureGraph(
-              response.temperature,
+              response.current_temperature,
               response.target_temperature,
-              response.output
+              response.pid_output
             );
           }
 
           // Update new SYNC data displays
-          if (kpDisplay)
-            kpDisplay.textContent =
-              response.kp !== undefined ? response.kp : "N/A";
-          if (kiDisplay)
-            kiDisplay.textContent =
-              response.ki !== undefined ? response.ki : "N/A";
-          if (kdDisplay)
-            kdDisplay.textContent =
-              response.kd !== undefined ? response.kd : "N/A";
-          if (hysteresisTempDisplay)
-            hysteresisTempDisplay.textContent =
-              response.hysteresis_degrees_c !== undefined
-                ? response.hysteresis_degrees_c
+          if (proportionalGainDisplay)
+            proportionalGainDisplay.textContent =
+              response.proportional_gain !== undefined
+                ? response.proportional_gain
+                : "N/A";
+          if (integralGainDisplay)
+            integralGainDisplay.textContent =
+              response.integral_gain !== undefined
+                ? response.integral_gain
+                : "N/A";
+          if (derivativeGainDisplay)
+            derivativeGainDisplay.textContent =
+              response.derivative_gain !== undefined
+                ? response.derivative_gain
+                : "N/A";
+          if (hysteresisTemperatureDisplay)
+            hysteresisTemperatureDisplay.textContent =
+              response.hysteresis_temperature !== undefined
+                ? response.hysteresis_temperature
                 : "N/A";
           if (hysteresisTimeDisplay)
             hysteresisTimeDisplay.textContent =
-              response.hysteresis_seconds !== undefined
-                ? response.hysteresis_seconds
+              response.hysteresis_time !== undefined
+                ? response.hysteresis_time
                 : "N/A";
           if (volumeDisplay)
             volumeDisplay.textContent =
@@ -602,46 +619,64 @@ document.addEventListener("DOMContentLoaded", () => {
               response.power_watts !== undefined ? response.power_watts : "N/A";
           if (tuningDisplay)
             tuningDisplay.textContent =
-              response.tuning !== undefined
-                ? response.tuning
+              response.is_tuning_active !== undefined
+                ? response.is_tuning_active
                   ? "Active"
                   : "Inactive"
                 : "N/A";
           if (confirmMessageDisplay)
             confirmMessageDisplay.textContent =
-              response.confirm_message || "N/A";
+              response.confirmation_message || "N/A";
           if (messageDisplay)
-            messageDisplay.textContent = response.message || "N/A";
-          if (messageL2Display)
-            messageL2Display.textContent = response.message_line_2 || "N/A";
-          if (messageL3Display)
-            messageL3Display.textContent = response.message_line_3 || "N/A";
+            messageDisplay.textContent = response.status_message || "N/A";
+          if (messageLine2Display)
+            messageLine2Display.textContent =
+              response.status_message_line_2 || "N/A";
+          if (messageLine3Display)
+            messageLine3Display.textContent =
+              response.status_message_line_3 || "N/A";
 
           // Populate PID config inputs
-          if (prefPidKpInput && response.kp !== undefined)
-            prefPidKpInput.value = response.kp;
-          if (prefPidKiInput && response.ki !== undefined)
-            prefPidKiInput.value = response.ki;
-          if (prefPidKdInput && response.kd !== undefined)
-            prefPidKdInput.value = response.kd;
-          if (prefPidPonInput && response.pOn !== undefined)
-            prefPidPonInput.value = response.pOn; // Assuming ESP32 sends pOn
-          if (prefPidSampleTimeInput && response.time !== undefined) {
-            prefPidSampleTimeInput.value = response.time;
-            lastKnownSampleTime = response.time; // Store for sending PID command
-          } else if (prefPidSampleTimeInput) {
-            prefPidSampleTimeInput.value = lastKnownSampleTime; // Use default/last known
+          if (
+            preferencePidProportionalGainInput &&
+            response.proportional_gain !== undefined
+          )
+            preferencePidProportionalGainInput.value =
+              response.proportional_gain;
+          if (
+            preferencePidIntegralGainInput &&
+            response.integral_gain !== undefined
+          )
+            preferencePidIntegralGainInput.value = response.integral_gain;
+          if (
+            preferencePidDerivativeGainInput &&
+            response.derivative_gain !== undefined
+          )
+            preferencePidDerivativeGainInput.value = response.derivative_gain;
+          if (
+            preferencePidProportionalOnInput &&
+            response.proportional_on !== undefined
+          )
+            preferencePidProportionalOnInput.value = response.proportional_on;
+          if (
+            preferencePidSampleTimeInput &&
+            response.sample_time !== undefined
+          ) {
+            preferencePidSampleTimeInput.value = response.sample_time;
+            lastKnownSampleTime = response.sample_time;
+          } else if (preferencePidSampleTimeInput) {
+            preferencePidSampleTimeInput.value = lastKnownSampleTime;
           }
 
-          if (response.id && response.confirm_message) {
-            lastMessageIdRequiringConfirmation = response.id;
+          if (response.message_id && response.confirmation_message) {
+            lastMessageIdRequiringConfirmation = response.message_id;
             statusArea.textContent = `Action Required: ${
-              response.message
-            } (ID: 0x${response.id.toString(16)})`;
+              response.status_message
+            } (ID: 0x${response.message_id.toString(16)})`;
             confirmActionButton.style.display = "block";
             rejectActionButton.style.display = "block";
             console.log(
-              `Confirmation required for message ID: 0x${response.id.toString(
+              `Confirmation required for message ID: 0x${response.message_id.toString(
                 16
               )}`
             );
@@ -650,16 +685,14 @@ document.addEventListener("DOMContentLoaded", () => {
           }
 
           // Handle state-specific timer display for auto SYNC too
-          // Note: `response` here is from the SYNC command in performSync
-          // `clearStateTimer()` is called at the start of `startStateCountdown`
           if (
-            response.state === 1 &&
+            response.device_state === 1 &&
             response.target_timer_time !== undefined
           ) {
             // Waiting Timer
             startStateCountdown(response.target_timer_time, "Timer Ends In");
           } else if (
-            response.state === 3 &&
+            response.device_state === 3 &&
             response.target_preparing_time !== undefined
           ) {
             // PREPARING
@@ -668,7 +701,7 @@ document.addEventListener("DOMContentLoaded", () => {
               "Preparation Finishes In"
             );
           } else {
-            clearStateTimer(); // If not in a countdown state, ensure timer is cleared.
+            clearStateTimer();
           }
         }
       });
@@ -845,29 +878,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // --- Handle Telemetry (Incoming Data) ---
   function handleTelemetry(event) {
-    // Determine if event is from BLE (event.target.value) or WebSocket (event.data)
     const data = event.target?.value || event.data;
     if (!data) return;
 
     try {
-      // Convert data to string if it's not already
       const dataStr =
         typeof data === "string" ? data : new TextDecoder().decode(data);
-      console.log("Received telemetry:", dataStr);
-
-      // Try to parse as JSON
       const jsonData = JSON.parse(dataStr);
-
-      // Handle timer updates
-      if (jsonData) {
-        updateTimersDisplay(jsonData);
-      }
-
-      // Handle other telemetry data
-      appendToCommandOutput(
-        `Received: ${JSON.stringify(jsonData)}`,
-        "response"
-      );
 
       // Handle command-specific responses based on 'id' if present
       if (jsonData.id && pendingCommands.has(jsonData.id)) {
@@ -876,196 +893,86 @@ document.addEventListener("DOMContentLoaded", () => {
         pendingCommands.delete(jsonData.id); // Clean up
       }
 
-      // Update UI based on jsonData.type
-      if (jsonData.type) {
-        switch (jsonData.type) {
-          case "status_update": // Existing status update
-            if (currentTempDisplay && jsonData.current_temp !== undefined) {
-              currentTempDisplay.textContent =
-                jsonData.current_temp.toFixed(2) + " °C";
-            }
-            if (targetTempDisplay && jsonData.target_temp !== undefined) {
-              targetTempDisplay.textContent = `(Current: ${jsonData.target_temp.toFixed(
-                2
-              )} °C)`;
-            }
-            if (currentStateDisplay && jsonData.current_state !== undefined) {
-              currentStateDisplay.textContent =
-                DEVICE_STATES[jsonData.current_state] || "Unknown";
-            }
-            // ... any other fields from status_update ...
-            break;
-          case "preferences":
-            if (preferencesValuesDiv) {
-              // This part is for the OLD raw display, can be kept or removed if not needed.
-              // We will now primarily populate the input fields.
-              preferencesValuesDiv.innerHTML = ""; // Clear previous values
-              const ul = document.createElement("ul");
-              ul.style.listStyleType = "none";
-              ul.style.paddingLeft = "0";
-              for (const key in jsonData) {
-                if (key !== "type" && key !== "status" && key !== "id") {
-                  const li = document.createElement("li");
-                  const strong = document.createElement("strong");
-                  strong.textContent =
-                    key
-                      .replace(/_/g, " ")
-                      .replace(/\b\w/g, (l) => l.toUpperCase()) + ": ";
-                  li.appendChild(strong);
-                  const span = document.createElement("span");
-                  span.textContent = jsonData[key];
-                  li.appendChild(span);
-                  ul.appendChild(li);
-                }
-              }
-              preferencesValuesDiv.appendChild(ul);
-            }
-
-            // Populate the new input fields
-            if (prefSsidInput && jsonData.ssid !== undefined)
-              prefSsidInput.value = jsonData.ssid;
-            // Do not populate password field for security: prefPasswordInput.value = jsonData.password;
-            if (prefVolumeInput && jsonData.volume_liters !== undefined)
-              prefVolumeInput.value = jsonData.volume_liters;
-            if (prefPowerInput && jsonData.power_watts !== undefined)
-              prefPowerInput.value = jsonData.power_watts;
-            if (
-              prefHysteresisTempInput &&
-              jsonData.hysteresis_degrees_c !== undefined
-            )
-              prefHysteresisTempInput.value = jsonData.hysteresis_degrees_c;
-            if (
-              prefHysteresisTimeInput &&
-              jsonData.hysteresis_seconds !== undefined
-            )
-              prefHysteresisTimeInput.value = jsonData.hysteresis_seconds;
-
-            if (prefPidKpInput && jsonData.kp !== undefined)
-              prefPidKpInput.value = jsonData.kp;
-            if (prefPidKiInput && jsonData.ki !== undefined)
-              prefPidKiInput.value = jsonData.ki;
-            if (prefPidKdInput && jsonData.kd !== undefined)
-              prefPidKdInput.value = jsonData.kd;
-            if (prefPidPonInput && jsonData.pOn !== undefined)
-              prefPidPonInput.value = jsonData.pOn;
-            if (prefPidSampleTimeInput && jsonData.time !== undefined)
-              prefPidSampleTimeInput.value = jsonData.time;
-
-            appendToCommandOutput(
-              "Preferences loaded into editable fields.",
-              "info"
-            );
-            break;
-          case "list_files":
-            console.log("Files listed:", jsonData.files);
-            // You'll need to add UI elements to display these files
-            // For example, populate a <ul> list
-            const fileListElement = document.getElementById("fileList"); // Assuming you add this to HTML
-            if (fileListElement) {
-              fileListElement.innerHTML = ""; // Clear previous list
-              jsonData.files.forEach((file) => {
-                const listItem = document.createElement("li");
-                listItem.textContent = `${file.name} (${file.size} bytes)`;
-                li.style.padding = "2px 0";
-                li.style.cursor = "pointer";
-                li.setAttribute("data-filename", file.name);
-                li.addEventListener("mouseover", () => {
-                  li.style.textDecoration = "underline";
-                });
-                li.addEventListener("mouseout", () => {
-                  li.style.textDecoration = "none";
-                });
-
-                li.addEventListener("click", async (event) => {
-                  const filename = event.target.getAttribute("data-filename");
-                  if (filename) {
-                    appendToCommandOutput(
-                      `Attempting to open file: ${filename}`,
-                      "info"
-                    );
-                    // Highlight clicked item briefly (optional)
-                    event.target.style.backgroundColor = "#e0e0e0";
-                    setTimeout(() => {
-                      event.target.style.backgroundColor = "";
-                    }, 300);
-
-                    await sendCommand(
-                      `OPEN_FILE ${filename}`,
-                      (openResponse) => {
-                        if (openResponse.error) {
-                          console.error(
-                            `Error sending OPEN_FILE ${filename}:`,
-                            openResponse.error
-                          );
-                          appendToCommandOutput(
-                            `Error for OPEN_FILE ${filename}: ${openResponse.error}`,
-                            "error"
-                          );
-                        } else {
-                          // The OPEN_FILE command in C++ doesn't send specific JSON back on success via the command channel.
-                          // It changes the device state to start reading from the file.
-                          // Success here means the command was acknowledged by the BLE characteristic.
-                          console.log(
-                            `OPEN_FILE ${filename} command sent successfully. Response:`,
-                            openResponse
-                          );
-                          appendToCommandOutput(
-                            `OPEN_FILE ${filename} command sent. Device will attempt to open.`,
-                            "response"
-                          );
-                          // Further confirmation of file opening would come from device behavior (e.g., logs or state changes).
-                        }
-                      }
-                    );
-                  }
-                });
-                ul.appendChild(li);
-              });
-              fileListOutput.appendChild(ul);
-            }
-            break;
-          case "confirmation_required":
-            // This logic seems to be for a different flow, adapt if needed
-            // For instance, if the device sends a "CONFIRM_ACTION <id>" message
-            // that your script needs to respond to with $id CONFIRM.
-            // The current `confirmActionButton.onclick` handles sending a confirm.
-            // This section might be for unsolicited requests for confirmation.
-            lastMessageIdRequiringConfirmation = jsonData.messageId; // Assuming `data.messageId` comes from device
-            statusArea.textContent = `Action Required: ${
-              jsonData.message
-            } (ID: 0x${jsonData.messageId.toString(16)})`;
-            confirmActionButton.style.display = "block";
-            rejectActionButton.style.display = "block";
-            console.log(
-              `Confirmation required for message ID: 0x${jsonData.messageId.toString(
-                16
-              )}`
-            );
-            break;
-          case "error_message":
-            statusArea.textContent = `Device Error: ${jsonData.message}`;
-            console.error(
-              `Device Error: ${jsonData.message} (Code: ${jsonData.errorCode})`
-            );
-            break;
-          case "utc":
-            // Handling GET_TIME response
-            const date = new Date(jsonData.utc * 1000); // Convert seconds to milliseconds
-            console.log("Device time (UTC):", date.toUTCString());
-            statusArea.textContent = `Device Time: ${date.toLocaleString()}`;
-            // You could display this time in a dedicated UI element
-            break;
-          default:
-            console.log("Received unhandled telemetry structure:", jsonData);
+      // Handle SYNC command with binary data
+      if (jsonData.type === "sync" && jsonData.data) {
+        // Decode base64 binary data
+        const binaryData = atob(jsonData.data);
+        const view = new DataView(new ArrayBuffer(binaryData.length));
+        for (let i = 0; i < binaryData.length; i++) {
+          view.setUint8(i, binaryData.charCodeAt(i));
         }
+
+        // Parse binary data
+        const syncData = {
+          current_temperature: view.getFloat32(0, true), // current temp
+          target_temperature: view.getFloat32(4, true), // target temp
+          pid_output: view.getUint8(8), // output
+          sd_card_present: view.getUint8(9) === 1, // sd present
+          device_state: view.getUint8(10), // state
+          current_step: view.getUint8(11), // step
+          process_start_time: view.getUint32(12, true), // started_at
+          estimated_time: view.getUint32(16, true), // elapsed_time
+          target_timer_time_seconds: view.getUint32(20, true), // remaining_time
+          step_time_seconds_start: view.getUint32(24, true), // step_time_seconds_start
+          step_time_seconds_estimated: view.getUint32(28, true), // step_time_seconds_estimated
+        };
+
+        // Handle timer updates
+        updateTimersDisplay({
+          started_at: syncData.process_start_time,
+          estimated_time: syncData.estimated_time,
+          target_timer_time_seconds: syncData.target_timer_time_seconds,
+          step_time_seconds_start: syncData.step_time_seconds_start,
+          step_time_seconds_estimated: syncData.step_time_seconds_estimated,
+        });
+
+        // Update UI based on syncData
+        if (syncData.current_temperature !== undefined) {
+          currentTemperatureDisplay.textContent = `${syncData.current_temperature.toFixed(
+            1
+          )}°C`;
+        }
+        if (syncData.target_temperature !== undefined) {
+          targetTemperatureDisplay.textContent = `${syncData.target_temperature.toFixed(
+            1
+          )}°C`;
+        }
+        if (syncData.device_state !== undefined) {
+          currentStateDisplay.textContent =
+            DEVICE_STATES[syncData.device_state] ||
+            `Unknown (${syncData.device_state})`;
+        }
+
+        // Update temperature graph
+        if (
+          syncData.current_temperature !== undefined &&
+          syncData.target_temperature !== undefined
+        ) {
+          updateTemperatureGraph(
+            syncData.current_temperature,
+            syncData.target_temperature,
+            syncData.pid_output
+          );
+        }
+
+        appendToCommandOutput(
+          `Received SYNC: ${JSON.stringify(syncData)}`,
+          "response"
+        );
       } else {
-        console.log("Received unhandled telemetry structure:", jsonData);
+        // Handle other JSON responses
+        if (jsonData.id && pendingCommands.has(jsonData.id)) {
+          const callback = pendingCommands.get(jsonData.id);
+          callback(jsonData);
+          pendingCommands.delete(jsonData.id);
+        }
+        appendToCommandOutput(
+          `Received: ${JSON.stringify(jsonData)}`,
+          "response"
+        );
       }
     } catch (error) {
-      console.error("Error parsing telemetry JSON or handling data:", error);
-      // statusArea.textContent = `Error processing telemetry: ${error.message}`;
-      // It might be binary data or non-JSON, handle accordingly
-      // For now, we'll just log, as raw string is already displayed.
+      console.error("Error parsing telemetry:", error);
     }
   }
 
@@ -1229,34 +1136,35 @@ document.addEventListener("DOMContentLoaded", () => {
             "telemetry"
           ); // Log as telemetry
           // Update UI elements (already handled by this callback structure if it mirrors getStatusButton)
-          if (response.temperature !== undefined) {
-            currentTempDisplay.textContent = `${response.temperature}°C`;
+          if (response.current_temperature !== undefined) {
+            currentTemperatureDisplay.textContent = `${response.current_temperature}°C`;
           }
           if (response.target_temperature !== undefined) {
-            targetTempDisplay.textContent = `${response.target_temperature}°C`;
+            targetTemperatureDisplay.textContent = `${response.target_temperature}°C`;
           }
-          if (response.state !== undefined) {
+          if (response.device_state !== undefined) {
             currentStateDisplay.textContent =
-              DEVICE_STATES[response.state] || `Unknown (${response.state})`;
+              DEVICE_STATES[response.device_state] ||
+              `Unknown (${response.device_state})`;
             // Show/Hide modal based on state
-            if (response.state === 2) {
+            if (response.device_state === 2) {
               // WAIT_CONFIRM state
-              // Assumes response.confirm_message is now sent by the device in SYNC
               showConfirmModal(
-                response.confirm_message || "Please confirm the pending action."
+                response.confirmation_message ||
+                  "Please confirm the pending action."
               );
             } else {
               hideConfirmModal();
             }
           }
           if (
-            response.temperature !== undefined &&
+            response.current_temperature !== undefined &&
             response.target_temperature !== undefined
           ) {
             updateTemperatureGraph(
-              response.temperature,
+              response.current_temperature,
               response.target_temperature,
-              response.output
+              response.pid_output
             );
           }
         }
@@ -1295,6 +1203,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (autoSyncToggle) {
+    autoSyncToggle.checked = true; // Set checkbox to checked by default
     isAutoSyncEnabled = autoSyncToggle.checked;
     autoSyncToggle.addEventListener("change", () => {
       isAutoSyncEnabled = autoSyncToggle.checked;
@@ -1657,53 +1566,63 @@ document.addEventListener("DOMContentLoaded", () => {
       };
 
       // SSID (only if not empty)
-      if (prefSsidInput && prefSsidInput.value.trim() !== "") {
-        await sendPreferenceCommand(`SSID ${prefSsidInput.value.trim()}`);
+      if (preferenceSsidInput && preferenceSsidInput.value.trim() !== "") {
+        await sendPreferenceCommand(`SSID ${preferenceSsidInput.value.trim()}`);
       }
       // Password (only if not empty - implies user wants to change it)
-      if (prefPasswordInput && prefPasswordInput.value !== "") {
+      if (preferencePasswordInput && preferencePasswordInput.value !== "") {
         // Don't trim password, spaces can be valid
-        await sendPreferenceCommand(`PASSWORD ${prefPasswordInput.value}`);
-        prefPasswordInput.value = ""; // Clear after sending for security
+        await sendPreferenceCommand(
+          `PASSWORD ${preferencePasswordInput.value}`
+        );
+        preferencePasswordInput.value = ""; // Clear after sending for security
       }
       // Volume
-      if (prefVolumeInput && prefVolumeInput.value !== "") {
+      if (preferenceVolumeInput && preferenceVolumeInput.value !== "") {
         await sendPreferenceCommand(
-          `VOLUME ${parseFloat(prefVolumeInput.value)}`
+          `VOLUME ${parseFloat(preferenceVolumeInput.value)}`
         );
       }
       // Power
-      if (prefPowerInput && prefPowerInput.value !== "") {
+      if (preferencePowerInput && preferencePowerInput.value !== "") {
         await sendPreferenceCommand(
-          `POWER ${parseFloat(prefPowerInput.value)}`
+          `POWER ${parseFloat(preferencePowerInput.value)}`
         );
       }
       // Hysteresis Temp
-      if (prefHysteresisTempInput && prefHysteresisTempInput.value !== "") {
+      if (
+        preferenceHysteresisTemperatureInput &&
+        preferenceHysteresisTemperatureInput.value !== ""
+      ) {
         await sendPreferenceCommand(
-          `HYSTERESIS_TEMP ${parseFloat(prefHysteresisTempInput.value)}`
+          `HYSTERESIS_TEMP ${parseFloat(
+            preferenceHysteresisTemperatureInput.value
+          )}`
         );
       }
       // Hysteresis Time
-      if (prefHysteresisTimeInput && prefHysteresisTimeInput.value !== "") {
+      if (
+        preferenceHysteresisTimeInput &&
+        preferenceHysteresisTimeInput.value !== ""
+      ) {
         await sendPreferenceCommand(
-          `HYSTERESIS_TIME ${parseInt(prefHysteresisTimeInput.value, 10)}`
+          `HYSTERESIS_TIME ${parseInt(preferenceHysteresisTimeInput.value, 10)}`
         );
       }
 
       // PID settings (sent as one command)
       if (
-        prefPidKpInput &&
-        prefPidKiInput &&
-        prefPidKdInput &&
-        prefPidPonInput &&
-        prefPidSampleTimeInput
+        preferencePidProportionalGainInput &&
+        preferencePidIntegralGainInput &&
+        preferencePidDerivativeGainInput &&
+        preferencePidProportionalOnInput &&
+        preferencePidSampleTimeInput
       ) {
-        const kp = parseFloat(prefPidKpInput.value);
-        const ki = parseFloat(prefPidKiInput.value);
-        const kd = parseFloat(prefPidKdInput.value);
-        const pOn = parseInt(prefPidPonInput.value, 10); // Ensure it's int 0 or 1
-        const sampleTime = parseInt(prefPidSampleTimeInput.value, 10);
+        const kp = parseFloat(preferencePidProportionalGainInput.value);
+        const ki = parseFloat(preferencePidIntegralGainInput.value);
+        const kd = parseFloat(preferencePidDerivativeGainInput.value);
+        const pOn = parseInt(preferencePidProportionalOnInput.value, 10); // Ensure it's int 0 or 1
+        const sampleTime = parseInt(preferencePidSampleTimeInput.value, 10);
 
         if (![kp, ki, kd, pOn, sampleTime].some(isNaN)) {
           // Check if all are valid numbers
@@ -1749,60 +1668,55 @@ document.addEventListener("DOMContentLoaded", () => {
   // Timer handling functions
   function updateTimersDisplay({
     started_at,
-    elapsed_time,
     estimated_time,
-    step,
+    target_timer_time_seconds,
+    step_time_seconds_start,
+    step_time_seconds_estimated,
   }) {
-    const container = document.getElementById("activeTimersContainer");
-    if (!container) return;
+    const timersContainer = document.getElementById("activeTimersContainer");
+    const timerItem = timersContainer.querySelector(".start-timer-item");
+    const stepTimerItem = timersContainer.querySelector(".step-timer-item");
+    const timerRemainingItem =
+      timersContainer.querySelector(".timer-remaining");
 
-    // Clear existing timers
-    container.innerHTML = "";
-
-    const timerElement = document.createElement("div");
-    timerElement.className = "timer-item";
-    timerElement.style.display = "block";
-    timerElement.style.marginBottom = "5px";
-    timerElement.style.padding = "5px";
-    timerElement.style.backgroundColor = "#f8f9fa";
-    timerElement.style.borderRadius = "4px";
-
-    const stepSpan = document.createElement("span");
-    stepSpan.className = "timer-step";
-    stepSpan.textContent = `Step: ${step || "N/A"}`;
-    stepSpan.style.fontWeight = "bold";
-    stepSpan.style.marginRight = "10px";
-    stepSpan.style.color = "#28a745";
-
-    const startedSpan = document.createElement("span");
-    startedSpan.className = "timer-started";
-    startedSpan.textContent = `Started: ${new Date(
-      started_at * 1000
-    ).toLocaleTimeString()}`;
-    startedSpan.style.fontWeight = "bold";
-    startedSpan.style.marginRight = "10px";
-
-    const elapsedSpan = document.createElement("span");
-    elapsedSpan.className = "timer-elapsed";
-    elapsedSpan.textContent = `Elapsed: ${formatTime(elapsed_time)}`;
-    elapsedSpan.style.marginRight = "10px";
-    elapsedSpan.style.color = "#666";
-
-    const remainingSpan = document.createElement("span");
-    remainingSpan.className = "timer-remaining";
-    if (estimated_time > 0) {
-      remainingSpan.textContent = `Remaining: ${formatTime(estimated_time)}`;
+    if (started_at) {
+      timerItem.querySelector(".start-timer-label").textContent = "Started At";
+      timerItem.querySelector(".start-timer-value").textContent = new Date(
+        started_at * 1000
+      ).toLocaleString();
+      timerItem.querySelector(".estimated-timer-label").textContent =
+        "Estimated Time";
+      timerItem.querySelector(".estimated-timer-value").textContent =
+        formatTime(estimated_time);
+      timerItem.querySelector(".elapsed-timer-label").textContent =
+        "Elapsed Time";
+      timerItem.querySelector(".elapsed-timer-value").textContent = formatTime(
+        Math.floor(new Date().getTime() / 1000) - started_at
+      );
     } else {
-      remainingSpan.textContent = "No time estimate";
+      timerItem.querySelector(".timer-label").textContent = "Total Time";
+      timerItem.querySelector(".timer-value").textContent = "00:00:00";
     }
-    remainingSpan.style.color = "#007bff";
+    // this times are UTC
+    if (target_timer_time_seconds) {
+      timerItem.querySelector(".timer-remaining-label").textContent =
+        "Target Timer";
+      timerItem.querySelector(".timer-remaining-value").textContent = new Date(
+        target_timer_time_seconds * 1000
+      ).toLocaleString();
+    } else {
+      timerItem.querySelector(".timer-remaining").textContent = "";
+    }
 
-    timerElement.appendChild(stepSpan);
-    timerElement.appendChild(startedSpan);
-    timerElement.appendChild(elapsedSpan);
-    timerElement.appendChild(remainingSpan);
-
-    container.appendChild(timerElement);
+    if (step_time_seconds_start) {
+      stepTimerItem.querySelector(".step-timer-label").textContent = "Step";
+      stepTimerItem.querySelector(".step-timer-value").textContent = formatTime(
+        step_time_seconds_start
+      );
+    } else {
+      stepTimerItem.querySelector(".step-timer-label").textContent = "Step";
+      stepTimerItem.querySelector(".step-timer-value").textContent = "00:00:00";
+    }
   }
 
   function formatTime(seconds) {
