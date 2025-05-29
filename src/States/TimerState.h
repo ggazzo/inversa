@@ -14,7 +14,6 @@ class WaitForTimerStateMachine : public State {
       virtual ~WaitForTimerStateMachine() = default;
       void enter() override {
         controller->setState(StateType::WAIT_TIMER);
-        // controller->saveMilestoneToPowerLoss();
       }
 
       void run() override {

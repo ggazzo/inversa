@@ -14,15 +14,18 @@ LocalController::LocalController(StateMachine *task, Settings *settings, Communi
 
 void LocalController::confirm() {
     Serial.println("LocalController::confirm");
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::setTargetTemperature(float target_temperature_c) {
     this->communicationPeripherals->setTargetTemperature(target_temperature_c);
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::setTargetTemperatureAndWait(float target_temperature_c) {
     this->setTargetTemperature(target_temperature_c);
     this->task->setState(&waitForTemperatureState);
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::abort() {
@@ -46,6 +49,7 @@ void LocalController::prepareTemperature(float targetTemperature_celsius, unsign
     this->state->target_timer_time_seconds = this->now() + preparingState.time_seconds;
 
     this->task->setState(&preparingState);
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::prepareTemperature(float targetTemperature_celsius, char* desiredTime_hhmm_ss) {
@@ -105,6 +109,7 @@ StateType LocalController::getState() {
 
 void LocalController::setState(StateType state) {
     this->state->current = state;
+    this->saveMilestoneToPowerLoss();
 }
 
 float LocalController::getTargetTemperature() {
@@ -129,6 +134,7 @@ void LocalController::stopAutotune() {
 
 void LocalController::startTotalTimeCounter(unsigned long start_time_seconds) {
     this->totalTimeStart = start_time_seconds;
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::startTotalTimeCounter() {
@@ -161,6 +167,7 @@ unsigned long LocalController::getElapsedTime() {
 
 void LocalController::setEstimatedTime(unsigned long estimatedTime_seconds) {
     this->estimatedTime = estimatedTime_seconds;
+    this->saveMilestoneToPowerLoss();
 }
 
 unsigned long LocalController::getEstimatedTime() {
@@ -168,11 +175,12 @@ unsigned long LocalController::getEstimatedTime() {
 }
 
 void LocalController::startStepTimeCounter() {
-    this->stepTimeStart = this->now();
+    this->startStepTimeCounter(this->now());
 }
 
 void LocalController::startStepTimeCounter(unsigned long start_time_seconds) {
     this->stepTimeStart = start_time_seconds;
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::stopStepTimeCounter() {
@@ -192,6 +200,7 @@ unsigned long LocalController::getStepElapsedTime() {
 
 void LocalController::setStepEstimatedTime(unsigned long estimatedTime_seconds) {
     this->stepEstimatedTime = estimatedTime_seconds;
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::waitForStepTime() {
@@ -201,6 +210,7 @@ void LocalController::waitForStepTime() {
 void LocalController::waitForTimer(unsigned long duration_seconds) {
     this->state->target_timer_time_seconds = this->now() + duration_seconds;
     this->task->setState(&timerState);
+    this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::stopTimer() {

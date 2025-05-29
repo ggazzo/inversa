@@ -15,7 +15,6 @@ class IdleStateMachine : public State {
 
       void enter() override {
         controller->setState(StateType::IDLE);
-        // controller->saveMilestoneToPowerLoss();
       }
       void run() override {
           readCommands();
