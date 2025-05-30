@@ -47,7 +47,9 @@ void LocalController::prepareTemperature(float targetTemperature_celsius, unsign
 
     preparingState.time_seconds = desiredTime_minutes_from_now_minutes * 60;
     this->state->target_timer_time_seconds = this->now() + preparingState.time_seconds;
-
+    this->setStep(Steps::PRE_HEATING);
+    this->startStepTimeCounter();
+    this->setEstimatedTime(this->state->target_timer_time_seconds);
     this->task->setState(&preparingState);
     this->saveMilestoneToPowerLoss();
 }
