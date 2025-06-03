@@ -5,6 +5,11 @@
 #endif
 //pid settings and gains
 
+#ifndef FIRMWARE_NAME
+#define FIRMWARE_NAME "inversa"
+#endif
+
+
 
 #ifdef ESP32 
 

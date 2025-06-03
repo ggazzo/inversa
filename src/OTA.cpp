@@ -1,10 +1,18 @@
 #include <ArduinoOTA.h>
+#include <GitHubOTA.h>
+#include "definitions.h"
 
+#define RELEASE_URL "https://github.com/ggazzo/inversa/latest"
+
+
+
+GitHubOTA OsOta(BUILD_GIT_VERSION, RELEASE_URL, (String(FIRMWARE_NAME) + ".bin"), true);
 
 #include "OTA.h"
 
 void handleOTA() {
     ArduinoOTA.handle();
+    OsOta.handle();
 }
 
 void setupOTA() {
