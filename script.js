@@ -31,6 +31,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const startProcessButton = document.getElementById("startProcessButton");
   const stopProcessButton = document.getElementById("stopProcessButton");
   const getStatusButton = document.getElementById("getStatusButton");
+  const setTimeButton = document.getElementById("set_time_button");
 
   // Manual command elements
   const manualCommandInput = document.getElementById("manualCommandInput");
@@ -528,6 +529,19 @@ document.addEventListener("DOMContentLoaded", () => {
             currentStateDisplay.textContent = "Idle";
           }
         }
+      });
+    };
+  }
+
+  if (setTimeButton) {
+    setTimeButton.onclick = async () => {
+      console.log("Set Time button clicked.");
+
+      // 2025-06-03T12:00:00
+      const event = new Date();
+      const isoTime = event.toISOString().split(".")[0];
+      await sendCommand(`SET_TIME ${isoTime}`, (response) => {
+        console.log("Set Time response:", response);
       });
     };
   }
@@ -1694,8 +1708,8 @@ document.addEventListener("DOMContentLoaded", () => {
         Math.floor(new Date().getTime() / 1000) - started_at
       );
     } else {
-      timerItem.querySelector(".timer-label").textContent = "Total Time";
-      timerItem.querySelector(".timer-value").textContent = "00:00:00";
+      timerItem.querySelector(".start-timer-label").textContent = "Total Time";
+      timerItem.querySelector(".start-timer-value").textContent = "00:00:00";
     }
     // this times are UTC
     if (target_timer_time_seconds) {
@@ -1705,7 +1719,7 @@ document.addEventListener("DOMContentLoaded", () => {
         target_timer_time_seconds * 1000
       ).toLocaleString();
     } else {
-      timerItem.querySelector(".timer-remaining").textContent = "";
+      // timerItem.querySelector(".timer-remaining-value").textContent = "";
     }
 
     if (step_time_seconds_start) {
