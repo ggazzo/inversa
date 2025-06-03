@@ -40,7 +40,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref_name }} .pio/build/${{ matrix.env }}/* --clobber
+          mkdir -p ./${{ matrix.env }}
+          mv .pio/build/${{ matrix.env }}/firmware.bin ./${{ matrix.env }}/${{ matrix.env }}.bin
+          mv .pio/build/${{ matrix.env }}/bootloader.bin ./${{ matrix.env }}/${{ matrix.env }}-bootloader.bin
+          mv .pio/build/${{ matrix.env }}/firmware.elf ./${{ matrix.env }}/${{ matrix.env }}.elf
+          mv .pio/build/${{ matrix.env }}/partitions.bin ./${{ matrix.env }}/${{ matrix.env }}-partitions.bin
+          gh release upload ${{ github.ref_name }} ${{ matrix.env }}/*
 
   build:
     runs-on: ubuntu-latest
