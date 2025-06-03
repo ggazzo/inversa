@@ -30,6 +30,7 @@ jobs:
       matrix:
         env: [wemos_s3_mini]
     steps:
+      - uses: actions/checkout@v4
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
