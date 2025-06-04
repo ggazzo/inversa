@@ -11,7 +11,6 @@
 #include "States/stateMachine.h"
 #include "States/TimerState.h"
 #include "logs.h"
-#include "estimated.h"
 #include "media.h"
 #include "NTPClient.h"
 #include "ArduinoJson.h"
@@ -475,7 +474,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
 
     ptr = strstr(command, "REMAINING");
     if (ptr == command) {
-        setEstimatedTime(atof(params));
+        controller->setEstimatedTime(atof(params));
         return;
     }
 
