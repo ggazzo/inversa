@@ -79,6 +79,7 @@ class MainController : public Controller {
         virtual void waitForStepTime() = 0;
         virtual void waitForTimer(unsigned long duration_seconds) = 0;
         virtual void stopTimer() = 0;
+        virtual unsigned long remainingTime() = 0;
         virtual bool isTimeFinished() = 0;
 
         virtual void saveMilestoneToPowerLoss() = 0;

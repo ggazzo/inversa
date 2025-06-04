@@ -48,6 +48,7 @@ class LocalController : public MainController<StateType, Steps> {
         unsigned long getEstimatedTime() override;
 
         unsigned long getElapsedTime() override;
+        unsigned long remainingTime() override;
 
         void startStepTimeCounter() override;
         void startStepTimeCounter(unsigned long start_time_seconds) override;

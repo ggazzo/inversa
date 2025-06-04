@@ -20,7 +20,6 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 #include <Wire.h>
 
 #define SKETCH_VERSION "0.0.1"
-#include "CountDown.h"
 #if defined(ESP8266)
   #include <ESP8266WiFi.h>
   #include <ESPAsyncTCP.h>
@@ -50,7 +49,6 @@ Adafruit_NeoPixel pixels(NUMPIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
 #endif
 
-CountDown countDown(CountDown::MINUTES);
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 

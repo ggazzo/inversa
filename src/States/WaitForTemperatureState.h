@@ -2,7 +2,6 @@
 #define WAIT_FOR_TEMPERATURE_STATE_H
 
 #include <Arduino.h>
-#include <CountDown.h>
 #include "calc.h"
 // #include "state.h"
 #include "media.h"

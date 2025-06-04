@@ -4,19 +4,22 @@ void PreparingStateMachine::monitorTask(void *pvParameters) {
    PreparingStateMachine *self = (PreparingStateMachine *)pvParameters;
 
    while (true) {
-      if (self->countDown.isStopped()) {
+
+      if (controller->isTimeFinished()) {
          controller->skip();
          break;
       }
 
-      float remainingTime = self->countDown.remaining();
       float currentTemp = controller->getTemperature();
+
       float heatingTime = calculateHeatingTime_seconds(
          self->volume_liters,
          self->power_watts,
          currentTemp,
          self->target_temperature_c
       );
+
+      unsigned long remainingTime = controller->remainingTime();
 
       ESP_LOGI("PreparingState", "Remaining time: %d, target temperature: %.2f, current temperature: %.2f",
          remainingTime, self->target_temperature_c, currentTemp);
