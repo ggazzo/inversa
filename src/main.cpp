@@ -4,12 +4,6 @@
 #include "NuSerial.hpp"
 #include "api.h"
 
-#include <Adafruit_NeoPixel.h>
-
-// How many internal neopixels do we have? some boards have more than one!
-#define NUMPIXELS        1
-
-Adafruit_NeoPixel pixels(NUMPIXELS, PIN_NEOPIXEL, NEO_GRB + NEO_KHZ800);
 
 #define DEVICE_NAME "Inversa"
 
