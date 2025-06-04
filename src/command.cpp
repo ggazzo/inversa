@@ -355,6 +355,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["power_watts"] = settings.getPowerWatts();
 
         (*doc)["wifi_ssid"] = settings.getWifiSsid();
+        (*doc)["firmware_version"] = FIRMWARE_NAME;
         return;
     }
 
