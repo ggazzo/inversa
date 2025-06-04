@@ -6,13 +6,13 @@
 
 
 
-GitHubOTA OsOta(BUILD_GIT_VERSION, RELEASE_URL, (String(FIRMWARE_NAME) + ".bin"), true);
+// GitHubOTA OsOta(BUILD_GIT_VERSION, RELEASE_URL, (String(FIRMWARE_NAME) + ".bin"), true);
 
 #include "OTA.h"
 
 void handleOTA() {
     ArduinoOTA.handle();
-    OsOta.handle();
+    // OsOta.handle();
 }
 
 void setupOTA() {
