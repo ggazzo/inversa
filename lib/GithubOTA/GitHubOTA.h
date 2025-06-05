@@ -8,7 +8,7 @@
 
 class GitHubOTA {
 public:
-    GitHubOTA(const char* repoOwner, const char* repoName, const char* currentVersion);
+    GitHubOTA(const char* url, const char* currentVersion, const char* firmwareName);
     bool checkForUpdate();
     bool performUpdate();
     String getLatestVersion();
@@ -19,8 +19,8 @@ public:
     void loop();
 
 private:
-    String _repoOwner;
-    String _repoName;
+    String _url;
+    String _firmwareName;
     String _currentVersion;
     String _latestVersion;
     String _updateUrl;

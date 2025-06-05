@@ -4,11 +4,9 @@
 #include "NuSerial.hpp"
 #include "api.h"
 
-
 #define DEVICE_NAME "Inversa"
 
 #include <settings.h>
-
 
 #include "Arduino.h"
 #include <Wire.h>
@@ -16,17 +14,11 @@
 #define SKETCH_VERSION "0.0.1"
 #if defined(ESP8266)
   #include <ESP8266WiFi.h>
-  #include <ESPAsyncTCP.h>
   #include <ESP8266mDNS.h>
-  #include <ESP8266HTTPClient.h>
 #elif defined(ESP32)
   #include <WiFi.h>
-  #include <AsyncTCP.h>
   #include <ESPmDNS.h>
 #endif
-
-
-#include <ESPAsyncWebServer.h>
 
 #ifdef OTA
   #include "OTA.h"
@@ -38,15 +30,10 @@
 
 #ifdef USE_RTC
 #include <RTClib.h>
-
-#include "ws.h"
-
+// #include "ws.h"
 #endif
 
-AsyncWebServer server(80);
-AsyncWebSocket ws("/ws");
-
-WebSocketBroadcastPrint wsPrint(&ws);
+// WebSocketBroadcastPrint wsPrint(&ws);
 
 #ifdef HAS_DISPLAY
 #include "display_manager.h"
@@ -66,7 +53,6 @@ MachineState state;
 #endif
 
 void setup() {
-
   Serial.begin(115200);
 
   Serial.println("Starting setup");
@@ -74,33 +60,25 @@ void setup() {
   NimBLEDevice::getAdvertising()->setName(DEVICE_NAME);
   NuSerial.begin(115200);
 
-
-  server.addHandler(&ws);
-  
   /* Attach Message Callback */
-  wsPrint.onMessage([&](uint8_t *data, size_t len) {
-    data[len] = '\0';    
-    executeCommand(reinterpret_cast<const char *>(data), &wsPrint);
-  });
+  // wsPrint.onMessage([&](uint8_t *data, size_t len) {
+  //   data[len] = '\0';    
+  //   executeCommand(reinterpret_cast<const char *>(data), &wsPrint);
+  // });
 
-  // Setup REST API endpoints
-  setupAPI(&server, controller);
+  // Setup REST API
+  setupAPI(controller);
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("Inversa", "12345678");
-
-
 
   #ifdef OTA
   setupOTA();
   #endif
 
-  server.begin();
-
   controller->setup();
 
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
-
 
   Serial.print("Wifi SSID: "); Serial.println(settings.getWifiSsid());
 
@@ -128,5 +106,5 @@ void loop()
     handleOTA();
   #endif
 
-  ws.cleanupClients();
+  handleAPI();
 }

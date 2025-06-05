@@ -3,203 +3,317 @@
 #include "Components/Settings.h"
 #include "modules.h"
 #include <RTClib.h>
+#include <WiFiServer.h>
 
 extern MachineState state;
 extern Settings settings;
 
 #define SECONDS_FROM_1970_TO_2000 946684800
+#define API_PORT 80
 
-void setupAPI(AsyncWebServer *server, MainController<StateType, Steps> *controller) {
-    // GET /api/temperature
-    server->on("/api/temperature", HTTP_GET, [](AsyncWebServerRequest *request) {
+WiFiServer server(API_PORT);
+
+void setupAPI(MainController<StateType, Steps> *ctrl) {
+    // server.begin(80);
+}
+
+void sendResponse(WiFiClient &client, int statusCode, const char* contentType, const char* body) {
+    client.print("HTTP/1.1 ");
+    client.print(statusCode);
+    client.println(" OK");
+    client.print("Content-Type: ");
+    client.println(contentType);
+    client.print("Content-Length: ");
+    client.println(strlen(body));
+    client.println();
+    client.println(body);
+}
+
+void handleGetTemperature(WiFiClient &client) {
+    JsonDocument doc;
+    doc["temperature"] = state.current_temperature_c;
+    doc["target_temperature"] = state.target_temperature_c;
+    String response;
+    serializeJson(doc, response);
+    sendResponse(client, 200, "application/json", response.c_str());
+}
+
+void handlePostTemperature(WiFiClient &client, const char* body) {
+    JsonDocument doc;
+    deserializeJson(doc, body);
+    if (doc.containsKey("temperature")) {
+        float temp = doc["temperature"];
+        controller->setTargetTemperature(temp);
+        sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+    } else {
+        sendResponse(client, 400, "application/json", "{\"error\":\"Missing temperature parameter\"}");
+    }
+}
+
+void handleGetState(WiFiClient &client) {
+    JsonDocument doc;
+    doc["type"] = "sync";
+    doc["temperature"] = state.current_temperature_c;
+    doc["target_temperature"] = state.target_temperature_c;
+    doc["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
+    doc["started"] = state.started;
+    doc["time"] = settings.getTime();
+    doc["started_at"] = DateTime(state.total_time_seconds_start + SECONDS_FROM_1970_TO_2000).timestamp();
+    doc["target_timer_time_seconds"] = DateTime(state.target_timer_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
+    doc["step_time_seconds_start"] = DateTime(state.step_time_seconds_start + SECONDS_FROM_1970_TO_2000).timestamp();
+    doc["step_time_seconds_estimated"] = DateTime(state.step_time_seconds_estimated + SECONDS_FROM_1970_TO_2000).timestamp();
+    doc["state"] = controller->getState();
+    doc["sd_present"] = state.sd_present;
+    String response;
+    serializeJson(doc, response);
+    sendResponse(client, 200, "application/json", response.c_str());
+}
+
+void handleGetPreferences(WiFiClient &client) {
+    JsonDocument doc;
+    doc["type"] = "preferences";
+    doc["kp"] = settings.getKp();
+    doc["ki"] = settings.getKi();
+    doc["kd"] = settings.getKd();
+    doc["pOn"] = settings.getPOn();
+    doc["time"] = settings.getTime();
+    doc["hysteresis_degrees_c"] = settings.getHysteresisDegreesC();
+    doc["hysteresis_seconds"] = settings.getHysteresisSeconds();
+    doc["volume_liters"] = settings.getVolumeLiters();
+    doc["power_watts"] = settings.getPowerWatts();
+    doc["wifi_ssid"] = settings.getWifiSsid();
+    String response;
+    serializeJson(doc, response);
+    sendResponse(client, 200, "application/json", response.c_str());
+}
+
+void handlePostPreferences(WiFiClient &client, const char* body) {
+    JsonDocument doc;
+    deserializeJson(doc, body);
+    
+    if (doc.containsKey("kp")) settings.setKp(doc["kp"]);
+    if (doc.containsKey("ki")) settings.setKi(doc["ki"]);
+    if (doc.containsKey("kd")) settings.setKd(doc["kd"]);
+    if (doc.containsKey("pOn")) settings.setPOn(doc["pOn"]);
+    if (doc.containsKey("hysteresis_degrees_c")) settings.setHysteresisDegreesC(doc["hysteresis_degrees_c"]);
+    if (doc.containsKey("hysteresis_seconds")) settings.setHysteresisSeconds(doc["hysteresis_seconds"]);
+    if (doc.containsKey("volume_liters")) settings.setVolumeLiters(doc["volume_liters"]);
+    if (doc.containsKey("power_watts")) settings.setPowerWatts(doc["power_watts"]);
+    if (doc.containsKey("wifi_ssid")) settings.setWifiSsid(doc["wifi_ssid"].as<String>());
+    if (doc.containsKey("wifi_password")) settings.setWifiPassword(doc["wifi_password"].as<String>());
+    
+    settings.save();
+    sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+}
+
+void handlePostStart(WiFiClient &client) {
+    controller->startTotalTimeCounter();
+    sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+}
+
+void handlePostAbort(WiFiClient &client) {
+    controller->abort();
+    sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+}
+
+void handlePostConfirm(WiFiClient &client) {
+    controller->confirm();
+    sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+}
+
+void handlePostWaitTimer(WiFiClient &client, const char* body) {
+    JsonDocument doc;
+    deserializeJson(doc, body);
+    if (doc.containsKey("duration")) {
+        unsigned long duration = doc["duration"];
+        controller->waitForTimer(duration);
+        sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+    } else {
+        sendResponse(client, 400, "application/json", "{\"error\":\"Missing duration parameter\"}");
+    }
+}
+
+void handlePostWaitTemperature(WiFiClient &client, const char* body) {
+    JsonDocument doc;
+    deserializeJson(doc, body);
+    if (doc.containsKey("temperature")) {
+        float temp = doc["temperature"];
+        controller->setTargetTemperatureAndWait(temp);
+        sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+    } else {
+        sendResponse(client, 400, "application/json", "{\"error\":\"Missing temperature parameter\"}");
+    }
+}
+
+void handlePostPrepareRelative(WiFiClient &client, const char* body) {
+    JsonDocument doc;
+    deserializeJson(doc, body);
+    if (doc.containsKey("temperature") && doc.containsKey("minutes")) {
+        float temp = doc["temperature"];
+        unsigned long minutes = doc["minutes"];
+        controller->setTargetTemperature(temp);
+        controller->waitForTimer(minutes * 60);
+        sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+    } else {
+        sendResponse(client, 400, "application/json", "{\"error\":\"Missing temperature or minutes parameter\"}");
+    }
+}
+
+void handlePostPrepareAbsolute(WiFiClient &client, const char* body) {
+    JsonDocument doc;
+    deserializeJson(doc, body);
+    if (doc.containsKey("temperature") && doc.containsKey("time")) {
+        float temp = doc["temperature"];
+        const char* time = doc["time"];
+        controller->setTargetTemperature(temp);
+        // TODO: Implement absolute time preparation
+        sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+    } else {
+        sendResponse(client, 400, "application/json", "{\"error\":\"Missing temperature or time parameter\"}");
+    }
+}
+
+void handlePostPID(WiFiClient &client, const char* body) {
+    JsonDocument doc;
+    deserializeJson(doc, body);
+    if (doc.containsKey("kp") && doc.containsKey("ki") && doc.containsKey("kd") && 
+        doc.containsKey("pOn") && doc.containsKey("sampleTime")) {
+        float kp = doc["kp"];
+        float ki = doc["ki"];
+        float kd = doc["kd"];
+        float pOn = doc["pOn"];
+        float sampleTime = doc["sampleTime"];
+        communicationPeripherals->setPidParameters(kp, ki, kd, pOn, sampleTime);
+        sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+    } else {
+        sendResponse(client, 400, "application/json", "{\"error\":\"Missing PID parameters\"}");
+    }
+}
+
+#ifdef BUZZER_PIN
+void handlePostBeep(WiFiClient &client) {
+    EasyBuzzer.singleBeep(300, 100);
+    sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
+}
+#endif
+
+void handleGetFile(WiFiClient &client, const char* query) {
+    char filename[32];
+    if (sscanf(query, "filename=%31s", filename) == 1) {
+        File file = SD.open("/" + String(filename), FILE_READ);
+        if (!file) {
+            sendResponse(client, 404, "application/json", "{\"error\":\"File not found\"}");
+            return;
+        }
+
+        String content = file.readString();
+        file.close();
+
         JsonDocument doc;
-        doc["temperature"] = state.current_temperature_c;
-        doc["target_temperature"] = state.target_temperature_c;
+        doc["filename"] = filename;
+        doc["content"] = content;
         String response;
         serializeJson(doc, response);
-        request->send(200, "application/json", response);
-    });
+        sendResponse(client, 200, "application/json", response.c_str());
+    } else {
+        sendResponse(client, 400, "application/json", "{\"error\":\"Missing filename parameter\"}");
+    }
+}
 
-    // POST /api/temperature
-    server->on("/api/temperature", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        if (request->hasParam("temperature", true)) {
-            float temp = request->getParam("temperature", true)->value().toFloat();
-            controller->setTargetTemperature(temp);
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing temperature parameter\"}");
-        }
-    });
-
-    // GET /api/state
-    server->on("/api/state", HTTP_GET, [controller](AsyncWebServerRequest *request) {
-        JsonDocument doc;
-        doc["type"] = "sync";
-        doc["temperature"] = state.current_temperature_c;
-        doc["target_temperature"] = state.target_temperature_c;
-        doc["output"] = constrain(map(state.output_val, 0, 255, 0, 100), 0, 100);
-        doc["started"] = state.started;
-        doc["time"] = settings.getTime();
-        doc["started_at"] = DateTime(state.total_time_seconds_start + SECONDS_FROM_1970_TO_2000).timestamp();
-        doc["target_timer_time_seconds"] = DateTime(state.target_timer_time_seconds + SECONDS_FROM_1970_TO_2000).timestamp();
-        doc["step_time_seconds_start"] = DateTime(state.step_time_seconds_start + SECONDS_FROM_1970_TO_2000).timestamp();
-        doc["step_time_seconds_estimated"] = DateTime(state.step_time_seconds_estimated + SECONDS_FROM_1970_TO_2000).timestamp();
-        doc["state"] = controller->getState();
-        doc["sd_present"] = state.sd_present;
-        String response;
-        serializeJson(doc, response);
-        request->send(200, "application/json", response);
-    });
-
-    // POST /api/start
-    server->on("/api/start", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        controller->startTotalTimeCounter();
-        request->send(200, "application/json", "{\"status\":\"ok\"}");
-    });
-
-    // POST /api/abort
-    server->on("/api/abort", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        controller->abort();
-        request->send(200, "application/json", "{\"status\":\"ok\"}");
-    });
-
-    // POST /api/confirm
-    server->on("/api/confirm", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        controller->confirm();
-        request->send(200, "application/json", "{\"status\":\"ok\"}");
-    });
-
-    // GET /api/preferences
-    server->on("/api/preferences", HTTP_GET, [](AsyncWebServerRequest *request) {
-        JsonDocument doc;
-        doc["type"] = "preferences";
-        doc["kp"] = settings.getKp();
-        doc["ki"] = settings.getKi();
-        doc["kd"] = settings.getKd();
-        doc["pOn"] = settings.getPOn();
-        doc["time"] = settings.getTime();
-        doc["hysteresis_degrees_c"] = settings.getHysteresisDegreesC();
-        doc["hysteresis_seconds"] = settings.getHysteresisSeconds();
-        doc["volume_liters"] = settings.getVolumeLiters();
-        doc["power_watts"] = settings.getPowerWatts();
-        doc["wifi_ssid"] = settings.getWifiSsid();
-        String response;
-        serializeJson(doc, response);
-        request->send(200, "application/json", response);
-    });
-
-    // POST /api/preferences
-    server->on("/api/preferences", HTTP_POST, [](AsyncWebServerRequest *request) {
-        if (request->hasParam("kp", true)) settings.setKp(request->getParam("kp", true)->value().toFloat());
-        if (request->hasParam("ki", true)) settings.setKi(request->getParam("ki", true)->value().toFloat());
-        if (request->hasParam("kd", true)) settings.setKd(request->getParam("kd", true)->value().toFloat());
-        if (request->hasParam("pOn", true)) settings.setPOn(request->getParam("pOn", true)->value().toInt());
-        if (request->hasParam("hysteresis_degrees_c", true)) settings.setHysteresisDegreesC(request->getParam("hysteresis_degrees_c", true)->value().toFloat());
-        if (request->hasParam("hysteresis_seconds", true)) settings.setHysteresisSeconds(request->getParam("hysteresis_seconds", true)->value().toFloat());
-        if (request->hasParam("volume_liters", true)) settings.setVolumeLiters(request->getParam("volume_liters", true)->value().toFloat());
-        if (request->hasParam("power_watts", true)) settings.setPowerWatts(request->getParam("power_watts", true)->value().toFloat());
-        if (request->hasParam("wifi_ssid", true)) settings.setWifiSsid(request->getParam("wifi_ssid", true)->value());
-        if (request->hasParam("wifi_password", true)) settings.setWifiPassword(request->getParam("wifi_password", true)->value());
-        settings.save();
-        request->send(200, "application/json", "{\"status\":\"ok\"}");
-    });
-
-    // POST /api/wait_timer
-    server->on("/api/wait_timer", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        if (request->hasParam("duration", true)) {
-            unsigned long duration = request->getParam("duration", true)->value().toInt();
-            controller->waitForTimer(duration);
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing duration parameter\"}");
-        }
-    });
-
-    // POST /api/wait_temperature
-    server->on("/api/wait_temperature", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        if (request->hasParam("temperature", true)) {
-            float temp = request->getParam("temperature", true)->value().toFloat();
-            controller->setTargetTemperatureAndWait(temp);
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing temperature parameter\"}");
-        }
-    });
-
-    // POST /api/prepare_relative
-    server->on("/api/prepare_relative", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        if (request->hasParam("temperature", true) && request->hasParam("minutes", true)) {
-            float temp = request->getParam("temperature", true)->value().toFloat();
-            unsigned long minutes = request->getParam("minutes", true)->value().toInt();
-            controller->setTargetTemperature(temp);
-            controller->waitForTimer(minutes * 60);
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing temperature or minutes parameter\"}");
-        }
-    });
-
-    // POST /api/prepare_absolute
-    server->on("/api/prepare_absolute", HTTP_POST, [controller](AsyncWebServerRequest *request) {
-        if (request->hasParam("temperature", true) && request->hasParam("time", true)) {
-            float temp = request->getParam("temperature", true)->value().toFloat();
-            String time = request->getParam("time", true)->value();
-            controller->setTargetTemperature(temp);
-            // TODO: Implement absolute time preparation
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing temperature or time parameter\"}");
-        }
-    });
-
-    // POST /api/pid
-    server->on("/api/pid", HTTP_POST, [](AsyncWebServerRequest *request) {
-        if (request->hasParam("kp", true) && request->hasParam("ki", true) && 
-            request->hasParam("kd", true) && request->hasParam("pOn", true) && 
-            request->hasParam("sampleTime", true)) {
-            float kp = request->getParam("kp", true)->value().toFloat();
-            float ki = request->getParam("ki", true)->value().toFloat();
-            float kd = request->getParam("kd", true)->value().toFloat();
-            float pOn = request->getParam("pOn", true)->value().toFloat();
-            float sampleTime = request->getParam("sampleTime", true)->value().toFloat();
-            communicationPeripherals->setPidParameters(kp, ki, kd, pOn, sampleTime);
-            request->send(200, "application/json", "{\"status\":\"ok\"}");
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing PID parameters\"}");
-        }
-    });
-
-    // POST /api/beep
-    #ifdef BUZZER_PIN
-    server->on("/api/beep", HTTP_POST, [](AsyncWebServerRequest *request) {
-        EasyBuzzer.singleBeep(300, 100);
-        request->send(200, "application/json", "{\"status\":\"ok\"}");
-    });
-    #endif
-
-    // GET /api/file
-    server->on("/api/file", HTTP_GET, [](AsyncWebServerRequest *request) {
-        if (request->hasParam("filename")) {
-            String filename = request->getParam("filename")->value();
-            File file = SD.open("/" + filename, FILE_READ);
-            
-            if (!file) {
-                request->send(404, "application/json", "{\"error\":\"File not found\"}");
-                return;
+void handleAPI() {
+    WiFiClient client = server.available();
+    if (client) {
+        String currentLine = "";
+        String method = "";
+        String path = "";
+        String query = "";
+        String body = "";
+        bool isBody = false;
+        int contentLength = 0;
+        
+        while (client.connected()) {
+            if (client.available()) {
+                char c = client.read();
+                
+                if (c == '\n') {
+                    if (currentLine.length() == 0) {
+                        isBody = true;
+                        continue;
+                    }
+                    
+                    if (method.length() == 0) {
+                        // Parse request line
+                        int space1 = currentLine.indexOf(' ');
+                        int space2 = currentLine.indexOf(' ', space1 + 1);
+                        method = currentLine.substring(0, space1);
+                        String fullPath = currentLine.substring(space1 + 1, space2);
+                        
+                        int queryPos = fullPath.indexOf('?');
+                        if (queryPos >= 0) {
+                            path = fullPath.substring(0, queryPos);
+                            query = fullPath.substring(queryPos + 1);
+                        } else {
+                            path = fullPath;
+                        }
+                    } else if (currentLine.startsWith("Content-Length: ")) {
+                        contentLength = currentLine.substring(16).toInt();
+                    }
+                    
+                    currentLine = "";
+                } else if (c != '\r') {
+                    if (isBody) {
+                        body += c;
+                        if (body.length() >= contentLength) {
+                            break;
+                        }
+                    } else {
+                        currentLine += c;
+                    }
+                }
             }
-
-            String content = file.readString();
-            file.close();
-
-            JsonDocument doc;
-            doc["filename"] = filename;
-            doc["content"] = content;
-            
-            String response;
-            serializeJson(doc, response);
-            request->send(200, "application/json", response);
-        } else {
-            request->send(400, "application/json", "{\"error\":\"Missing filename parameter\"}");
         }
-    });
+
+        // Handle request
+        if (path == "/api/temperature") {
+            if (method == "GET") {
+                handleGetTemperature(client);
+            } else if (method == "POST") {
+                handlePostTemperature(client, body.c_str());
+            }
+        } else if (path == "/api/state" && method == "GET") {
+            handleGetState(client);
+        } else if (path == "/api/preferences") {
+            if (method == "GET") {
+                handleGetPreferences(client);
+            } else if (method == "POST") {
+                handlePostPreferences(client, body.c_str());
+            }
+        } else if (path == "/api/start" && method == "POST") {
+            handlePostStart(client);
+        } else if (path == "/api/abort" && method == "POST") {
+            handlePostAbort(client);
+        } else if (path == "/api/confirm" && method == "POST") {
+            handlePostConfirm(client);
+        } else if (path == "/api/wait_timer" && method == "POST") {
+            handlePostWaitTimer(client, body.c_str());
+        } else if (path == "/api/wait_temperature" && method == "POST") {
+            handlePostWaitTemperature(client, body.c_str());
+        } else if (path == "/api/prepare_relative" && method == "POST") {
+            handlePostPrepareRelative(client, body.c_str());
+        } else if (path == "/api/prepare_absolute" && method == "POST") {
+            handlePostPrepareAbsolute(client, body.c_str());
+        } else if (path == "/api/pid" && method == "POST") {
+            handlePostPID(client, body.c_str());
+        } else if (path == "/api/beep" && method == "POST") {
+            #ifdef BUZZER_PIN
+            handlePostBeep(client);
+            #endif
+        } else if (path == "/api/file" && method == "GET") {
+            handleGetFile(client, query.c_str());
+        } else {
+            sendResponse(client, 404, "application/json", "{\"error\":\"Not found\"}");
+        }
+
+        client.stop();
+    }
 } 

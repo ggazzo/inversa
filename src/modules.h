@@ -34,3 +34,11 @@ extern PID *pid;
 extern Settings settings;
 extern MainController<StateType, Steps> *controller;
 extern CommunicationPeripherals *communicationPeripherals;
+
+void setupModules();
+void loopModules();
+
+#ifndef MODULES_H
+#define MODULES_H
+
+#endif
