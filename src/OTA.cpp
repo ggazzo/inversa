@@ -13,11 +13,12 @@
 
 GitHubOTA OsOta(RELEASE_URL, BUILD_GIT_VERSION, FIRMWARE_FILE_NAME);
 
+const unsigned long CHECK_INTERVAL = 1000 * 60 * 10; // Check every 10 minutes
 void handleOTA() {
-    static unsigned long lastCheck = 0;
-    const unsigned long CHECK_INTERVAL = 1000; // Check every hour
+    static unsigned long lastCheck = millis() + CHECK_INTERVAL;
     
     if (millis() - lastCheck < CHECK_INTERVAL) {
+        ArduinoOTA.handle();
         return;
     }
     
@@ -50,7 +51,7 @@ void handleOTA() {
         Serial.println("[OTA] No version tag found in release");
         return;
     }
-    
+
     Serial.printf("[OTA] Current version: %s, Latest version: %s\n", BUILD_GIT_VERSION, latestVersion);
     
     // Compare versions
@@ -67,7 +68,7 @@ void handleOTA() {
     
     JsonArray assets = doc["assets"];
     for (JsonObject asset : assets) {
-        if (asset["name"].as<String>() == "firmware.bin") {
+        if (asset["name"].as<String>() == FIRMWARE_FILE_NAME) {
             firmwareUrl = asset["browser_download_url"].as<String>();
             firmwareSize = asset["size"].as<size_t>();
             Serial.printf("[OTA] Found firmware asset: %s (%d bytes)\n", firmwareUrl.c_str(), firmwareSize);
@@ -82,6 +83,9 @@ void handleOTA() {
     
     // Download and update firmware
     Serial.println("[OTA] Starting firmware download...");
+    // handle 302 redirects
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    http.setRedirectLimit(5);
     http.begin(firmwareUrl);
     httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
