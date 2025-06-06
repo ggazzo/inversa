@@ -340,6 +340,11 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     }
 
+    if(strcmp(command, "CHECK_FOR_UPDATES") == 0) {
+        controller->checkForUpdates();
+        return;
+    }
+
     if(strcmp(command, "PREFERENCES") == 0) {
         (*doc)["type"] = "preferences";
         (*doc)["kp"] = settings.getKp();
