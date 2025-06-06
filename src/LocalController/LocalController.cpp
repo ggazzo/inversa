@@ -60,7 +60,7 @@ void LocalController::prepareTemperature(float targetTemperature_celsius, char* 
 }
 
 void LocalController::checkForUpdates() {
-    handleOTA(this->state->current == StateType::IDLE);
+    checkForUpdatesGithub();
 }
 
 void LocalController::setup() {

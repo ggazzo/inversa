@@ -3,5 +3,6 @@
 
 void handleOTA(bool checkForUpdates);
 void setupOTA();
+void checkForUpdatesGithub();
 
 #endif

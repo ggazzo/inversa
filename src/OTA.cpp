@@ -16,9 +16,11 @@ void checkForUpdatesGithub() {
   HTTPClient http;
     http.begin("https://api.github.com/repos/ggazzo/inversa/releases/latest");
     http.addHeader("User-Agent", "ESP32");
+
     
     int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
+        Serial.printf("Failed to get release info. HTTP code: %d\n", httpCode);
         http.end();
         return;
     }
@@ -29,17 +31,22 @@ void checkForUpdatesGithub() {
     DynamicJsonDocument doc(2048);
     DeserializationError error = deserializeJson(doc, payload);
     if (error) {
+        Serial.printf("JSON parsing failed: %s\n", error.c_str());
         return;
     }
     
     const char* latestVersion = doc["tag_name"];
     if (!latestVersion) {
+        Serial.println("No version tag found in release");
         return;
     }
 
+
+    Serial.printf("Latest version: %s, Current version: %s\n", latestVersion, BUILD_GIT_VERSION);
     
     // Compare versions
     if (compareSemVer(latestVersion, BUILD_GIT_VERSION) <= 0) {
+        Serial.println("Already on latest version");
         return;
     }
     
@@ -58,6 +65,7 @@ void checkForUpdatesGithub() {
     }
     
     if (firmwareUrl.length() == 0) {
+        Serial.println("No firmware asset found");
         return;
     }
     
@@ -68,29 +76,33 @@ void checkForUpdatesGithub() {
     http.begin(firmwareUrl);
     httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
+        Serial.printf("Failed to download firmware. HTTP code: %d\n", httpCode);
         http.end();
         return;
     }
     
     int contentLength = http.getSize();
     if (contentLength <= 0) {
+        Serial.println("Invalid content length");
         http.end();
         return;
     }
     
     
     if (!Update.begin(contentLength)) {
+        Serial.println("Failed to begin update");
         http.end();
         return;
     }
     
     WiFiClient *stream = http.getStreamPtr();
     size_t written = Update.writeStream(*stream);
-    
-    http.end();
+    Serial.printf("Written: %d, Content Length: %d\n", written, contentLength);
     if (written == contentLength && Update.end()) {
+        Serial.println("Update successful, restarting...");
         ESP.restart();
     }
+    http.end();
     
 }
 void handleOTA(bool checkForUpdates) {
