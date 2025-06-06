@@ -59,6 +59,7 @@ class MainController : public Controller {
             this->stopStepTimeCounter();
         }
 
+        virtual void checkForUpdates() = 0;
         virtual void startTotalTimeCounter() = 0;
         virtual void startTotalTimeCounter(unsigned long start_time_seconds) = 0;
         virtual void stopTotalTimeCounter() = 0;

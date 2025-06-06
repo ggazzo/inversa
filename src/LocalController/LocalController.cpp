@@ -1,6 +1,8 @@
 #include <RTClib.h>
 #include <WiFiUdp.h>
 
+#include "OTA.h"
+
 const long utcOffsetInSeconds = - 3 * 60 * 60;
 
 #include "LocalController.h"
@@ -57,8 +59,13 @@ void LocalController::prepareTemperature(float targetTemperature_celsius, char* 
     this->prepareTemperature(targetTemperature_celsius, (DateTime(desiredTime_hhmm_ss).secondstime() - this->now()));
 }
 
+void LocalController::checkForUpdates() {
+    handleOTA(this->state->current == StateType::IDLE);
+}
+
 void LocalController::setup() {
     MainController::setup();
+    setupOTA();
     peripheralController->setup();
     if (rtc->begin()) {
         ESP_LOGI("LocalController", "RTC Begin");
@@ -83,6 +90,7 @@ void LocalController::setup() {
 
 void LocalController::loop() {
     MainController::loop();
+    handleOTA(this->state->current == StateType::IDLE);
     peripheralController->loop();
     this->ftpSrv.handleFTP();
 }

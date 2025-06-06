@@ -354,7 +354,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["power_watts"] = settings.getPowerWatts();
 
         (*doc)["wifi_ssid"] = settings.getWifiSsid();
-        (*doc)["firmware_version"] = FIRMWARE_NAME;
+        (*doc)["firmware_version"] = FIRMWARE_NAME " " BUILD_GIT_VERSION;
         return;
     }
 
@@ -534,6 +534,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         char isoDate[20];
         strcpy(isoDate, params);
         controller->setTime(isoDate);
+        (*doc)["status"] = "ok";
     }
 };
 

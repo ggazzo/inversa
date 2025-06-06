@@ -540,7 +540,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // 2025-06-03T12:00:00
       const event = new Date();
       const isoTime = event.toISOString().split(".")[0];
-      await sendCommand(`SET_TIME ${isoTime}`, (response) => {
+
+      await sendCommand(`SET_DATE ${isoTime}`, (response) => {
         console.log("Set Time response:", response);
       });
     };

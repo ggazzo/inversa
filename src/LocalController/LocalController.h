@@ -58,6 +58,7 @@ class LocalController : public MainController<StateType, Steps> {
         void setStepEstimatedTime(unsigned long estimatedTime_seconds) override;
 
         void waitForStepTime() override;
+        void checkForUpdates() override;
 
         void waitForTimer(unsigned long duration_seconds) override;
         void stopTimer() override;

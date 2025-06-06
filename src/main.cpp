@@ -20,9 +20,6 @@
   #include <ESPmDNS.h>
 #endif
 
-#ifdef OTA
-  #include "OTA.h"
-#endif
 #include "media.h"
 #include "state.h"
 
@@ -72,10 +69,6 @@ void setup() {
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("Inversa", "12345678");
 
-  #ifdef OTA
-  setupOTA();
-  #endif
-
   controller->setup();
 
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
@@ -96,15 +89,7 @@ void setup() {
 
 void loop()
 {
-  static unsigned long lastLoopTime = 0;
-  if (millis() - lastLoopTime > 100) {
-    lastLoopTime = millis();
-    controller->loop();
-  }
-
-  #ifdef OTA
-    handleOTA();
-  #endif
+  controller->loop();
 
   handleAPI();
 }
