@@ -69,9 +69,8 @@ void setup() {
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("Inversa", "12345678");
 
-  controller->setup();
-
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
+  WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), IPAddress(8,8,8,8)); 
 
   Serial.print("Wifi SSID: "); Serial.println(settings.getWifiSsid());
 
@@ -85,6 +84,7 @@ void setup() {
   MDNS.begin("inversa");
 
   initializeSDCard();
+  controller->setup();
 }
 
 void loop()

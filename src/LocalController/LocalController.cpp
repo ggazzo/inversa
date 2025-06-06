@@ -63,6 +63,25 @@ void LocalController::checkForUpdates() {
     checkForUpdatesGithub();
 }
 
+void LocalController::monitorTask(void *pvParameters) {
+    LocalController *controller = (LocalController *)pvParameters;
+    while (true) {
+
+        while (WiFi.status() != WL_CONNECTED && controller->settings->getWifiSsid().length() > 0) {
+            vTaskDelay(1000 / portTICK_PERIOD_MS); // every second
+        }
+
+        ESP_LOGI("LocalController", "setting time from NTP");
+        controller->timeClient.begin();
+        ESP_LOGI("LocalController", "NTP Client Begin");
+        if(controller->timeClient.update()){
+            ESP_LOGI("LocalController", "NTP Client Update");
+            controller->rtc->adjust(DateTime(controller->timeClient.getEpochTime()));
+        }
+        vTaskDelay(1000 * 60 * 60 / portTICK_PERIOD_MS); // every hour
+    }
+}
+
 void LocalController::setup() {
     MainController::setup();
     setupOTA();
@@ -70,19 +89,12 @@ void LocalController::setup() {
     if (rtc->begin()) {
         ESP_LOGI("LocalController", "RTC Begin");
         if (!rtc->isrunning()) {
-            ESP_LOGI("LocalController", "RTC is not running, setting time from NTP");
-            timeClient.begin();
-            ESP_LOGI("LocalController", "NTP Client Begin");
-            if(timeClient.update()){
-                ESP_LOGI("LocalController", "NTP Client Update");
-                rtc->adjust(DateTime(timeClient.getEpochTime()));
-            }
-            else {
+            xTaskCreate(monitorTask, "LocalController::monitor", configMINIMAL_STACK_SIZE * 4, this, 1, &timerTask);
                 ESP_LOGI("LocalController", "Failed to set time from NTP, setting time from compile date");
                 rtc->adjust(DateTime(F(__DATE__), F(__TIME__)));
-            }
         }
     }
+    ESP_LOGI("INTERNAL TIME", "Time: %s", this->getTimeString().c_str());
     this->ftpSrv.begin("esp32", "esp32");
 
     this->restoreStateFromPowerLoss();

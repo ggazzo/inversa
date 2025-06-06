@@ -11,6 +11,15 @@
 
 #include "state.h"
 
+#if defined(ESP8266)
+  #include <ESP8266WiFi.h>
+  #include <ESP8266mDNS.h>
+#elif defined(ESP32)
+  #include <WiFi.h>
+  #include <ESPmDNS.h>
+#endif
+
+
 class LocalController : public MainController<StateType, Steps> {
     public:
         LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController);
@@ -90,11 +99,13 @@ class LocalController : public MainController<StateType, Steps> {
 
         PowerRecovery<MachineState> powerRecovery;
 
-
+        static void monitorTask(void *pvParameters);
 
         void restoreStateFromPowerLoss();
 
         uint32_t now();
+
+        TaskHandle_t timerTask;
 
 };
 
