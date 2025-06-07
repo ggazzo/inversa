@@ -35,6 +35,7 @@ void LocalController::abort() {
     this->task->setState(&idleState);
     this->stopTotalTimeCounter();
     this->stopTimer();
+    this->setTargetTemperature(0);
 }
 
 void LocalController::skip() {

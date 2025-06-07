@@ -45,8 +45,17 @@ NTC_Thermistor thermistor(
 #include <SimpleKalmanFilter.h>
 SimpleKalmanFilter kfilter(1, 1, 0.01);
 
+#define MAX_TEMPERATURE 115.0f
+#define MIN_TEMPERATURE 0.0f
+
+
+
 TemperatureSensor * temperatureSensor = new NTC_Sensor_Temperature(&thermistor, []() {
   state.current_temperature_c = kfilter.updateEstimate(temperatureSensor->getTemperature());
+  if (state.current_temperature_c > MAX_TEMPERATURE || state.current_temperature_c < MIN_TEMPERATURE) {
+    controller->abort();
+  }
+
 });
 
 PID *pid = new PID(&state.current_temperature_c, &state.output_val, &state.target_temperature_c,KP, KI,KD, DIRECT);
@@ -119,4 +128,4 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
 
 RTC_DS1307 *rtc = new RTC_DS1307(); 
 
-MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController);
+MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController); 
