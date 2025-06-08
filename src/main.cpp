@@ -64,10 +64,11 @@ void setup() {
   // });
 
   // Setup REST API
-  setupAPI(controller);
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("Inversa", "12345678");
+  
+  setupAPI(controller);
 
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
   WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), IPAddress(8,8,8,8)); 

@@ -14,7 +14,7 @@ extern Settings settings;
 WiFiServer server(API_PORT);
 
 void setupAPI(MainController<StateType, Steps> *ctrl) {
-    // server.begin(80);
+    server.begin();
 }
 
 void sendResponse(WiFiClient &client, int statusCode, const char* contentType, const char* body) {

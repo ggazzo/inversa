@@ -1,5 +1,6 @@
 #include "command.h"
 #include <RTClib.h>
+#include <WiFi.h>
 #ifndef __AVR__
 #include "FS.h"
 #endif
@@ -360,6 +361,7 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
 
         (*doc)["wifi_ssid"] = settings.getWifiSsid();
         (*doc)["firmware_version"] = FIRMWARE_NAME " " BUILD_GIT_VERSION;
+        (*doc)["ip"] = WiFi.localIP().toString();
         return;
     }
 
