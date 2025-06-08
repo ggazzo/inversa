@@ -61,17 +61,17 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install PlatformIO
-        run: pip install platformio
-
       - name: Get cached build
         uses: actions/cache@v4
         with:
-          path: .pio/build
-          key: ${{ matrix.env }}-${{ github.sha }}
+          path: |
+            ~/.platformio
+            .pio
+          key: ${{ runner.os }}-platformio-${{ hashFiles('**/platformio.ini') }}
           restore-keys: |
-            ${{ matrix.env }}-${{ github.sha }}
-
+            ${{ runner.os }}-platformio-
+      - name: Install PlatformIO
+        run: pip install platformio
       - name: Build for ${{ matrix.env }}
         run: pio run -e ${{ matrix.env }}
 
