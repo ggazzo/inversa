@@ -4,6 +4,8 @@
 #include "modules.h"
 #include <RTClib.h>
 #include <WiFiServer.h>
+#include <map>
+#include <vector>
 
 extern MachineState state;
 extern Settings settings;
@@ -13,8 +15,18 @@ extern Settings settings;
 
 WiFiServer server(API_PORT);
 
+struct RouteHandler {
+    const char* method;
+    void (*handler)(WiFiClient&, const char*);
+};
+
+std::map<String, std::vector<RouteHandler>> routes;
+
+void setupRoutes();
+
 void setupAPI(MainController<StateType, Steps> *ctrl) {
     server.begin();
+    setupRoutes();
 }
 
 void sendResponse(WiFiClient &client, int statusCode, const char* contentType, const char* body) {
@@ -222,98 +234,114 @@ void handleGetFile(WiFiClient &client, const char* query) {
 
 void handleAPI() {
     WiFiClient client = server.available();
-    if (client) {
-        String currentLine = "";
-        String method = "";
-        String path = "";
-        String query = "";
-        String body = "";
-        bool isBody = false;
-        int contentLength = 0;
-        
-        while (client.connected()) {
-            if (client.available()) {
-                char c = client.read();
-                
-                if (c == '\n') {
-                    if (currentLine.length() == 0) {
-                        isBody = true;
-                        continue;
-                    }
-                    
-                    if (method.length() == 0) {
-                        // Parse request line
-                        int space1 = currentLine.indexOf(' ');
-                        int space2 = currentLine.indexOf(' ', space1 + 1);
-                        method = currentLine.substring(0, space1);
-                        String fullPath = currentLine.substring(space1 + 1, space2);
-                        
-                        int queryPos = fullPath.indexOf('?');
-                        if (queryPos >= 0) {
-                            path = fullPath.substring(0, queryPos);
-                            query = fullPath.substring(queryPos + 1);
-                        } else {
-                            path = fullPath;
-                        }
-                    } else if (currentLine.startsWith("Content-Length: ")) {
-                        contentLength = currentLine.substring(16).toInt();
-                    }
-                    
-                    currentLine = "";
-                } else if (c != '\r') {
-                    if (isBody) {
-                        body += c;
-                        if (body.length() >= contentLength) {
-                            break;
-                        }
-                    } else {
-                        currentLine += c;
-                    }
-                }
-            }
-        }
-
-        // Handle request
-        if (path == "/api/temperature") {
-            if (method == "GET") {
-                handleGetTemperature(client);
-            } else if (method == "POST") {
-                handlePostTemperature(client, body.c_str());
-            }
-        } else if (path == "/api/state" && method == "GET") {
-            handleGetState(client);
-        } else if (path == "/api/preferences") {
-            if (method == "GET") {
-                handleGetPreferences(client);
-            } else if (method == "POST") {
-                handlePostPreferences(client, body.c_str());
-            }
-        } else if (path == "/api/start" && method == "POST") {
-            handlePostStart(client);
-        } else if (path == "/api/abort" && method == "POST") {
-            handlePostAbort(client);
-        } else if (path == "/api/confirm" && method == "POST") {
-            handlePostConfirm(client);
-        } else if (path == "/api/wait_timer" && method == "POST") {
-            handlePostWaitTimer(client, body.c_str());
-        } else if (path == "/api/wait_temperature" && method == "POST") {
-            handlePostWaitTemperature(client, body.c_str());
-        } else if (path == "/api/prepare_relative" && method == "POST") {
-            handlePostPrepareRelative(client, body.c_str());
-        } else if (path == "/api/prepare_absolute" && method == "POST") {
-            handlePostPrepareAbsolute(client, body.c_str());
-        } else if (path == "/api/pid" && method == "POST") {
-            handlePostPID(client, body.c_str());
-        } else if (path == "/api/beep" && method == "POST") {
-            #ifdef BUZZER_PIN
-            handlePostBeep(client);
-            #endif
-        } else if (path == "/api/file" && method == "GET") {
-            handleGetFile(client, query.c_str());
-        } else {
-            sendResponse(client, 404, "application/json", "{\"error\":\"Not found\"}");
-        }
-
-        client.stop();
+    if (!client) {
+        return;
     }
+
+    String currentLine = "";
+    String method = "";
+    String path = "";
+    String query = "";
+    String body = "";
+    bool isBody = false;
+    int contentLength = 0;
+    String requestLine = "";
+
+    bool isFirstLine = true;
+    while (client.connected()) {
+      if (client.available()) {
+        char c = client.read();
+
+        if (c == '\n') {
+          if (requestLine.length() == 0) {
+            break;
+          }
+
+          if (isFirstLine) {
+            isFirstLine = false;
+            int methodEnd = requestLine.indexOf(' ');
+            int routeEnd = requestLine.indexOf(' ', methodEnd + 1);
+
+            method = requestLine.substring(0, methodEnd);
+            path = requestLine.substring(methodEnd + 1, routeEnd);
+          }
+
+          requestLine = "";
+        } else if (c != '\r') {
+          requestLine += c;
+        }
+      }
+    }
+
+    auto routeIt = routes.find(path);
+    if (routeIt != routes.end()) {
+        for (const auto& handler : routeIt->second) {
+            if (String(handler.method) == method) {
+                handler.handler(client, body.c_str());
+                client.stop();
+                return;
+            }
+        }
+    }
+    
+    sendResponse(client, 404, "application/json", "{\"error\":\"Not found\"}");
+    client.stop();
 } 
+
+void setupRoutes() {
+    routes["/api/temperature"] = {
+        {"GET", [](WiFiClient& client, const char* body) { handleGetTemperature(client); }},
+        {"POST", handlePostTemperature}
+    };
+    
+    routes["/api/state"] = {
+        {"GET", [](WiFiClient& client, const char* body) { handleGetState(client); }}
+    };
+    
+    routes["/api/preferences"] = {
+        {"GET", [](WiFiClient& client, const char* body) { handleGetPreferences(client); }},
+        {"POST", handlePostPreferences}
+    };
+    
+    routes["/api/start"] = {
+        {"POST", [](WiFiClient& client, const char* body) { handlePostStart(client); }}
+    };
+    
+    routes["/api/abort"] = {
+        {"POST", [](WiFiClient& client, const char* body) { handlePostAbort(client); }}
+    };
+    
+    routes["/api/confirm"] = {
+        {"POST", [](WiFiClient& client, const char* body) { handlePostConfirm(client); }}
+    };
+    
+    routes["/api/wait_timer"] = {
+        {"POST", handlePostWaitTimer}
+    };
+    
+    routes["/api/wait_temperature"] = {
+        {"POST", handlePostWaitTemperature}
+    };
+    
+    routes["/api/prepare_relative"] = {
+        {"POST", handlePostPrepareRelative}
+    };
+    
+    routes["/api/prepare_absolute"] = {
+        {"POST", handlePostPrepareAbsolute}
+    };
+    
+    routes["/api/pid"] = {
+        {"POST", handlePostPID}
+    };
+    
+    #ifdef BUZZER_PIN
+    routes["/api/beep"] = {
+        {"POST", [](WiFiClient& client, const char* body) { handlePostBeep(client); }}
+    };
+    #endif
+    
+    routes["/api/file"] = {
+        {"GET", handleGetFile}
+    };
+}

@@ -341,8 +341,27 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         return;
     }
 
-    if(strcmp(command, "CHECK_FOR_UPDATES") == 0) {
+
+    if(strcmp(command, "FIRMWARE_VERSION") == 0) {
+        (*doc)["type"] = "firmware_version";
+        (*doc)["version"] = FIRMWARE_NAME " " BUILD_GIT_VERSION;
+        return;
+    }
+
+    if(strcmp(command, "FIRMWARE_UPDATE") == 0) {
         controller->checkForUpdates();
+        return;
+    }
+
+    if(strcmp(command, "WIFI_STATUS") == 0) {
+        (*doc)["wifi_ssid"] = settings.getWifiSsid();
+        if (WiFi.status() == WL_CONNECTED)
+        {
+            (*doc)["wifi_status"] = "connected";
+            (*doc)["ip"] = WiFi.localIP().toString();
+        } else {
+            (*doc)["wifi_status"] = "disconnected";
+        }
         return;
     }
 
@@ -358,10 +377,6 @@ void _executeCommand(const char* command, Print* output, JsonDocument* doc) {
         (*doc)["hysteresis_seconds"] = settings.getHysteresisSeconds();
         (*doc)["volume_liters"] = settings.getVolumeLiters();
         (*doc)["power_watts"] = settings.getPowerWatts();
-
-        (*doc)["wifi_ssid"] = settings.getWifiSsid();
-        (*doc)["firmware_version"] = FIRMWARE_NAME " " BUILD_GIT_VERSION;
-        (*doc)["ip"] = WiFi.localIP().toString();
         return;
     }
 

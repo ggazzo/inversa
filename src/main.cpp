@@ -49,6 +49,7 @@ MachineState state;
     char fileNames[MAX_FILES][30];
 #endif
 
+
 void setup() {
   Serial.begin(115200);
 
@@ -67,25 +68,35 @@ void setup() {
 
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAP("Inversa", "12345678");
-  
-  setupAPI(controller);
 
-  WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword(), 6);
+
+  settings.load();
+
+  WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword());
   WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), IPAddress(8,8,8,8)); 
 
   Serial.print("Wifi SSID: "); Serial.println(settings.getWifiSsid());
+  Serial.print("Wifi Password: "); Serial.println(settings.getWifiPassword());
 
   if( settings.getWifiSsid().length() > 0) {
     // check if is ther any ssid in preferences
     while (WiFi.status() != WL_CONNECTED && settings.getWifiSsid().length() > 0) {
+      Serial.print(".");
       delay(500);
     }
+    Serial.println();
+    Serial.println("Connected to WiFi");
+    Serial.print("IP address: ");
+    Serial.println(WiFi.localIP());
   }
+
+  setupAPI(controller);
 
   MDNS.begin("inversa");
 
   initializeSDCard();
   controller->setup();
+
 }
 
 void loop()
