@@ -72,6 +72,7 @@ void setup() {
 
   settings.load();
 
+  WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword());
   
   MDNS.begin("inversa");
 
