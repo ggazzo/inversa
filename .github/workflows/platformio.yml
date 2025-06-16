@@ -4,11 +4,19 @@ on:
   push:
     tags:
       - "*" # Trigger only on version tags
-
+    branches:
+    paths-ignore:
+      - "**.md"
+  pull_request:
+    branches:
+      - "**"
+    paths-ignore:
+      - "**.md"
 jobs:
   publish:
     runs-on: ubuntu-latest
     needs: build
+    if: github.ref == 'refs/tags/*'
     steps:
       - name: Create Release
         id: create_release
@@ -46,6 +54,31 @@ jobs:
           mv .pio/build/${{ matrix.env }}/firmware.elf ./${{ matrix.env }}/${{ matrix.env }}.elf
           mv .pio/build/${{ matrix.env }}/partitions.bin ./${{ matrix.env }}/${{ matrix.env }}-partitions.bin
           gh release upload ${{ github.ref_name }} ${{ matrix.env }}/*
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Get cached build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: ${{ runner.os }}-platformio-${{ hashFiles('**/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-platformio-
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Test
+        run: pio test -e native
 
   build:
     runs-on: ubuntu-latest
