@@ -5,6 +5,7 @@ on:
     tags:
       - "*" # Trigger only on version tags
     branches:
+      - "**"
     paths-ignore:
       - "**.md"
   pull_request:
