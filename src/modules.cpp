@@ -45,7 +45,7 @@ NTC_Thermistor thermistor(
 #include <SimpleKalmanFilter.h>
 SimpleKalmanFilter kfilter(1, 1, 0.01);
 
-#define MAX_TEMPERATURE 115.0f
+#define MAX_TEMPERATURE 150.0f
 #define MIN_TEMPERATURE 0.0f
 
 
