@@ -9,27 +9,154 @@
 
 extern MachineState state;
 extern Settings settings;
+// BierBot* bierbot = nullptr;
 
 #define SECONDS_FROM_1970_TO_2000 946684800
 #define API_PORT 80
 
-WiFiServer server(API_PORT);
+API::API(MainController<StateType, Steps>* ctrl) : server(API_PORT), controller(ctrl) {}
 
-struct RouteHandler {
-    const char* method;
-    void (*handler)(WiFiClient&, const char*);
-};
-
-std::map<String, std::vector<RouteHandler>> routes;
-
-void setupRoutes();
-
-void setupAPI(MainController<StateType, Steps> *ctrl) {
-    server.begin();
-    setupRoutes();
+void API::stop() {
+    this->initialized = false;
+    this->server.stop();
 }
 
-void sendResponse(WiFiClient &client, int statusCode, const char* contentType, const char* body) {
+void API::setupRoutes() {
+    std::vector<RouteHandler> tempHandlers = {
+        {"GET", [this](WiFiClient& client, const char* body) { this->handleGetTemperature(client); }},
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostTemperature(client, body); }}
+    };
+    routes["/api/temperature"] = tempHandlers;
+    
+    std::vector<RouteHandler> stateHandlers = {
+        {"GET", [this](WiFiClient& client, const char* body) { this->handleGetState(client); }}
+    };
+    routes["/api/state"] = stateHandlers;
+    
+    std::vector<RouteHandler> prefHandlers = {
+        {"GET", [this](WiFiClient& client, const char* body) { this->handleGetPreferences(client); }},
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostPreferences(client, body); }}
+    };
+    routes["/api/preferences"] = prefHandlers;
+    
+    std::vector<RouteHandler> startHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostStart(client); }}
+    };
+    routes["/api/start"] = startHandlers;
+    
+    std::vector<RouteHandler> abortHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostAbort(client); }}
+    };
+    routes["/api/abort"] = abortHandlers;
+    
+    std::vector<RouteHandler> confirmHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostConfirm(client); }}
+    };
+    routes["/api/confirm"] = confirmHandlers;
+    
+    std::vector<RouteHandler> waitTimerHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostWaitTimer(client, body); }}
+    };
+    routes["/api/wait_timer"] = waitTimerHandlers;
+    
+    std::vector<RouteHandler> waitTempHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostWaitTemperature(client, body); }}
+    };
+    routes["/api/wait_temperature"] = waitTempHandlers;
+    
+    std::vector<RouteHandler> prepRelHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostPrepareRelative(client, body); }}
+    };
+    routes["/api/prepare_relative"] = prepRelHandlers;
+    
+    std::vector<RouteHandler> prepAbsHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostPrepareAbsolute(client, body); }}
+    };
+    routes["/api/prepare_absolute"] = prepAbsHandlers;
+    
+    std::vector<RouteHandler> pidHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostPID(client, body); }}
+    };
+    routes["/api/pid"] = pidHandlers;
+    
+    #ifdef BUZZER_PIN
+    std::vector<RouteHandler> beepHandlers = {
+        {"POST", [this](WiFiClient& client, const char* body) { this->handlePostBeep(client); }}
+    };
+    routes["/api/beep"] = beepHandlers;
+    #endif
+    
+    std::vector<RouteHandler> fileHandlers = {
+        {"GET", [this](WiFiClient& client, const char* body) { this->handleGetFile(client, body); }}
+    };
+    routes["/api/file"] = fileHandlers;
+}
+
+void API::setup() {
+    if (this->initialized) {
+        server.stop();
+    }
+    server.begin();
+    setupRoutes();
+    this->initialized = true;
+}
+
+void API::loop() {
+    if (!this->initialized) return;
+    WiFiClient client = server.available();
+    if (!client) return;
+
+    String currentLine = "";
+    String method = "";
+    String path = "";
+    String query = "";
+    String body = "";
+    bool isBody = false;
+    int contentLength = 0;
+    String requestLine = "";
+
+    bool isFirstLine = true;
+    while (client.connected()) {
+        if (client.available()) {
+            char c = client.read();
+
+            if (c == '\n') {
+                if (requestLine.length() == 0) {
+                    break;
+                }
+
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    int methodEnd = requestLine.indexOf(' ');
+                    int routeEnd = requestLine.indexOf(' ', methodEnd + 1);
+
+                    method = requestLine.substring(0, methodEnd);
+                    path = requestLine.substring(methodEnd + 1, routeEnd);
+                }
+
+                requestLine = "";
+            } else if (c != '\r') {
+                requestLine += c;
+            }
+        }
+    }
+
+    auto routeIt = routes.find(path);
+    if (routeIt != routes.end()) {
+        for (const auto& handler : routeIt->second) {
+            if (String(handler.method) == method) {
+                handler.handler(client, body.c_str());
+                client.stop();
+                return;
+            }
+        }
+    }
+    
+    sendResponse(client, 404, "application/json", "{\"error\":\"Not found\"}");
+    client.stop();
+}
+
+void API::sendResponse(WiFiClient &client, int statusCode, const char* contentType, const char* body) {
     client.print("HTTP/1.1 ");
     client.print(statusCode);
     client.println(" OK");
@@ -41,16 +168,17 @@ void sendResponse(WiFiClient &client, int statusCode, const char* contentType, c
     client.println(body);
 }
 
-void handleGetTemperature(WiFiClient &client) {
+void API::handleGetTemperature(WiFiClient &client) {
     JsonDocument doc;
     doc["temperature"] = state.current_temperature_c;
     doc["target_temperature"] = state.target_temperature_c;
+    doc["output"] = state.output_val;
     String response;
     serializeJson(doc, response);
     sendResponse(client, 200, "application/json", response.c_str());
 }
 
-void handlePostTemperature(WiFiClient &client, const char* body) {
+void API::handlePostTemperature(WiFiClient &client, const char* body) {
     JsonDocument doc;
     deserializeJson(doc, body);
     if (doc.containsKey("temperature")) {
@@ -62,7 +190,7 @@ void handlePostTemperature(WiFiClient &client, const char* body) {
     }
 }
 
-void handleGetState(WiFiClient &client) {
+void API::handleGetState(WiFiClient &client) {
     JsonDocument doc;
     doc["type"] = "sync";
     doc["temperature"] = state.current_temperature_c;
@@ -81,7 +209,7 @@ void handleGetState(WiFiClient &client) {
     sendResponse(client, 200, "application/json", response.c_str());
 }
 
-void handleGetPreferences(WiFiClient &client) {
+void API::handleGetPreferences(WiFiClient &client) {
     JsonDocument doc;
     doc["type"] = "preferences";
     doc["kp"] = settings.getKp();
@@ -99,7 +227,7 @@ void handleGetPreferences(WiFiClient &client) {
     sendResponse(client, 200, "application/json", response.c_str());
 }
 
-void handlePostPreferences(WiFiClient &client, const char* body) {
+void API::handlePostPreferences(WiFiClient &client, const char* body) {
     JsonDocument doc;
     deserializeJson(doc, body);
     
@@ -118,22 +246,22 @@ void handlePostPreferences(WiFiClient &client, const char* body) {
     sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
 }
 
-void handlePostStart(WiFiClient &client) {
+void API::handlePostStart(WiFiClient &client) {
     controller->startTotalTimeCounter();
     sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
 }
 
-void handlePostAbort(WiFiClient &client) {
+void API::handlePostAbort(WiFiClient &client) {
     controller->abort();
     sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
 }
 
-void handlePostConfirm(WiFiClient &client) {
+void API::handlePostConfirm(WiFiClient &client) {
     controller->confirm();
     sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
 }
 
-void handlePostWaitTimer(WiFiClient &client, const char* body) {
+void API::handlePostWaitTimer(WiFiClient &client, const char* body) {
     JsonDocument doc;
     deserializeJson(doc, body);
     if (doc.containsKey("duration")) {
@@ -145,7 +273,7 @@ void handlePostWaitTimer(WiFiClient &client, const char* body) {
     }
 }
 
-void handlePostWaitTemperature(WiFiClient &client, const char* body) {
+void API::handlePostWaitTemperature(WiFiClient &client, const char* body) {
     JsonDocument doc;
     deserializeJson(doc, body);
     if (doc.containsKey("temperature")) {
@@ -157,7 +285,7 @@ void handlePostWaitTemperature(WiFiClient &client, const char* body) {
     }
 }
 
-void handlePostPrepareRelative(WiFiClient &client, const char* body) {
+void API::handlePostPrepareRelative(WiFiClient &client, const char* body) {
     JsonDocument doc;
     deserializeJson(doc, body);
     if (doc.containsKey("temperature") && doc.containsKey("minutes")) {
@@ -171,21 +299,20 @@ void handlePostPrepareRelative(WiFiClient &client, const char* body) {
     }
 }
 
-void handlePostPrepareAbsolute(WiFiClient &client, const char* body) {
+void API::handlePostPrepareAbsolute(WiFiClient &client, const char* body) {
     JsonDocument doc;
     deserializeJson(doc, body);
     if (doc.containsKey("temperature") && doc.containsKey("time")) {
         float temp = doc["temperature"];
         const char* time = doc["time"];
         controller->setTargetTemperature(temp);
-        // TODO: Implement absolute time preparation
         sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
     } else {
         sendResponse(client, 400, "application/json", "{\"error\":\"Missing temperature or time parameter\"}");
     }
 }
 
-void handlePostPID(WiFiClient &client, const char* body) {
+void API::handlePostPID(WiFiClient &client, const char* body) {
     JsonDocument doc;
     deserializeJson(doc, body);
     if (doc.containsKey("kp") && doc.containsKey("ki") && doc.containsKey("kd") && 
@@ -203,13 +330,13 @@ void handlePostPID(WiFiClient &client, const char* body) {
 }
 
 #ifdef BUZZER_PIN
-void handlePostBeep(WiFiClient &client) {
+void API::handlePostBeep(WiFiClient &client) {
     EasyBuzzer.singleBeep(300, 100);
     sendResponse(client, 200, "application/json", "{\"status\":\"ok\"}");
 }
 #endif
 
-void handleGetFile(WiFiClient &client, const char* query) {
+void API::handleGetFile(WiFiClient &client, const char* query) {
     char filename[32];
     if (sscanf(query, "filename=%31s", filename) == 1) {
         File file = SD.open("/" + String(filename), FILE_READ);
@@ -230,118 +357,4 @@ void handleGetFile(WiFiClient &client, const char* query) {
     } else {
         sendResponse(client, 400, "application/json", "{\"error\":\"Missing filename parameter\"}");
     }
-}
-
-void handleAPI() {
-    WiFiClient client = server.available();
-    if (!client) {
-        return;
-    }
-
-    String currentLine = "";
-    String method = "";
-    String path = "";
-    String query = "";
-    String body = "";
-    bool isBody = false;
-    int contentLength = 0;
-    String requestLine = "";
-
-    bool isFirstLine = true;
-    while (client.connected()) {
-      if (client.available()) {
-        char c = client.read();
-
-        if (c == '\n') {
-          if (requestLine.length() == 0) {
-            break;
-          }
-
-          if (isFirstLine) {
-            isFirstLine = false;
-            int methodEnd = requestLine.indexOf(' ');
-            int routeEnd = requestLine.indexOf(' ', methodEnd + 1);
-
-            method = requestLine.substring(0, methodEnd);
-            path = requestLine.substring(methodEnd + 1, routeEnd);
-          }
-
-          requestLine = "";
-        } else if (c != '\r') {
-          requestLine += c;
-        }
-      }
-    }
-
-    auto routeIt = routes.find(path);
-    if (routeIt != routes.end()) {
-        for (const auto& handler : routeIt->second) {
-            if (String(handler.method) == method) {
-                handler.handler(client, body.c_str());
-                client.stop();
-                return;
-            }
-        }
-    }
-    
-    sendResponse(client, 404, "application/json", "{\"error\":\"Not found\"}");
-    client.stop();
-} 
-
-void setupRoutes() {
-    routes["/api/temperature"] = {
-        {"GET", [](WiFiClient& client, const char* body) { handleGetTemperature(client); }},
-        {"POST", handlePostTemperature}
-    };
-    
-    routes["/api/state"] = {
-        {"GET", [](WiFiClient& client, const char* body) { handleGetState(client); }}
-    };
-    
-    routes["/api/preferences"] = {
-        {"GET", [](WiFiClient& client, const char* body) { handleGetPreferences(client); }},
-        {"POST", handlePostPreferences}
-    };
-    
-    routes["/api/start"] = {
-        {"POST", [](WiFiClient& client, const char* body) { handlePostStart(client); }}
-    };
-    
-    routes["/api/abort"] = {
-        {"POST", [](WiFiClient& client, const char* body) { handlePostAbort(client); }}
-    };
-    
-    routes["/api/confirm"] = {
-        {"POST", [](WiFiClient& client, const char* body) { handlePostConfirm(client); }}
-    };
-    
-    routes["/api/wait_timer"] = {
-        {"POST", handlePostWaitTimer}
-    };
-    
-    routes["/api/wait_temperature"] = {
-        {"POST", handlePostWaitTemperature}
-    };
-    
-    routes["/api/prepare_relative"] = {
-        {"POST", handlePostPrepareRelative}
-    };
-    
-    routes["/api/prepare_absolute"] = {
-        {"POST", handlePostPrepareAbsolute}
-    };
-    
-    routes["/api/pid"] = {
-        {"POST", handlePostPID}
-    };
-    
-    #ifdef BUZZER_PIN
-    routes["/api/beep"] = {
-        {"POST", [](WiFiClient& client, const char* body) { handlePostBeep(client); }}
-    };
-    #endif
-    
-    routes["/api/file"] = {
-        {"GET", handleGetFile}
-    };
 }

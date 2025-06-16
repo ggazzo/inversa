@@ -19,10 +19,12 @@
   #include <ESPmDNS.h>
 #endif
 
+#include "api.h"
+
 
 class LocalController : public MainController<StateType, Steps> {
     public:
-        LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController);
+        LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController, API *api);
         void setTargetTemperature(float target_temperature_c) override;
         void setTargetTemperatureAndWait(float target_temperature_c) override;
         void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_seconds) override;
@@ -81,6 +83,7 @@ class LocalController : public MainController<StateType, Steps> {
         void setTime(char* isoDate) override;
 
         MachineState *state;
+        API *api;
     private:
         RTC_DS1307 *rtc;
         NTPClient timeClient;
@@ -106,6 +109,8 @@ class LocalController : public MainController<StateType, Steps> {
         uint32_t now();
 
         TaskHandle_t timerTask;
+
+        
 
 };
 

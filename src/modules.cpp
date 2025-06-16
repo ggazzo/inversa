@@ -9,7 +9,7 @@
 #include "HeaterSSR.h"
 
 #include "Communication/CommunicationPeripherals.h"
-
+#include "api.h"
 
 #include "definitions.h"  
 #include "modules.h"
@@ -17,6 +17,7 @@
 #include "States/stateMachine.h"
 #include "LocalCommunication.h"
 #include "LocalController/LocalController.h"
+
 
 extern MachineState state;
 
@@ -47,6 +48,8 @@ SimpleKalmanFilter kfilter(1, 1, 0.01);
 
 #define MAX_TEMPERATURE 150.0f
 #define MIN_TEMPERATURE 0.0f
+
+API* api = new API(controller);
 
 
 
@@ -128,4 +131,4 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
 
 RTC_DS1307 *rtc = new RTC_DS1307(); 
 
-MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController); 
+MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController, api); 

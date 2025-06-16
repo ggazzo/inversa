@@ -7,16 +7,18 @@ const long utcOffsetInSeconds = - 3 * 60 * 60;
 
 #include "LocalController.h"
 #include "States/stateMachine.h"
+#include "api.h"
 
 WiFiUDP ntpUDP;
 
-LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController) {
+LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController), api(api) {
     this->step = Steps::NONE;
 }
 
 void LocalController::confirm() {
     Serial.println("LocalController::confirm");
     this->saveMilestoneToPowerLoss();
+    this->skip();
 }
 
 void LocalController::setTargetTemperature(float target_temperature_c) {
@@ -66,10 +68,11 @@ void LocalController::checkForUpdates() {
 
 void LocalController::monitorTask(void *pvParameters) {
     LocalController *controller = (LocalController *)pvParameters;
+
     while (true) {
 
-        while (WiFi.status() != WL_CONNECTED && controller->settings->getWifiSsid().length() > 0) {
-            vTaskDelay(1000 / portTICK_PERIOD_MS); // every second
+        if (!controller->rtc->begin()) {
+            continue;
         }
 
         ESP_LOGI("LocalController", "setting time from NTP");
@@ -87,10 +90,19 @@ void LocalController::setup() {
     MainController::setup();
     setupOTA();
     peripheralController->setup();
+
+    /**
+     * Setup API and start task to update time from NTP every hour
+     */
+    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
+        this->api->setup();
+        vTaskDelete(timerTask);
+        xTaskCreate(monitorTask, "LocalController::monitor", configMINIMAL_STACK_SIZE * 4, this, 1, &timerTask);
+    }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
+
     if (rtc->begin()) {
         ESP_LOGI("LocalController", "RTC Begin");
         if (!rtc->isrunning()) {
-            xTaskCreate(monitorTask, "LocalController::monitor", configMINIMAL_STACK_SIZE * 4, this, 1, &timerTask);
                 ESP_LOGI("LocalController", "Failed to set time from NTP, setting time from compile date");
                 rtc->adjust(DateTime(F(__DATE__), F(__TIME__)));
         }
@@ -106,6 +118,7 @@ void LocalController::loop() {
     handleOTA(this->state->current == StateType::IDLE);
     peripheralController->loop();
     this->ftpSrv.handleFTP();
+    this->api->loop();
 }
 
 void LocalController::waitConfirmation() {
