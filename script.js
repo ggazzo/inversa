@@ -1714,11 +1714,10 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     // this times are UTC
     if (target_timer_time_seconds) {
-      timerItem.querySelector(".timer-remaining-label").textContent =
+      timerRemainingItem.querySelector(".timer-remaining-label").textContent =
         "Target Timer";
-      timerItem.querySelector(".timer-remaining-value").textContent = new Date(
-        target_timer_time_seconds * 1000
-      ).toLocaleString();
+      timerRemainingItem.querySelector(".timer-remaining-value").textContent =
+        new Date(target_timer_time_seconds * 1000).toLocaleString();
     } else {
       // timerItem.querySelector(".timer-remaining-value").textContent = "";
     }
