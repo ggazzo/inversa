@@ -13,8 +13,9 @@
 const unsigned long CHECK_INTERVAL = 1000 * 60 * 30; // Check every 5 minutes
 
 void checkForUpdatesGithub() {
-  HTTPClient http;
-    http.begin("https://api.github.com/repos/ggazzo/inversa/releases/latest");
+    WiFiClient client;
+    HTTPClient http;
+    http.begin(client, "https://api.github.com/repos/ggazzo/inversa/releases/latest");
     http.addHeader("User-Agent", "ESP32");
 
     
@@ -73,7 +74,7 @@ void checkForUpdatesGithub() {
     // handle 302 redirects
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.setRedirectLimit(5);
-    http.begin(firmwareUrl);
+    http.begin(client, firmwareUrl);
     httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
         Serial.printf("Failed to download firmware. HTTP code: %d\n", httpCode);
