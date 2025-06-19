@@ -12,10 +12,16 @@
 #define SENSOR_PIN A3
 #define HEATER_PIN 2
 
-#define SD_CS_PIN SS
-#define SD_MISO MISO
-#define SD_MOSI MOSI
-#define SD_SCK  SCK
+#define SD_CS_PIN 5
+#define SD_SCK  1
+
+
+#define SD_MISO 0
+#define SD_MOSI 4
+
+
+
+
 
 #define TX 21
 #define RX 20
