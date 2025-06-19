@@ -38,7 +38,7 @@ jobs:
     needs: [build, publish]
     strategy:
       matrix:
-        env: [wemos_s3_mini]
+        env: [wemos_s3_mini, wemos_c3_mini]
     steps:
       - uses: actions/checkout@v4
       - name: Download artifacts
