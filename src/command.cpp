@@ -635,6 +635,4 @@ void openFile(const char* filename) {
         sdCardState.isFileOpen = false;
         LOG_SERIAL_L("File not opened");
     }
-
-    mainTaskMachine.setState(&idleState);
 }

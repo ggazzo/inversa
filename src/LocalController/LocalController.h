@@ -93,13 +93,6 @@ class LocalController : public MainController<StateType, Steps> {
         FtpServer ftpSrv;
 
 
-        unsigned long totalTimeStart = 0;
-        unsigned long estimatedTime = 0;
-
-        unsigned long stepTimeStart = 0;
-        unsigned long stepEstimatedTime = 0;
-
-
         PowerRecovery<MachineState> powerRecovery;
 
         static void monitorTask(void *pvParameters);

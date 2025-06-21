@@ -11,79 +11,12 @@ const long utcOffsetInSeconds = - 3 * 60 * 60;
 
 WiFiUDP ntpUDP;
 
-LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController), api(api) {
+// ============================================================================
+// CONSTRUCTOR AND CORE SETUP
+// ============================================================================
+
+LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), timerTask(nullptr), powerRecovery() {
     this->step = Steps::NONE;
-}
-
-void LocalController::confirm() {
-    Serial.println("LocalController::confirm");
-    this->saveMilestoneToPowerLoss();
-    this->skip();
-}
-
-void LocalController::setTargetTemperature(float target_temperature_c) {
-    this->communicationPeripherals->setTargetTemperature(target_temperature_c);
-    this->saveMilestoneToPowerLoss();
-}
-
-void LocalController::setTargetTemperatureAndWait(float target_temperature_c) {
-    this->setTargetTemperature(target_temperature_c);
-    this->task->setState(&waitForTemperatureState);
-    this->saveMilestoneToPowerLoss();
-}
-
-void LocalController::abort() {
-    this->deleteMilestoneFromPowerLoss();
-    this->task->setState(&idleState);
-    this->stopTotalTimeCounter();
-    this->stopTimer();
-    this->setTargetTemperature(0);
-}
-
-void LocalController::skip() {
-    this->task->setState(&idleState);
-}
-
-void LocalController::prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_minutes) {
-
-    preparingState.volume_liters = settings->getVolumeLiters();
-    preparingState.power_watts = settings->getPowerWatts();
-    preparingState.target_temperature_c = targetTemperature_celsius;
-
-    this->state->target_timer_time_seconds = this->now() + desiredTime_minutes_from_now_minutes * 60;
-    this->setStep(Steps::PRE_HEATING);
-    this->startStepTimeCounter();
-    this->setEstimatedTime(this->state->target_timer_time_seconds);
-    this->task->setState(&preparingState);
-    this->saveMilestoneToPowerLoss();
-}
-
-void LocalController::prepareTemperature(float targetTemperature_celsius, char* desiredTime_hhmm_ss) {
-    this->prepareTemperature(targetTemperature_celsius, (DateTime(desiredTime_hhmm_ss).secondstime() - this->now()));
-}
-
-void LocalController::checkForUpdates() {
-    checkForUpdatesGithub();
-}
-
-void LocalController::monitorTask(void *pvParameters) {
-    LocalController *controller = (LocalController *)pvParameters;
-
-    while (true) {
-
-        if (!controller->rtc->begin()) {
-            continue;
-        }
-
-        ESP_LOGI("LocalController", "setting time from NTP");
-        controller->timeClient.begin();
-        ESP_LOGI("LocalController", "NTP Client Begin");
-        if(controller->timeClient.update()){
-            ESP_LOGI("LocalController", "NTP Client Update");
-            controller->rtc->adjust(DateTime(controller->timeClient.getEpochTime()));
-        }
-        vTaskDelay(1000 * 60 * 60 / portTICK_PERIOD_MS); // every hour
-    }
 }
 
 void LocalController::setup() {
@@ -121,30 +54,103 @@ void LocalController::loop() {
     this->api->loop();
 }
 
+void LocalController::monitorTask(void *pvParameters) {
+    LocalController *controller = (LocalController *)pvParameters;
+
+    while (true) {
+
+        if (!controller->rtc->begin()) {
+            continue;
+        }
+
+        ESP_LOGI("LocalController", "setting time from NTP");
+        controller->timeClient.begin();
+        ESP_LOGI("LocalController", "NTP Client Begin");
+        if(controller->timeClient.update()){
+            ESP_LOGI("LocalController", "NTP Client Update");
+            controller->rtc->adjust(DateTime(controller->timeClient.getEpochTime()));
+        }
+        vTaskDelay(1000 * 60 * 60 / portTICK_PERIOD_MS); // every hour
+    }
+}
+
+// ============================================================================
+// STATE MANAGEMENT AND CONTROL FLOW
+// ============================================================================
+
+void LocalController::confirm() {
+    Serial.println("LocalController::confirm");
+    this->saveMilestoneToPowerLoss();
+    this->skip();
+}
+
+void LocalController::abort() {
+    this->task->setState(&idleState);
+    this->stopTotalTimeCounter();
+    this->stopTimer();
+    this->setTargetTemperature(0);
+    this->deleteMilestoneFromPowerLoss();
+}
+
+void LocalController::skip() {
+    this->task->setState(&idleState);
+}
+
 void LocalController::waitConfirmation() {
     this->task->setState(&confirmState);
 }
 
-float LocalController::getTemperature() {
-    return this->state->current_temperature_c;
-}
-
-float LocalController::getVolume() {
-    return this->settings->getVolumeLiters();
-}
-
-float LocalController::getPower() {
-    return this->settings->getPowerWatts();
+void LocalController::setState(StateType state) {
+    this->state->current = state;
+    if(state != StateType::IDLE){
+        this->startTotalTimeCounter();
+    }
+    this->saveMilestoneToPowerLoss();
 }
 
 StateType LocalController::getState() {
     return this->state->current;
 }
 
+void LocalController::checkForUpdates() {
+    checkForUpdatesGithub();
+}
 
-void LocalController::setState(StateType state) {
-    this->state->current = state;
+// ============================================================================
+// TEMPERATURE CONTROL
+// ============================================================================
+
+void LocalController::setTargetTemperature(float target_temperature_c) {
+    this->communicationPeripherals->setTargetTemperature(target_temperature_c);
     this->saveMilestoneToPowerLoss();
+}
+
+void LocalController::setTargetTemperatureAndWait(float target_temperature_c) {
+    this->setTargetTemperature(target_temperature_c);
+    this->task->setState(&waitForTemperatureState);
+    this->saveMilestoneToPowerLoss();
+}
+
+void LocalController::prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_minutes) {
+
+    preparingState.volume_liters = settings->getVolumeLiters();
+    preparingState.power_watts = settings->getPowerWatts();
+    preparingState.target_temperature_c = targetTemperature_celsius;
+
+    this->state->target_timer_time_seconds = this->now() + desiredTime_minutes_from_now_minutes * 60;
+    this->setStep(Steps::PRE_HEATING);
+    this->startStepTimeCounter();
+    this->setEstimatedTime(this->state->target_timer_time_seconds);
+    this->task->setState(&preparingState);
+    this->saveMilestoneToPowerLoss();
+}
+
+void LocalController::prepareTemperature(float targetTemperature_celsius, char* desiredTime_hhmm_ss) {
+    this->prepareTemperature(targetTemperature_celsius, (DateTime(desiredTime_hhmm_ss).secondstime() - this->now()));
+}
+
+float LocalController::getTemperature() {
+    return this->state->current_temperature_c;
 }
 
 float LocalController::getTargetTemperature() {
@@ -167,8 +173,28 @@ void LocalController::stopAutotune() {
     this->communicationPeripherals->stopAutotune();
 }
 
+// ============================================================================
+// TIME MANAGEMENT
+// ============================================================================
+
+uint32_t LocalController::now() {
+    return this->rtc->now().secondstime();
+}
+
+String LocalController::getTimeString() {
+    return this->rtc->now().timestamp();
+}
+
+void LocalController::setTime(char* isoDate) {
+    this->rtc->adjust(DateTime(isoDate));
+}
+
+// Total Time Management
 void LocalController::startTotalTimeCounter(unsigned long start_time_seconds) {
-    this->totalTimeStart = start_time_seconds;
+    if(this->state->total_time_seconds_start != 0){
+        return;
+    }
+    this->state->total_time_seconds_start = start_time_seconds;
     this->saveMilestoneToPowerLoss();
 }
 
@@ -177,75 +203,74 @@ void LocalController::startTotalTimeCounter() {
 }
 
 unsigned long LocalController::getTimeStart() {
-    return this->totalTimeStart;
+    return this->state->total_time_seconds_start;
 }
 
 void LocalController::stopTotalTimeCounter() {
-    this->totalTimeStart = 0;
+    this->state->total_time_seconds_start = 0;
     this->setEstimatedTime(0);
 }
 
-void LocalController::resetTotalTimeCounter() { 
-    this->totalTimeStart = 0;
-}
-
-uint32_t LocalController::now() {
-    return this->rtc->now().secondstime() - utcOffsetInSeconds;
+void LocalController::resetTotalTimeCounter() {
+    this->state->total_time_seconds_start = 0;
+    this->startTotalTimeCounter();
 }
 
 unsigned long LocalController::getElapsedTime() {
-    if (this->totalTimeStart == 0) {
+    if (this->state->total_time_seconds_start == 0) {
         return 0;
     }
-    return this->now() - this->totalTimeStart;
+    return this->now() - this->state->total_time_seconds_start;
+}
+
+void LocalController::setEstimatedTime(unsigned long estimatedTime_seconds) {
+    this->state->total_time_seconds_estimated = estimatedTime_seconds;
+    this->saveMilestoneToPowerLoss();
+}
+
+unsigned long LocalController::getEstimatedTime() {
+    return this->state->total_time_seconds_estimated;
 }
 
 unsigned long LocalController::remainingTime() {
     return this->state->target_timer_time_seconds - this->now();
 }
 
-void LocalController::setEstimatedTime(unsigned long estimatedTime_seconds) {
-    this->estimatedTime = estimatedTime_seconds;
-    this->saveMilestoneToPowerLoss();
-}
-
-unsigned long LocalController::getEstimatedTime() {
-    return this->estimatedTime;
-}
-
+// Step Time Management
 void LocalController::startStepTimeCounter() {
     this->startStepTimeCounter(this->now());
 }
 
 void LocalController::startStepTimeCounter(unsigned long start_time_seconds) {
-    this->stepTimeStart = start_time_seconds;
+    this->state->step_time_seconds_start = start_time_seconds;
     this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::stopStepTimeCounter() {
-    this->stepTimeStart = 0;
+    this->state->step_time_seconds_start = 0;
 }
 
 unsigned long LocalController::getStepTimeStart() {
-    return this->stepTimeStart;
+    return this->state->step_time_seconds_start;
 }
 
 unsigned long LocalController::getStepElapsedTime() {
-    if (this->stepTimeStart == 0) {
+    if (this->state->step_time_seconds_start == 0) {
         return 0;
     }
-    return this->now() - this->stepTimeStart;
+    return this->now() - this->state->step_time_seconds_start;
 }
 
 void LocalController::setStepEstimatedTime(unsigned long estimatedTime_seconds) {
-    this->stepEstimatedTime = estimatedTime_seconds;
+    this->state->step_time_seconds_estimated = estimatedTime_seconds;
     this->saveMilestoneToPowerLoss();
 }
 
 void LocalController::waitForStepTime() {
-    this->waitForTimer(this->stepEstimatedTime - this->getStepElapsedTime());
+    this->waitForTimer(this->state->step_time_seconds_estimated - this->getStepElapsedTime());
 }
 
+// Timer Management
 void LocalController::waitForTimer(unsigned long duration_seconds) {
     this->state->target_timer_time_seconds = this->now() + duration_seconds;
     this->task->setState(&timerState);
@@ -259,6 +284,10 @@ void LocalController::stopTimer() {
 bool LocalController::isTimeFinished() {
     return this->state->target_timer_time_seconds < this->now();
 }
+
+// ============================================================================
+// POWER RECOVERY AND PERSISTENCE
+// ============================================================================
 
 void LocalController::saveMilestoneToPowerLoss() {
     this->powerRecovery.saveState(this->state);
@@ -374,11 +403,14 @@ void LocalController::restoreStateFromPowerLoss()
     this->powerRecovery.deleteState();
 }
 
+// ============================================================================
+// UTILITY AND HELPER METHODS
+// ============================================================================
 
-String LocalController::getTimeString() {
-    return this->rtc->now().timestamp();
+float LocalController::getVolume() {
+    return this->settings->getVolumeLiters();
 }
 
-void LocalController::setTime(char* isoDate) {
-    this->rtc->adjust(DateTime(isoDate));
+float LocalController::getPower() {
+    return this->settings->getPowerWatts();
 }
