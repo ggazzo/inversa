@@ -11,7 +11,6 @@
 #include "media.h"
 #include "States/stateMachine.h"
 #include "States/TimerState.h"
-#include "logs.h"
 #include "media.h"
 #include "NTPClient.h"
 #include "ArduinoJson.h"
@@ -621,18 +620,13 @@ void openFile(const char* filename) {
     char buffer[30] = "/";
     strcat(buffer, filename);
 
-    LOG_SERIAL("Opening file: "); 
-    LOG_SERIAL_L(buffer);
-
     sdCardState.file = new File(std::move(SD.open(buffer, FILE_READ)));
     
 
     if (sdCardState.file) {
         sdCardState.isFileOpen = true;
-        LOG_SERIAL_L("File opened successfully");
     }
     else {
         sdCardState.isFileOpen = false;
-        LOG_SERIAL_L("File not opened");
     }
 }

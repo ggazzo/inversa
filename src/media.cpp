@@ -7,7 +7,6 @@
 #endif
 #include "SD.h"
 #include "SPI.h"
-#include "logs.h"
 #ifdef USE_RTC 
 #include <RTClib.h>
 extern RTC_DS1307 rtc;
