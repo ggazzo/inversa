@@ -41,7 +41,6 @@ const char* ssid = STASSID;
 const char* password = STAPSK;
 
 #include "modules.h"
-#include "setOutput.h"
 
 MachineState state;
 #ifdef HAS_MEDIA

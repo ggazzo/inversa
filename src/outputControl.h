@@ -3,7 +3,6 @@
 #define OUTPUT_CONTROL_H
 #include "Arduino.h"
 #include "state.h"
-#include "setOutput.h"
 #include <PID_v1.h>
 
 
