@@ -21,6 +21,11 @@
 
 extern MachineState state;
 
+#define REFERENCE_RESISTANCE 10000
+#define NOMINAL_RESISTANCE 10000
+#define NOMINAL_TEMPERATURE 25
+#define B_VALUE 3950
+
 #ifdef ESP32
 NTC_Thermistor_CustomFormula_ESP32 thermistor( 
   SENSOR_PIN,
