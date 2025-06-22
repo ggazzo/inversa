@@ -45,7 +45,6 @@ const char* password = STAPSK;
 MachineState state;
 #ifdef HAS_MEDIA
     SDCardState sdCardState;
-    char fileNames[MAX_FILES][30];
 #endif
 
 

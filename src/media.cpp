@@ -17,7 +17,6 @@ extern RTC_DS1307 rtc;
 #include "state.h"
 #include "command.h"
 
-extern char fileNames[MAX_FILES][30];
 extern SDCardState sdCardState;
 
 extern MachineState state;
