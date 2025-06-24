@@ -12,7 +12,7 @@
 // CONSTRUCTOR AND CORE SETUP
 // ============================================================================
 
-LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), powerRecovery() {
+LocalController::LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), powerRecovery() {
     this->step = Steps::NONE;
 }
 

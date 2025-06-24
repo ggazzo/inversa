@@ -10,7 +10,7 @@
 template <typename T, typename S>
 class MainController : public Controller {
     public:
-        MainController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals):
+        MainController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals):
             task(task),
             settings(settings),
             communicationPeripherals(communicationPeripherals) {
@@ -93,7 +93,7 @@ class MainController : public Controller {
     protected:
         S step;
         StateMachine *task;
-        Settings *settings;
+        ISettings *settings;
         CommunicationPeripherals *communicationPeripherals;
 
 };

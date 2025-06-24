@@ -23,7 +23,7 @@
 
 class LocalController : public MainController<StateType, Steps> {
     public:
-        LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api);
+        LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api);
         void setTargetTemperature(float target_temperature_c) override;
         void setTargetTemperatureAndWait(float target_temperature_c) override;
         void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_seconds) override;
