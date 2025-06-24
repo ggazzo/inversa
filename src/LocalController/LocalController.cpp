@@ -19,7 +19,7 @@ LocalController::LocalController(StateMachine *task, ISettings *settings, Commun
 void LocalController::setup() {
     MainController::setup();
     this->ota.setup();
-    peripheralController->setup();
+    this->peripheralController->setup();
 
     this->api->setup();
 
@@ -33,7 +33,7 @@ void LocalController::setup() {
 void LocalController::loop() {
     MainController::loop();
     this->ota.loop();
-    peripheralController->loop();
+    this->peripheralController->loop();
     this->ftpSrv.handleFTP();
     this->rtc->loop();
     this->api->loop();
@@ -45,7 +45,6 @@ void LocalController::loop() {
 // ============================================================================
 
 void LocalController::confirm() {
-    Serial.println("LocalController::confirm");
     this->saveMilestoneToPowerLoss();
     this->skip();
 }
