@@ -12,7 +12,7 @@
 // CONSTRUCTOR AND CORE SETUP
 // ============================================================================
 
-LocalController::LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), powerRecovery() {
+LocalController::LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, IAPI *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), powerRecovery() {
     this->step = Steps::NONE;
 }
 
@@ -21,14 +21,9 @@ void LocalController::setup() {
     setupOTA();
     peripheralController->setup();
 
-    /**
-     * Setup API and start task to update time from NTP every hour
-     */
-    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
-        this->api->setup();
-    }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
+    this->api->setup();
 
-    rtc->setup();
+    this->rtc->setup();
 
     this->ftpSrv.begin("esp32", "esp32");
 

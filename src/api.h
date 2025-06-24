@@ -1,4 +1,12 @@
 #pragma once
+#if defined(ESP8266)
+  #include <ESP8266WiFi.h>
+  #include <ESP8266mDNS.h>
+#elif defined(ESP32)
+  #include <WiFi.h>
+  #include <ESPmDNS.h>
+#endif
+
 
 #include <WiFiServer.h>
 #include <WiFiClient.h>
@@ -14,7 +22,13 @@ struct RouteHandler {
     std::function<void(WiFiClient&, const char*)> handler;
 };
 
-class API {
+class IAPI {
+    public:
+        virtual void setup() = 0;
+        virtual void loop() = 0;
+};
+
+class API: public IAPI {
 private:
     WiFiServer server;
     std::map<String, std::vector<RouteHandler>> routes;
@@ -43,8 +57,8 @@ private:
 
 public:
     API(MainController<StateType, Steps>* ctrl);
-    void setup();
-    void loop();
+    void setup() override;
+    void loop() override;
     void stop();
 };
 

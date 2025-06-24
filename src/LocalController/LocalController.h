@@ -23,7 +23,7 @@
 
 class LocalController : public MainController<StateType, Steps> {
     public:
-        LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api);
+        LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, IAPI *api);
         void setTargetTemperature(float target_temperature_c) override;
         void setTargetTemperatureAndWait(float target_temperature_c) override;
         void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_seconds) override;
@@ -82,7 +82,7 @@ class LocalController : public MainController<StateType, Steps> {
         void setTime(char* isoDate) override;
 
         MachineState *state;
-        API *api;
+        IAPI *api;
     private:
       IRTC *rtc;
       PeripheralController *peripheralController;
@@ -95,7 +95,6 @@ class LocalController : public MainController<StateType, Steps> {
       void restoreStateFromPowerLoss();
 
       uint32_t now();
-
 
         
 

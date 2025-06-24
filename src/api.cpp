@@ -93,12 +93,19 @@ void API::setupRoutes() {
 }
 
 void API::setup() {
-    if (this->initialized) {
-        server.stop();
-    }
-    server.begin();
-    setupRoutes();
-    this->initialized = true;
+
+     /**
+     * Setup API and start task to update time from NTP every hour
+     */
+    WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
+        if (this->initialized) {
+            server.stop();
+        }
+        server.begin();
+        setupRoutes();
+        this->initialized = true;
+    }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
+
 }
 
 void API::loop() {
