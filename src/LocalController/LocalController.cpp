@@ -3,19 +3,16 @@
 
 #include "OTA.h"
 
-const long utcOffsetInSeconds = - 3 * 60 * 60;
-
 #include "LocalController.h"
 #include "States/stateMachine.h"
 #include "api.h"
 
-WiFiUDP ntpUDP;
 
 // ============================================================================
 // CONSTRUCTOR AND CORE SETUP
 // ============================================================================
 
-LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), timeClient(ntpUDP, "pool.ntp.org", utcOffsetInSeconds), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), timerTask(nullptr), powerRecovery() {
+LocalController::LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), powerRecovery() {
     this->step = Steps::NONE;
 }
 
@@ -29,18 +26,10 @@ void LocalController::setup() {
      */
     WiFi.onEvent([this](WiFiEvent_t event, WiFiEventInfo_t info) {
         this->api->setup();
-        vTaskDelete(timerTask);
-        xTaskCreate(monitorTask, "LocalController::monitor", configMINIMAL_STACK_SIZE * 4, this, 1, &timerTask);
     }, WiFiEvent_t::ARDUINO_EVENT_WIFI_STA_CONNECTED);
 
-    if (rtc->begin()) {
-        ESP_LOGI("LocalController", "RTC Begin");
-        if (!rtc->isrunning()) {
-                ESP_LOGI("LocalController", "Failed to set time from NTP, setting time from compile date");
-                rtc->adjust(DateTime(F(__DATE__), F(__TIME__)));
-        }
-    }
-    ESP_LOGI("INTERNAL TIME", "Time: %s", this->getTimeString().c_str());
+    rtc->setup();
+
     this->ftpSrv.begin("esp32", "esp32");
 
     this->restoreStateFromPowerLoss();
@@ -51,28 +40,10 @@ void LocalController::loop() {
     handleOTA(this->state->current == StateType::IDLE);
     peripheralController->loop();
     this->ftpSrv.handleFTP();
+    this->rtc->loop();
     this->api->loop();
 }
 
-void LocalController::monitorTask(void *pvParameters) {
-    LocalController *controller = (LocalController *)pvParameters;
-
-    while (true) {
-
-        if (!controller->rtc->begin()) {
-            continue;
-        }
-
-        ESP_LOGI("LocalController", "setting time from NTP");
-        controller->timeClient.begin();
-        ESP_LOGI("LocalController", "NTP Client Begin");
-        if(controller->timeClient.update()){
-            ESP_LOGI("LocalController", "NTP Client Update");
-            controller->rtc->adjust(DateTime(controller->timeClient.getEpochTime()));
-        }
-        vTaskDelay(1000 * 60 * 60 / portTICK_PERIOD_MS); // every hour
-    }
-}
 
 // ============================================================================
 // STATE MANAGEMENT AND CONTROL FLOW
@@ -178,15 +149,15 @@ void LocalController::stopAutotune() {
 // ============================================================================
 
 uint32_t LocalController::now() {
-    return this->rtc->now().secondstime();
+    return this->rtc->now();
 }
 
 String LocalController::getTimeString() {
-    return this->rtc->now().timestamp();
+    return DateTime(this->rtc->now()).timestamp();
 }
 
 void LocalController::setTime(char* isoDate) {
-    this->rtc->adjust(DateTime(isoDate));
+    this->rtc->setTime(isoDate);
 }
 
 // Total Time Management

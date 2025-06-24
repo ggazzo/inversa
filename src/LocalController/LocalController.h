@@ -1,8 +1,8 @@
 #ifndef LOCAL_CONTROLLER_H
 #define LOCAL_CONTROLLER_H
-#include <RTClib.h>
-#include <NTPClient.h>
 #include "ESP32FtpServer.h"
+
+#include "Components/RTC.h"
 
 #include "Controller/PeripheralController.h"
 #include "Controller/MainController.h"
@@ -21,10 +21,9 @@
 
 #include "api.h"
 
-
 class LocalController : public MainController<StateType, Steps> {
     public:
-        LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, RTC_DS1307 *rtc, MachineState *state, PeripheralController *peripheralController, API *api);
+        LocalController(StateMachine *task, Settings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, API *api);
         void setTargetTemperature(float target_temperature_c) override;
         void setTargetTemperatureAndWait(float target_temperature_c) override;
         void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_seconds) override;
@@ -85,23 +84,18 @@ class LocalController : public MainController<StateType, Steps> {
         MachineState *state;
         API *api;
     private:
-        RTC_DS1307 *rtc;
-        NTPClient timeClient;
-        PeripheralController *peripheralController;
+      IRTC *rtc;
+      PeripheralController *peripheralController;
 
-        Steps currentStep;
-        FtpServer ftpSrv;
+      Steps currentStep;
+      FtpServer ftpSrv;
 
+      PowerRecovery<MachineState> powerRecovery;
 
-        PowerRecovery<MachineState> powerRecovery;
+      void restoreStateFromPowerLoss();
 
-        static void monitorTask(void *pvParameters);
+      uint32_t now();
 
-        void restoreStateFromPowerLoss();
-
-        uint32_t now();
-
-        TaskHandle_t timerTask;
 
         
 

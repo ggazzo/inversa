@@ -17,7 +17,7 @@
 #include "States/stateMachine.h"
 #include "LocalCommunication.h"
 #include "LocalController/LocalController.h"
-
+#include "RTC.h"
 
 extern MachineState state;
 
@@ -134,6 +134,7 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
   }
 );
 
-RTC_DS1307 *rtc = new RTC_DS1307(); 
+IRTC *rtc = new RTC();
+
 
 MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController, api); 
