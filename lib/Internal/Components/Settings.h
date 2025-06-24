@@ -37,7 +37,7 @@ class ISettings {
         // Save settings to preferences
         virtual void save() = 0;
         virtual void clear() = 0;
-        virtual void load() = 0;
+        virtual void setup() = 0;
 };
 
 class Settings: public ISettings {
@@ -72,7 +72,7 @@ class Settings: public ISettings {
 
         virtual void save() override;
         virtual void clear() override;
-        virtual void load() override;
+        virtual void setup() override;
         
 
     private:

@@ -24,7 +24,7 @@ class MainController : public Controller {
         }
 
         void setup() override {
-            this->settings->load();
+            this->settings->setup();
             this->communicationPeripherals->setPidParameters(this->settings->getKp(), this->settings->getKi(), this->settings->getKd(), this->settings->getPOn(), this->settings->getTime());
         }
 

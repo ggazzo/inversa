@@ -68,7 +68,7 @@ void setup() {
   WiFi.softAP("Inversa", "12345678");
 
 
-  settings.load();
+  settings.setup();
 
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword());
   

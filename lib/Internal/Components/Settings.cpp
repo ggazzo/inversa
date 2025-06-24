@@ -6,11 +6,11 @@
 #define HYSTERESIS_DEGREES_C_KEY "h_d_c"
 #define HYSTERESIS_SECONDS_KEY "h_s"
 Settings::Settings() {
-    load();
+    setup();
 }
 
 
-void Settings::load() {
+void Settings::setup() {
     preferences.begin(PREFERENCES_KEY, false);
 
     kp = preferences.getFloat("kp", 2.0);
@@ -148,5 +148,5 @@ void Settings::clear() {
     preferences.begin(PREFERENCES_KEY, false);
     preferences.clear();
     preferences.end();
-    load();
+    setup();
 }
