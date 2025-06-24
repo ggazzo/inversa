@@ -20,6 +20,7 @@
 #endif
 
 #include "api.h"
+#include "OTA.h"
 
 class LocalController : public MainController<StateType, Steps> {
     public:
@@ -86,6 +87,7 @@ class LocalController : public MainController<StateType, Steps> {
     private:
       IRTC *rtc;
       PeripheralController *peripheralController;
+      OTA ota;
 
       Steps currentStep;
       FtpServer ftpSrv;

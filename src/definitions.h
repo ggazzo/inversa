@@ -28,7 +28,6 @@
 #define LOOP_INTERVAL_U_S LOOP_INTERVAL * 1000
 
 
-#define OTA
 #define OTA_HOSTNAME "Inversa"
 
 

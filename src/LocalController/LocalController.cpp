@@ -18,7 +18,7 @@ LocalController::LocalController(StateMachine *task, ISettings *settings, Commun
 
 void LocalController::setup() {
     MainController::setup();
-    setupOTA();
+    this->ota.setup();
     peripheralController->setup();
 
     this->api->setup();
@@ -32,7 +32,7 @@ void LocalController::setup() {
 
 void LocalController::loop() {
     MainController::loop();
-    handleOTA(this->state->current == StateType::IDLE);
+    this->ota.loop();
     peripheralController->loop();
     this->ftpSrv.handleFTP();
     this->rtc->loop();
@@ -79,7 +79,7 @@ StateType LocalController::getState() {
 }
 
 void LocalController::checkForUpdates() {
-    checkForUpdatesGithub();
+    this->ota.checkForUpdatesGithub();
 }
 
 // ============================================================================

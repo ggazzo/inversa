@@ -12,7 +12,31 @@
 
 const unsigned long CHECK_INTERVAL = 1000 * 60 * 30; // Check every 5 minutes
 
-void checkForUpdatesGithub() {
+OTA::OTA() : lastCheck(millis() + CHECK_INTERVAL) {}
+
+void OTA::setup() {
+  #ifdef OTA_HOSTNAME
+  ArduinoOTA.setHostname(OTA_HOSTNAME);
+  #endif
+  #ifdef ESP32
+  ArduinoOTA.begin();
+  #else
+  ArduinoOTA.begin(true);
+  #endif
+}
+
+void OTA::loop() {
+    ArduinoOTA.handle();
+    
+    if (millis() - lastCheck < CHECK_INTERVAL) {
+        return;
+    }
+    
+    lastCheck = millis();
+    checkForUpdatesGithub();
+}
+
+void OTA::checkForUpdatesGithub() {
     WiFiClient client;
     HTTPClient http;
     http.begin(client, "https://api.github.com/repos/ggazzo/inversa/releases/latest");
@@ -104,27 +128,4 @@ void checkForUpdatesGithub() {
         ESP.restart();
     }
     http.end();
-    
-}
-void handleOTA(bool checkForUpdates) {
-    static unsigned long lastCheck = millis() + CHECK_INTERVAL;
-    ArduinoOTA.handle();
-    
-    if (millis() - lastCheck < CHECK_INTERVAL) {
-        return;
-    }
-    
-    lastCheck = millis();
-    checkForUpdatesGithub();
-}
-
-void setupOTA() {
-  #ifdef OTA_HOSTNAME
-  ArduinoOTA.setHostname(OTA_HOSTNAME);
-  #endif
-  #ifdef ESP32
-  ArduinoOTA.begin();
-  #else
-  ArduinoOTA.begin(true);
-  #endif
 }
