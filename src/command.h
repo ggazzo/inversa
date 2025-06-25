@@ -12,7 +12,6 @@
 #define MAX_CMD_SIZE 128
 #endif
 
-void openFile(const char* fileName);
 void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes, float volume_liters, float power_watts);
 
 void setTargetTemperature(float temp);

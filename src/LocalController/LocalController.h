@@ -24,7 +24,7 @@
 
 class LocalController : public MainController<StateType, Steps> {
     public:
-        LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, IAPI *api);
+        LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, IAPI *api, IPowerRecovery<MachineState> *powerRecovery);
         void setTargetTemperature(float target_temperature_c) override;
         void setTargetTemperatureAndWait(float target_temperature_c) override;
         void prepareTemperature(float targetTemperature_celsius, unsigned long desiredTime_minutes_from_now_seconds) override;
@@ -92,7 +92,7 @@ class LocalController : public MainController<StateType, Steps> {
       Steps currentStep;
       FtpServer ftpSrv;
 
-      PowerRecovery<MachineState> powerRecovery;
+      IPowerRecovery<MachineState> *powerRecovery;
 
       void restoreStateFromPowerLoss();
 

@@ -3,9 +3,19 @@
 
 #include "definitions.h"
 #include "SD.h"
+#include "state.h"
+#include "media.h"
 
 template<typename T>
-class PowerRecovery {
+class IPowerRecovery {
+    public:
+        virtual void saveState(T *state) = 0;
+        virtual void deleteState() = 0;
+        virtual bool loadState(T *state) = 0;
+};
+
+template<typename T>
+class PowerRecovery : public IPowerRecovery<T> {
     public:
         void saveState(T *state);
         void deleteState();
@@ -58,6 +68,26 @@ bool PowerRecovery<T>::loadState(T *state) {
 
     file.read((uint8_t*)state, sizeof(T));
     file.close();
+
+
+
+    if(strlen(state->file_name) > 0){
+        ESP_LOGI("LocalController", "Opening file ");
+        openFile(state->file_name);
+
+        if(state->version != CURRENT_VERSION){
+            ESP_LOGI("LocalController", "Invalid state");
+            return false;
+        }
+
+        if(sdCardState.isFileOpen){
+            ESP_LOGI("LocalController", "File recovered from power loss");
+            ESP_LOGI("LocalController", "Seeking to ");
+            ESP_LOGI("LocalController", "%d", state->file_position);
+            sdCardState.file->seek(state->file_position);
+        }
+    }
+
     return true;
 }
 #endif

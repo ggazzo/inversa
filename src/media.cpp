@@ -46,7 +46,30 @@ void initializeSDCard() {
      
 }
 
+void openFile(const char* filename) {
+    if (!sdCardState.isMounted) {
+        sdCardState.isFileOpen = false;
+        return;
+    }
 
+    if (sdCardState.file != nullptr) {
+        sdCardState.file->close();
+        delete sdCardState.file;
+    }
+
+    char buffer[30] = "/";
+    strcat(buffer, filename);
+
+    sdCardState.file = new File(std::move(SD.open(buffer, FILE_READ)));
+    
+
+    if (sdCardState.file) {
+        sdCardState.isFileOpen = true;
+    }
+    else {
+        sdCardState.isFileOpen = false;
+    }
+}
 
 // void setLogFile(const char* fileName) {
 //     if (!sdCardState.isMounted) {

@@ -12,7 +12,7 @@
 // CONSTRUCTOR AND CORE SETUP
 // ============================================================================
 
-LocalController::LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, IAPI *api): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), powerRecovery() {
+LocalController::LocalController(StateMachine *task, ISettings *settings, CommunicationPeripherals *communicationPeripherals, IRTC *rtc, MachineState *state, PeripheralController *peripheralController, IAPI *api, IPowerRecovery<MachineState> *powerRecovery): MainController<StateType, Steps>(task, settings, communicationPeripherals), rtc(rtc), state(state), peripheralController(peripheralController), api(api), currentStep(Steps::NONE), powerRecovery(powerRecovery) {
     this->step = Steps::NONE;
 }
 
@@ -255,11 +255,11 @@ bool LocalController::isTimeFinished() {
 // ============================================================================
 
 void LocalController::saveMilestoneToPowerLoss() {
-    this->powerRecovery.saveState(this->state);
+    this->powerRecovery->saveState(this->state);
 }
 
 void LocalController::deleteMilestoneFromPowerLoss() {
-    this->powerRecovery.deleteState();
+    this->powerRecovery->deleteState();
 }
 
 void LocalController::restoreStateFromPowerLoss() 
@@ -268,28 +268,9 @@ void LocalController::restoreStateFromPowerLoss()
     MachineState storedState;
 
 
-    if(!this->powerRecovery.loadState(&storedState)){
+    if(!this->powerRecovery->loadState(&storedState)){
         ESP_LOGI("LocalController", "No state found");
         return;
-    }
-
-
-    if(storedState.version != this->state->version){
-        ESP_LOGI("LocalController", "Invalid state");
-        return;
-    }
-
-
-    if(strlen(storedState.file_name) > 0){
-        ESP_LOGI("LocalController", "Opening file ");
-        openFile(storedState.file_name);
-
-        if(sdCardState.isFileOpen){
-            ESP_LOGI("LocalController", "File recovered from power loss");
-            ESP_LOGI("LocalController", "Seeking to ");
-            ESP_LOGI("LocalController", "%d", storedState.file_position);
-            sdCardState.file->seek(storedState.file_position);
-        }
     }
 
     this->setStep(storedState.step);
@@ -365,7 +346,7 @@ void LocalController::restoreStateFromPowerLoss()
     // Delete file
     ESP_LOGI("LocalController", "Deleting file ");
     ESP_LOGI("LocalController", "%s", POWER_LOSS_RECOVERY_FILE);
-    this->powerRecovery.deleteState();
+    this->powerRecovery->deleteState();
 }
 
 // ============================================================================

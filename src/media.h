@@ -24,6 +24,7 @@ struct SDCardState {
 
 extern SDCardState sdCardState;
 #endif
+void openFile(const char* fileName);
 
 
 void initializeSDCard();

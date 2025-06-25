@@ -136,5 +136,7 @@ CommunicationPeripherals *communicationPeripherals = new LocalCommunication(
 
 IRTC *rtc = new RTC();
 
+PowerRecovery<MachineState> powerRecovery;
 
-MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController, api); 
+
+MainController<StateType, Steps> *controller = new LocalController(&mainTaskMachine, &settings, communicationPeripherals, rtc, &state, peripheralController, api, &powerRecovery); 
