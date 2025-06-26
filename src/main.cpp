@@ -71,6 +71,7 @@ void setup() {
   settings.setup();
 
   WiFi.begin(settings.getWifiSsid(), settings.getWifiPassword());
+  WiFi.config(WiFi.localIP(), WiFi.gatewayIP(), WiFi.subnetMask(), IPAddress(8,8,8,8)); 
   
   MDNS.begin("inversa");
 

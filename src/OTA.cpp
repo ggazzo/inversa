@@ -37,13 +37,19 @@ void OTA::loop() {
 }
 
 void OTA::checkForUpdatesGithub() {
-    WiFiClient client;
+
+    if(WiFi.status() != WL_CONNECTED){
+        Serial.println("Not connected to WiFi");
+        return;
+    }
+
+    WiFiClientSecure client;
     HTTPClient http;
-    http.begin(client, "https://api.github.com/repos/ggazzo/inversa/releases/latest");
+    http.begin(client, RELEASE_URL);
+    client.setInsecure();
     http.addHeader("User-Agent", "ESP32");
 
-    
-    int httpCode = http.GET();
+        int httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
         Serial.printf("Failed to get release info. HTTP code: %d\n", httpCode);
         http.end();
@@ -99,6 +105,7 @@ void OTA::checkForUpdatesGithub() {
     http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
     http.setRedirectLimit(5);
     http.begin(client, firmwareUrl);
+    client.setInsecure();
     httpCode = http.GET();
     if (httpCode != HTTP_CODE_OK) {
         Serial.printf("Failed to download firmware. HTTP code: %d\n", httpCode);
