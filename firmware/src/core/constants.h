@@ -37,6 +37,9 @@
 #define PID_KP_DEFAULT            20.0f
 #define PID_KI_DEFAULT            0.01f
 #define PID_KD_DEFAULT            2000.0f
+#define PID_KP_MAX                500.0f
+#define PID_KI_MAX                10.0f
+#define PID_KD_MAX                50000.0f
 #define PID_OUTPUT_MIN            0.0f
 #define PID_OUTPUT_MAX            255.0f
 #define PID_SAMPLE_TIME_MS        1000

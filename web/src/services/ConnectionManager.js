@@ -1,6 +1,6 @@
 // ConnectionManager.js — Manages BLE connection lifecycle and message routing
 import { BLEService } from './BLEService';
-import { isConnected, deviceName, updateFromTelemetry, showToast } from '../stores/state';
+import { isConnected, deviceName, updateFromTelemetry, showToast, hasRecovery, recoveryRecipeName } from '../stores/state';
 
 class ConnectionManagerClass {
   constructor() {
@@ -62,6 +62,11 @@ class ConnectionManagerClass {
     return BLEService.request('req:set-pid', { kp, ki, kd });
   }
 
+  // Save PID settings with NVS persistence
+  async saveSettings(kp, ki, kd) {
+    return BLEService.request('req:settings:set', { kp, ki, kd });
+  }
+
   async listRecipes() {
     const res = await BLEService.request('req:recipe:list');
     return res.recipes || [];
@@ -107,6 +112,15 @@ class ConnectionManagerClass {
     return BLEService.request('req:info');
   }
 
+  // Recovery
+  async resumeRecovery() {
+    return BLEService.request('req:recovery:resume');
+  }
+
+  async discardRecovery() {
+    return BLEService.request('req:recovery:discard');
+  }
+
   _handleMessage(data) {
     switch (data.tp) {
       case 'evt:status':
@@ -127,6 +141,12 @@ class ConnectionManagerClass {
 
       case 'evt:log':
         console.log('[Device]', data.msg);
+        break;
+
+      case 'evt:recipe:recovery':
+        hasRecovery.value = true;
+        recoveryRecipeName.value = data.recipe || '';
+        showToast(`Receita "${data.recipe}" pode ser recuperada`, 'info', 10000);
         break;
     }
   }

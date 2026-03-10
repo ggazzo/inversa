@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include "../core/Plugin.h"
 #include "../core/constants.h"
+#include "../core/NVSStorage.h"
 #include "../models/MachineState.h"
 
 class PIDPlugin : public Plugin {
@@ -10,9 +11,11 @@ public:
     const char* getName() const override { return "PID"; }
 
     bool setup() override {
-        _kp = PID_KP_DEFAULT;
-        _ki = PID_KI_DEFAULT;
-        _kd = PID_KD_DEFAULT;
+        // Load PID params from NVS, or use defaults
+        NVSStorage& nvs = NVSStorage::instance();
+        _kp = nvs.loadPIDKp(PID_KP_DEFAULT);
+        _ki = nvs.loadPIDKi(PID_KI_DEFAULT);
+        _kd = nvs.loadPIDKd(PID_KD_DEFAULT);
         _outputMin = PID_OUTPUT_MIN;
         _outputMax = PID_OUTPUT_MAX;
         _sampleTime = PID_SAMPLE_TIME_MS;
@@ -20,6 +23,10 @@ public:
         gState.pidKp = _kp;
         gState.pidKi = _ki;
         gState.pidKd = _kd;
+        
+        if (nvs.hasPIDParams()) {
+            Serial.printf("[PID] Loaded from NVS: Kp=%.2f Ki=%.4f Kd=%.1f\n", _kp, _ki, _kd);
+        }
 
         // Listen for setpoint changes
         bus().subscribe(EventType::SetpointChanged, [this](const Event& e) {
@@ -79,12 +86,20 @@ public:
         bus().publish(EventType::PIDOutputChanged, _output);
     }
 
-    void setTunings(float kp, float ki, float kd) {
+    void setTunings(float kp, float ki, float kd, bool persist = false) {
         _kp = kp; _ki = ki; _kd = kd;
         gState.pidKp = kp;
         gState.pidKi = ki;
         gState.pidKd = kd;
         reset();
+        
+        if (persist) {
+            NVSStorage::instance().savePIDParams(kp, ki, kd);
+        }
+    }
+    
+    void saveToNVS() {
+        NVSStorage::instance().savePIDParams(_kp, _ki, _kd);
     }
 
     void reset() {
