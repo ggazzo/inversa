@@ -44,11 +44,12 @@ export function Settings() {
 
     setSaving(true);
     try {
-      await ConnectionManager.setPID(kpVal, kiVal, kdVal);
+      // Use saveSettings for NVS persistence
+      await ConnectionManager.saveSettings(kpVal, kiVal, kdVal);
       pidKp.value = kpVal;
       pidKi.value = kiVal;
       pidKd.value = kdVal;
-      showToast('PID atualizado!', 'success');
+      showToast('PID salvo na memoria!', 'success');
     } catch (e) {
       showToast(e.message, 'error');
     } finally {

@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include "../core/EventBus.h"
 #include "../core/constants.h"
+#include "../core/RecoveryManager.h"
 #include "../models/MachineState.h"
 #include "../protocol/protocol.h"
 #include "BLEPlugin.h"
@@ -174,6 +175,22 @@ public:
             res["kd"] = gState.pidKd;
             _ble->sendJson(res);
         }
+        // ── Settings: Set (with NVS persistence) ────────────
+        else if (strcmp(type, Protocol::REQ_SETTINGS_SET) == 0) {
+            float kp = doc["kp"] | gState.pidKp;
+            float ki = doc["ki"] | gState.pidKi;
+            float kd = doc["kd"] | gState.pidKd;
+            
+            // Validate PID params
+            if (kp < 0 || kp > PID_KP_MAX) { sendError(rid, "Invalid Kp"); return; }
+            if (ki < 0 || ki > PID_KI_MAX) { sendError(rid, "Invalid Ki"); return; }
+            if (kd < 0 || kd > PID_KD_MAX) { sendError(rid, "Invalid Kd"); return; }
+            
+            if (_pid) {
+                _pid->setTunings(kp, ki, kd, true);  // persist = true
+            }
+            sendOk(rid);
+        }
         // ── Info ────────────────────────────────────────────
         else if (strcmp(type, Protocol::REQ_INFO) == 0) {
             JsonDocument res;
@@ -188,6 +205,47 @@ public:
         // ── Status (explicit request) ───────────────────────
         else if (strcmp(type, Protocol::REQ_STATUS) == 0) {
             // Telemetry will be sent on next cycle; send one now
+            sendOk(rid);
+        }
+        // ── Recovery: Resume ────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_RECOVERY_RESUME) == 0) {
+            if (!gState.hasRecoveryData) {
+                sendError(rid, "No recovery data");
+                return;
+            }
+            if (!_sd || !_recipe) {
+                sendError(rid, "Not available");
+                return;
+            }
+            
+            RecoveryData recoveryData;
+            if (!RecoveryManager::instance().loadRecovery(recoveryData)) {
+                sendError(rid, "Failed to load recovery");
+                return;
+            }
+            
+            // Load the recipe content
+            String content = _sd->readRecipe(String(recoveryData.recipeName) + ".txt");
+            if (content.isEmpty()) {
+                sendError(rid, "Recipe file not found");
+                RecoveryManager::instance().clearRecovery();
+                gState.hasRecoveryData = false;
+                return;
+            }
+            
+            // Restore recipe state
+            if (_recipe->restoreFromRecovery(recoveryData, content)) {
+                gState.hasRecoveryData = false;
+                sendOk(rid);
+            } else {
+                sendError(rid, "Failed to restore recipe");
+            }
+        }
+        // ── Recovery: Discard ───────────────────────────────
+        else if (strcmp(type, Protocol::REQ_RECOVERY_DISCARD) == 0) {
+            RecoveryManager::instance().clearRecovery();
+            gState.hasRecoveryData = false;
+            gState.recoveryRecipeName = "";
             sendOk(rid);
         }
         else {

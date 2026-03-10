@@ -15,11 +15,12 @@ namespace Protocol {
     constexpr const char* EVT_STATUS        = "evt:status";
     
     // Events (device → app)
-    constexpr const char* EVT_RECIPE_STEP   = "evt:recipe:step";
-    constexpr const char* EVT_RECIPE_STATE  = "evt:recipe:state";
+    constexpr const char* EVT_RECIPE_STEP    = "evt:recipe:step";
+    constexpr const char* EVT_RECIPE_STATE   = "evt:recipe:state";
     constexpr const char* EVT_RECIPE_CONFIRM = "evt:recipe:confirm";
-    constexpr const char* EVT_ERROR         = "evt:error";
-    constexpr const char* EVT_LOG           = "evt:log";
+    constexpr const char* EVT_RECIPE_RECOVERY = "evt:recipe:recovery";
+    constexpr const char* EVT_ERROR          = "evt:error";
+    constexpr const char* EVT_LOG            = "evt:log";
 
     // Requests (app → device)
     constexpr const char* REQ_SET_TEMP      = "req:set-temp";
@@ -43,6 +44,8 @@ namespace Protocol {
     constexpr const char* REQ_INFO          = "req:info";
     constexpr const char* REQ_AUTOTUNE_START = "req:autotune:start";
     constexpr const char* REQ_AUTOTUNE_STOP  = "req:autotune:stop";
+    constexpr const char* REQ_RECOVERY_RESUME  = "req:recovery:resume";
+    constexpr const char* REQ_RECOVERY_DISCARD = "req:recovery:discard";
 
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";
