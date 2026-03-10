@@ -13,6 +13,12 @@ export const heaterOn = signal(false);
 export const pumpOn = signal(false);
 export const mode = signal('idle');   // idle, manual, recipe, tuning
 export const uptime = signal(0);
+export const tempSensorOk = signal(true);
+export const safetyShutoff = signal(false);
+
+// ─── Recovery State ─────────────────────────────────────────
+export const hasRecovery = signal(false);
+export const recoveryRecipeName = signal('');
 
 // ─── Recipe State ───────────────────────────────────────────
 export const recipeName = signal('');
@@ -89,6 +95,9 @@ export function updateFromTelemetry(data) {
   if (data.rt !== undefined) recipeTotalSteps.value = data.rt;
   if (data.rn !== undefined) recipeName.value = data.rn;
   if (data.tl !== undefined) timerLeft.value = data.tl;
+  if (data.sok !== undefined) tempSensorOk.value = data.sok;
+  if (data.saf !== undefined) safetyShutoff.value = data.saf;
+  if (data.rst !== undefined) recipeState.value = data.rst;
 
   // Add to history
   addTelemetryPoint(

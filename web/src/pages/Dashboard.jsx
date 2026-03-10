@@ -1,15 +1,103 @@
+import { useState } from 'preact/hooks';
 import { TemperatureChart } from '../components/TemperatureChart';
+import { ConnectionManager } from '../services/ConnectionManager';
 import {
   currentTemp, targetTemp, pidOutput, heaterOn, pumpOn,
   mode, modeLabel, isRecipeRunning, recipeName, recipeStep,
   recipeTotalSteps, recipeState, formattedTimer, isConnected,
+  tempSensorOk, safetyShutoff, hasRecovery, recoveryRecipeName, showToast,
 } from '../stores/state';
 
 export function Dashboard() {
   const connected = isConnected.value;
+  const sensorFailed = connected && !tempSensorOk.value;
+  const safetyActive = connected && safetyShutoff.value;
+  const showRecovery = connected && hasRecovery.value;
+  const [recovering, setRecovering] = useState(false);
+
+  async function handleResumeRecovery() {
+    setRecovering(true);
+    try {
+      await ConnectionManager.resumeRecovery();
+      hasRecovery.value = false;
+      showToast('Receita retomada!', 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setRecovering(false);
+    }
+  }
+
+  async function handleDiscardRecovery() {
+    setRecovering(true);
+    try {
+      await ConnectionManager.discardRecovery();
+      hasRecovery.value = false;
+      recoveryRecipeName.value = '';
+      showToast('Recuperacao descartada', 'info');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setRecovering(false);
+    }
+  }
 
   return (
     <div class="flex flex-col gap-4">
+      {/* Safety Alerts */}
+      {safetyActive && (
+        <div class="alert alert-error shadow-md">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <h3 class="font-bold">Desligamento de Seguranca</h3>
+            <p class="text-sm">O aquecedor foi desligado por protecao. Verifique o sensor e a temperatura.</p>
+          </div>
+        </div>
+      )}
+
+      {sensorFailed && !safetyActive && (
+        <div class="alert alert-warning shadow-md">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <h3 class="font-bold">Falha no Sensor</h3>
+            <p class="text-sm">O sensor de temperatura nao esta respondendo corretamente.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Recovery Dialog */}
+      {showRecovery && (
+        <div class="alert alert-info shadow-md">
+          <svg xmlns="http://www.w3.org/2000/svg" class="stroke-current shrink-0 h-6 w-6" fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <div class="flex-1">
+            <h3 class="font-bold">Receita Interrompida</h3>
+            <p class="text-sm">A receita "{recoveryRecipeName.value}" pode ser retomada.</p>
+          </div>
+          <div class="flex gap-2">
+            <button 
+              class="btn btn-sm btn-ghost" 
+              onClick={handleDiscardRecovery}
+              disabled={recovering}
+            >
+              Descartar
+            </button>
+            <button 
+              class="btn btn-sm btn-primary" 
+              onClick={handleResumeRecovery}
+              disabled={recovering}
+            >
+              {recovering ? <span class="loading loading-spinner loading-xs" /> : 'Retomar'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Temperature Display */}
       <div class="card bg-base-100 shadow-md">
         <div class="card-body p-4">

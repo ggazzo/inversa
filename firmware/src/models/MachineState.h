@@ -54,6 +54,10 @@ struct MachineState {
 
     // System
     uint32_t uptimeMs       = 0;
+
+    // Recovery
+    bool   hasRecoveryData      = false;
+    String recoveryRecipeName   = "";
 };
 
 // Global state — accessible by all plugins

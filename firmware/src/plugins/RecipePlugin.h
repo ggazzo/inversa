@@ -4,6 +4,7 @@
 #include <vector>
 #include "../core/Plugin.h"
 #include "../core/constants.h"
+#include "../core/RecoveryManager.h"
 #include "../models/MachineState.h"
 
 // ─── Recipe Command Types ───────────────────────────────────
@@ -52,6 +53,9 @@ public:
             gState.recipeState == RecipeState::Paused) {
             return;
         }
+
+        // Periodic save for power loss recovery
+        RecoveryManager::instance().periodicSave();
 
         switch (gState.recipeState) {
             case RecipeState::Running:
@@ -128,6 +132,7 @@ public:
         bus().publish(EventType::RecipeStopped);
         bus().publish(EventType::SetpointChanged, 0.0f);
         bus().publish(EventType::HeaterStateChanged, false);
+        RecoveryManager::instance().clearRecovery();
         Serial.println("[Recipe] Stopped");
     }
 
@@ -156,6 +161,38 @@ public:
     int getCurrentStep() const { return _currentStep; }
     int getTotalSteps() const { return _commands.size(); }
     const std::vector<RecipeCommand>& getCommands() const { return _commands; }
+
+    // Restore from recovery data (returns true if recipe is ready to resume)
+    bool restoreFromRecovery(const RecoveryData& data, const String& recipeContent) {
+        if (!loadRecipe(recipeContent, String(data.recipeName))) {
+            return false;
+        }
+        
+        // Restore state
+        _currentStep = data.currentStep;
+        gState.recipeStep = data.currentStep;
+        gState.targetTemp = data.targetTemp;
+        gState.recipeState = static_cast<RecipeState>(data.recipeState);
+        gState.timerRemainingMs = data.timerRemainingMs;
+        gState.mode = OperatingMode::Recipe;
+        
+        // For timer state, recalculate start time
+        if (gState.recipeState == RecipeState::WaitingForTimer && data.timerRemainingMs > 0) {
+            _timerDuration = data.timerRemainingMs;
+            _timerStart = millis();  // Start fresh with remaining time
+        }
+        
+        Serial.printf("[Recipe] Restored from recovery: step %d, state %d, target %.1f\n",
+                     _currentStep, data.recipeState, data.targetTemp);
+        
+        // Publish events to sync other plugins
+        bus().publish(EventType::SetpointChanged, data.targetTemp);
+        if (data.targetTemp > 0) {
+            bus().publish(EventType::HeaterStateChanged, true);
+        }
+        
+        return true;
+    }
 
 private:
     std::vector<RecipeCommand> _commands;
@@ -237,6 +274,7 @@ private:
             gState.mode = OperatingMode::Idle;
             bus().publish(EventType::RecipeCompleted);
             bus().publish(EventType::HeaterStateChanged, false);
+            RecoveryManager::instance().clearRecovery();
             Serial.println("[Recipe] Completed!");
             return;
         }
