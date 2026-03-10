@@ -18,9 +18,12 @@ public:
 
         if (!SD.begin(PIN_SD_CS)) {
             Serial.println("[SDCard] Mount FAILED");
+            _mounted = false;
             bus().publish(EventType::SDCardError);
             return false;
         }
+        
+        _mounted = true;
 
         // Ensure recipes directory exists
         if (!SD.exists(SD_RECIPES_DIR)) {
