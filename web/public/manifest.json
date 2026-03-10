@@ -1,0 +1,16 @@
+{
+  "name": "Inversa",
+  "short_name": "Inversa",
+  "description": "Homebrewing Temperature Controller",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1d232a",
+  "theme_color": "#1d232a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
