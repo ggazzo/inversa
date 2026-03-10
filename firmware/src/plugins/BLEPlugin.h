@@ -124,6 +124,21 @@ private:
         
         // Allow multiple connections
         NimBLEDevice::getAdvertising()->start();
+        
+        // Notify app if recovery data is available
+        if (gState.hasRecoveryData) {
+            delay(500);  // Give app time to set up
+            sendRecoveryNotification();
+        }
+    }
+    
+    void sendRecoveryNotification() {
+        JsonDocument doc;
+        doc[Protocol::FIELD_TYPE] = Protocol::EVT_RECIPE_RECOVERY;
+        doc["recipe"] = gState.recoveryRecipeName;
+        sendJson(doc);
+        Serial.printf("[BLE] Sent recovery notification: %s\n", 
+                     gState.recoveryRecipeName.c_str());
     }
 
     void onDisconnect(NimBLEServer* server, NimBLEConnInfo& connInfo, int reason) override {

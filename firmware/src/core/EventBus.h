@@ -29,6 +29,7 @@ enum class EventType : uint8_t {
     RecipeCompleted,
     RecipeWaitConfirm,      // string: confirm message
     RecipeConfirmed,
+    RecipeRecoveryAvailable, // string: recipe name (recovery data found on boot)
 
     // SD Card
     SDCardMounted,

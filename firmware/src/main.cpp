@@ -5,6 +5,8 @@
 #include "core/constants.h"
 #include "core/EventBus.h"
 #include "core/PluginManager.h"
+#include "core/NVSStorage.h"
+#include "core/RecoveryManager.h"
 #include "models/MachineState.h"
 
 // Plugins
@@ -34,6 +36,9 @@ void setup() {
     Serial.println("╚══════════════════════════════════════╝");
     Serial.println();
 
+    // Initialize NVS storage for persistent settings
+    NVSStorage::instance().begin();
+
     auto& pm = PluginManager::instance();
 
     // Register plugins in dependency order
@@ -48,8 +53,23 @@ void setup() {
     // Initialize all plugins
     pm.setup();
 
+    // Initialize recovery manager
+    RecoveryManager::instance().init(sd);
+
     // Wire up command handler (routes BLE commands to plugins)
     commandHandler.init(ble, sd, recipe, pid);
+
+    // Check for power loss recovery
+    if (RecoveryManager::instance().hasValidRecovery()) {
+        RecoveryData recoveryData;
+        if (RecoveryManager::instance().loadRecovery(recoveryData)) {
+            Serial.printf("[System] Recovery available: '%s' step %d/%d\n", 
+                         recoveryData.recipeName, recoveryData.currentStep, recoveryData.totalSteps);
+            gState.hasRecoveryData = true;
+            gState.recoveryRecipeName = String(recoveryData.recipeName);
+            // Notify app via BLE when client connects (handled in BLEPlugin)
+        }
+    }
 
     // System ready
     EventBus::instance().publish(EventType::SystemReady);
