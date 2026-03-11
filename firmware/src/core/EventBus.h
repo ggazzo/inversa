@@ -68,6 +68,12 @@ enum class EventType : uint8_t {
     TimerCompleted,
     TimerCancelled,
 
+    // Auto-Tune
+    AutoTuneStarted,
+    AutoTuneProgress,       // int: progress percentage
+    AutoTuneCompleted,      // string: JSON with Kp, Ki, Kd
+    AutoTuneFailed,         // string: error message
+
     // System
     SystemReady,
     SystemError,

@@ -265,6 +265,12 @@ private:
             doc["tr"] = gState.timerRemaining;
         }
 
+        // Auto-Tune info
+        if (gState.autoTuneActive) {
+            doc["ata"] = true;
+            doc["atp"] = gState.autoTuneProgress;
+        }
+
         sendJson(doc);
     }
 
