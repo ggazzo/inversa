@@ -65,3 +65,14 @@
 
 // ─── Power Loss Recovery ────────────────────────────────────
 #define RECOVERY_SAVE_INTERVAL_MS 5000
+
+// ─── WiFi Configuration ─────────────────────────────────────
+#define WIFI_CONNECT_TIMEOUT_MS   15000
+#define WIFI_RECONNECT_INTERVAL_MS 30000
+
+// ─── OTA Configuration ──────────────────────────────────────
+#define GITHUB_REPO_OWNER         "ggazzo"
+#define GITHUB_REPO_NAME          "inversa"
+#define GITHUB_API_URL            "https://api.github.com"
+#define OTA_CHECK_TIMEOUT_MS      30000
+#define OTA_PROGRESS_INTERVAL_PCT 5  // Report progress every 5%

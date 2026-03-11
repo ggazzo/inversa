@@ -39,6 +39,7 @@ enum class EventType : uint8_t {
     BLEClientConnected,
     BLEClientDisconnected,
     BLECommandReceived,     // string: JSON command
+    BLESend,                // string: JSON message to send to client
 
     // System
     SystemReady,

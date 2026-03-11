@@ -47,6 +47,22 @@ namespace Protocol {
     constexpr const char* REQ_RECOVERY_RESUME  = "req:recovery:resume";
     constexpr const char* REQ_RECOVERY_DISCARD = "req:recovery:discard";
 
+    // WiFi (app → device)
+    constexpr const char* REQ_WIFI_CONFIG     = "req:wifi:config";
+    constexpr const char* REQ_WIFI_CONNECT    = "req:wifi:connect";
+    constexpr const char* REQ_WIFI_DISCONNECT = "req:wifi:disconnect";
+    constexpr const char* REQ_WIFI_STATUS     = "req:wifi:status";
+
+    // OTA (app → device)
+    constexpr const char* REQ_OTA_CHECK       = "req:ota:check";
+    constexpr const char* REQ_OTA_INSTALL     = "req:ota:install";
+
+    // WiFi Events (device → app)
+    constexpr const char* EVT_WIFI_STATUS     = "evt:wifi:status";
+
+    // OTA Events (device → app)
+    constexpr const char* EVT_OTA_STATUS      = "evt:ota:status";
+
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";
     constexpr const char* RES_ERROR         = "res:error";
