@@ -81,6 +81,16 @@ struct MachineState {
     bool   brewLogActive        = false;
     uint32_t brewLogStartTime   = 0;
     uint16_t brewLogEntries     = 0;
+
+    // Boil Timer
+    bool     boilActive         = false;
+    uint32_t boilTotal          = 0;      // Total boil time in seconds
+    uint32_t boilRemaining      = 0;      // Remaining time in seconds
+    uint8_t  boilAdditions      = 0;      // Number of additions configured
+
+    // Mash-Out
+    bool     mashOutEnabled     = false;
+    float    mashOutTemp        = 76.0f;  // Default mash-out temperature
 };
 
 // Global state — accessible by all plugins

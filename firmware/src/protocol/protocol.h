@@ -66,6 +66,16 @@ namespace Protocol {
     constexpr const char* REQ_LOG_STOP        = "req:log:stop";
     constexpr const char* REQ_LOG_EXPORT      = "req:log:export";   // {fmt: "csv"|"json"}
 
+    // Boil Timer (app → device)
+    constexpr const char* REQ_BOIL_START      = "req:boil:start";   // {min: uint16, additions: [{min, name}]}
+    constexpr const char* REQ_BOIL_STOP       = "req:boil:stop";
+    constexpr const char* REQ_BOIL_PAUSE      = "req:boil:pause";
+    constexpr const char* REQ_BOIL_RESUME     = "req:boil:resume";
+    constexpr const char* REQ_BOIL_ADD        = "req:boil:add";     // {min: uint16, name: string}
+
+    // Mash-Out (app → device)
+    constexpr const char* REQ_MASHOUT_SET     = "req:mashout:set";  // {enabled: bool, temp: float}
+
     // WiFi Events (device → app)
     constexpr const char* EVT_WIFI_STATUS     = "evt:wifi:status";
 
@@ -79,6 +89,10 @@ namespace Protocol {
     // Brew Log Events (device → app)
     constexpr const char* EVT_LOG_STATUS      = "evt:log:status";
     constexpr const char* EVT_LOG_DATA        = "evt:log:data";     // Chunked export data
+
+    // Boil Timer Events (device → app)
+    constexpr const char* EVT_BOIL_STATUS     = "evt:boil:status";
+    constexpr const char* EVT_BOIL_ADDITION   = "evt:boil:addition"; // Addition alert
 
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";

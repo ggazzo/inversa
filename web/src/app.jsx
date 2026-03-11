@@ -5,6 +5,7 @@ import { ConnectionBar } from './components/ConnectionBar';
 import { Dashboard } from './pages/Dashboard';
 import { Control } from './pages/Control';
 import { Recipes } from './pages/Recipes';
+import { Boil } from './pages/Boil';
 import { Settings } from './pages/Settings';
 import { ConnectionManager } from './services/ConnectionManager';
 import { activeTab, toastMessage, toastType } from './stores/state';
@@ -26,6 +27,7 @@ export function App() {
           <Dashboard path="/" />
           <Control path="/control" />
           <Recipes path="/recipes" />
+          <Boil path="/boil" />
           <Settings path="/settings" />
         </Router>
       </main>

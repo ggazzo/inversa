@@ -236,6 +236,20 @@ private:
             doc["ble"] = gState.brewLogEntries;
         }
 
+        // Boil Timer info
+        if (gState.boilActive) {
+            doc["ba"]  = true;
+            doc["bt"]  = gState.boilTotal;
+            doc["br"]  = gState.boilRemaining;
+            doc["bad"] = gState.boilAdditions;
+        }
+
+        // Mash-Out info
+        if (gState.mashOutEnabled) {
+            doc["moe"] = true;
+            doc["mot"] = round2(gState.mashOutTemp);
+        }
+
         sendJson(doc);
     }
 

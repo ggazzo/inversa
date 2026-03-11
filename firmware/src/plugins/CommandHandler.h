@@ -15,6 +15,7 @@
 #include "OTAPlugin.h"
 #include "RampPlugin.h"
 #include "BrewLogPlugin.h"
+#include "BoilTimerPlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -24,7 +25,8 @@ class CommandHandler {
 public:
     void init(BLEPlugin* ble, SDCardPlugin* sd, RecipePlugin* recipe, PIDPlugin* pid,
               WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr,
-              RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr) {
+              RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr,
+              BoilTimerPlugin* boilTimer = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
@@ -33,6 +35,7 @@ public:
         _ota = ota;
         _ramp = ramp;
         _brewLog = brewLog;
+        _boilTimer = boilTimer;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             JsonDocument doc;
@@ -350,6 +353,68 @@ public:
             
             _ble->sendJson(res);
         }
+        // ── Boil Timer: Start ───────────────────────────────
+        else if (strcmp(type, Protocol::REQ_BOIL_START) == 0) {
+            if (!_boilTimer) { sendError(rid, "BoilTimer not available"); return; }
+            uint16_t minutes = doc["min"] | 60;
+            
+            // Clear previous additions and add new ones
+            _boilTimer->clearAdditions();
+            JsonArray additions = doc["additions"].as<JsonArray>();
+            if (additions) {
+                for (JsonObject add : additions) {
+                    uint16_t addMin = add["min"] | 0;
+                    const char* addName = add["name"] | "Addition";
+                    _boilTimer->addAddition(addMin, addName);
+                }
+            }
+            
+            _boilTimer->start(minutes);
+            sendOk(rid);
+        }
+        // ── Boil Timer: Stop ────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_BOIL_STOP) == 0) {
+            if (!_boilTimer) { sendError(rid, "BoilTimer not available"); return; }
+            _boilTimer->stop();
+            sendOk(rid);
+        }
+        // ── Boil Timer: Pause ───────────────────────────────
+        else if (strcmp(type, Protocol::REQ_BOIL_PAUSE) == 0) {
+            if (!_boilTimer) { sendError(rid, "BoilTimer not available"); return; }
+            _boilTimer->pause();
+            sendOk(rid);
+        }
+        // ── Boil Timer: Resume ──────────────────────────────
+        else if (strcmp(type, Protocol::REQ_BOIL_RESUME) == 0) {
+            if (!_boilTimer) { sendError(rid, "BoilTimer not available"); return; }
+            _boilTimer->resume();
+            sendOk(rid);
+        }
+        // ── Boil Timer: Add Addition ────────────────────────
+        else if (strcmp(type, Protocol::REQ_BOIL_ADD) == 0) {
+            if (!_boilTimer) { sendError(rid, "BoilTimer not available"); return; }
+            uint16_t addMin = doc["min"] | 0;
+            String addName = doc["name"] | "Addition";
+            if (_boilTimer->addAddition(addMin, addName.c_str())) {
+                sendOk(rid);
+            } else {
+                sendError(rid, "Max additions reached");
+            }
+        }
+        // ── Mash-Out: Set ───────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_MASHOUT_SET) == 0) {
+            bool enabled = doc["enabled"] | false;
+            float temp = doc["temp"] | 76.0f;
+            
+            if (temp < 70.0f || temp > 80.0f) {
+                sendError(rid, "Temp must be 70-80C");
+                return;
+            }
+            
+            gState.mashOutEnabled = enabled;
+            gState.mashOutTemp = temp;
+            sendOk(rid);
+        }
         else {
             sendError(rid, "Unknown command");
         }
@@ -364,6 +429,7 @@ private:
     OTAPlugin* _ota = nullptr;
     RampPlugin* _ramp = nullptr;
     BrewLogPlugin* _brewLog = nullptr;
+    BoilTimerPlugin* _boilTimer = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;

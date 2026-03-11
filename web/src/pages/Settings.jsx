@@ -7,6 +7,7 @@ import {
   rampActive, rampRate,
   brewLogActive, brewLogEntries, brewLogData,
   notificationsEnabled, notifyOnTempReached, notifyOnStepComplete,
+  mashOutEnabled, mashOutTemp,
 } from '../stores/state';
 
 export function Settings() {
@@ -244,6 +245,30 @@ export function Settings() {
     }
   }
 
+  // Mash-Out state
+  const [mashOutTempInput, setMashOutTempInput] = useState(mashOutTemp.value);
+
+  async function saveMashOut() {
+    try {
+      await ConnectionManager.setMashOut(mashOutEnabled.value, parseFloat(mashOutTempInput));
+      mashOutTemp.value = parseFloat(mashOutTempInput);
+      showToast('Mash-Out configurado', 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  async function toggleMashOut() {
+    try {
+      const newValue = !mashOutEnabled.value;
+      await ConnectionManager.setMashOut(newValue, parseFloat(mashOutTempInput));
+      mashOutEnabled.value = newValue;
+      showToast(newValue ? 'Mash-Out ativado' : 'Mash-Out desativado', 'info');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
   if (!connected) {
     return (
       <div class="flex flex-col items-center justify-center py-16 text-base-content/50">
@@ -403,6 +428,45 @@ export function Settings() {
               Connect to WiFi to check for updates
             </p>
           )}
+        </div>
+      </div>
+
+      {/* Mash-Out */}
+      <div class="card bg-base-100 shadow-md">
+        <div class="card-body p-4">
+          <h3 class="text-sm font-semibold uppercase text-base-content/60 mb-3">Mash-Out Automatico</h3>
+          
+          <p class="text-xs text-base-content/50 mb-3">
+            Subir automaticamente para a temperatura de mash-out ao final da mostura.
+          </p>
+
+          <div class="form-control mb-3">
+            <label class="label cursor-pointer justify-start gap-3">
+              <input 
+                type="checkbox" 
+                class="toggle toggle-primary toggle-sm"
+                checked={mashOutEnabled.value}
+                onChange={toggleMashOut}
+              />
+              <span class="label-text">Ativar mash-out automatico</span>
+            </label>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <input
+              type="number"
+              class="input input-bordered input-sm w-20 font-mono"
+              value={mashOutTempInput}
+              onInput={(e) => setMashOutTempInput(e.target.value)}
+              min="70"
+              max="80"
+              step="0.5"
+            />
+            <span class="text-sm text-base-content/50">°C</span>
+            <button class="btn btn-sm btn-outline ml-auto" onClick={saveMashOut}>
+              Salvar
+            </button>
+          </div>
         </div>
       </div>
 

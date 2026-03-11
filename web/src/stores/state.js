@@ -49,6 +49,17 @@ export const notificationsEnabled = signal(false);
 export const notifyOnTempReached = signal(true);
 export const notifyOnStepComplete = signal(true);
 
+// ─── Boil Timer State ───────────────────────────────────────
+export const boilActive = signal(false);
+export const boilTotal = signal(0);       // Total seconds
+export const boilRemaining = signal(0);   // Remaining seconds
+export const boilAdditions = signal([]);  // List of additions
+export const boilAlerts = signal([]);     // Triggered alerts
+
+// ─── Mash-Out State ─────────────────────────────────────────
+export const mashOutEnabled = signal(false);
+export const mashOutTemp = signal(76.0);
+
 // ─── Recipe State ───────────────────────────────────────────
 export const recipeName = signal('');
 export const recipeStep = signal(0);
@@ -137,6 +148,15 @@ export function updateFromTelemetry(data) {
   // Brew Log state
   if (data.bla !== undefined) brewLogActive.value = data.bla;
   if (data.ble !== undefined) brewLogEntries.value = data.ble;
+  
+  // Boil Timer state
+  if (data.ba !== undefined) boilActive.value = data.ba;
+  if (data.bt !== undefined) boilTotal.value = data.bt;
+  if (data.br !== undefined) boilRemaining.value = data.br;
+  
+  // Mash-Out state
+  if (data.moe !== undefined) mashOutEnabled.value = data.moe;
+  if (data.mot !== undefined) mashOutTemp.value = data.mot;
 
   // Add to history
   addTelemetryPoint(
