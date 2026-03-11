@@ -1,10 +1,12 @@
 #pragma once
 
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <vector>
 #include <algorithm>
 #include "../core/Plugin.h"
 #include "../core/EventBus.h"
+#include "../core/constants.h"
 #include "../models/MachineState.h"
 
 // ─── Hop/Addition Alert ─────────────────────────────────────
@@ -17,6 +19,7 @@ struct BoilAddition {
 // ─── Boil Timer Plugin ──────────────────────────────────────
 // Manages boil timer with hop addition alerts.
 // Alerts are triggered based on time remaining (e.g., "60 min" = 60 min left).
+// Can be started via direct API or via EventBus (for recipe integration).
 
 class BoilTimerPlugin : public Plugin {
 public:
@@ -26,6 +29,21 @@ public:
     const char* getName() const override { return "BoilTimer"; }
 
     bool setup() override {
+        // Subscribe to BoilStarted event (from RecipePlugin)
+        // Event format: floatValue = minutes, stringValue = JSON array of additions
+        bus().subscribe(EventType::BoilStarted, [this](const Event& e) {
+            uint16_t minutes = (uint16_t)e.floatValue;
+            
+            // Parse additions from JSON string
+            if (!e.stringValue.isEmpty()) {
+                parseAdditionsFromJson(e.stringValue);
+            }
+            
+            // Start the boil
+            start(minutes);
+            DEBUG_PRINTF("[BoilTimer] Started via event: %d min\n", minutes);
+        });
+
         DEBUG_PRINTLN("[BoilTimer] Initialized");
         return true;
     }
@@ -183,5 +201,27 @@ private:
         json += String(add.minutesRemaining);
         json += "}";
         bus().publish(EventType::BLESend, json);
+    }
+
+    // Parse additions from JSON array string
+    // Format: [{"min":60,"name":"Magnum"},{"min":15,"name":"Cascade"}]
+    void parseAdditionsFromJson(const String& jsonStr) {
+        JsonDocument doc;
+        DeserializationError err = deserializeJson(doc, jsonStr);
+        if (err) {
+            DEBUG_PRINTF("[BoilTimer] Failed to parse additions JSON: %s\n", err.c_str());
+            return;
+        }
+
+        clearAdditions();
+        
+        JsonArray arr = doc.as<JsonArray>();
+        for (JsonObject obj : arr) {
+            uint16_t min = obj["min"] | 0;
+            const char* name = obj["name"] | "Addition";
+            addAddition(min, name);
+        }
+        
+        DEBUG_PRINTF("[BoilTimer] Parsed %d additions from JSON\n", _additions.size());
     }
 };

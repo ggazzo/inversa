@@ -30,6 +30,22 @@ public:
     const char* getName() const override { return "Timer"; }
 
     bool setup() override {
+        // Subscribe to timer start requests (from RecipePlugin)
+        // intValue = seconds for relative timer
+        // stringValue = "HH:MM" for absolute timer
+        bus().subscribe(EventType::TimerStartRequest, [this](const Event& e) {
+            if (!e.stringValue.isEmpty() && e.stringValue.indexOf(':') > 0) {
+                // Absolute timer - parse HH:MM
+                int colonPos = e.stringValue.indexOf(':');
+                uint8_t hour = e.stringValue.substring(0, colonPos).toInt();
+                uint8_t minute = e.stringValue.substring(colonPos + 1).toInt();
+                startAt(hour, minute);
+            } else if (e.intValue > 0) {
+                // Relative timer - seconds
+                start(e.intValue);
+            }
+        });
+
         DEBUG_PRINTLN("[Timer] Plugin initialized");
         return true;
     }

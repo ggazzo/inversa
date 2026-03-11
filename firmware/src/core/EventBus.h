@@ -61,6 +61,7 @@ enum class EventType : uint8_t {
     RTCTimeUpdated,         // float: unix timestamp
 
     // Timer (generic countdown timer)
+    TimerStartRequest,      // int: duration in seconds (or string "HH:MM" for absolute)
     TimerStarted,           // int: duration in seconds
     TimerTick,              // int: remaining seconds
     TimerPaused,
@@ -172,6 +173,11 @@ public:
     // Convenience: publish with string
     void publish(EventType type, const String& value) {
         publish(Event(type, value));
+    }
+
+    // Convenience: publish with float and string
+    void publish(EventType type, float value, const String& str) {
+        publish(Event(type, value, str));
     }
 
 private:
