@@ -17,6 +17,11 @@ enum class EventType : uint8_t {
     HeaterStateChanged,     // bool: on/off
     PIDParamsChanged,       // PID Kp, Ki, Kd changed
 
+    // Ramp Mode
+    RampConfigChanged,      // float: rate in °C/min (0 = disabled)
+    RampedSetpointChanged,  // float: current ramped setpoint
+    RampCompleted,          // float: final temperature reached
+
     // Pump
     PumpStateChanged,       // bool: on/off
 

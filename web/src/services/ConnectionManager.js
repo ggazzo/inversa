@@ -4,12 +4,35 @@ import {
   isConnected, deviceName, updateFromTelemetry, showToast, 
   hasRecovery, recoveryRecipeName,
   wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
-  otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion
+  otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion,
+  rampActive, rampRate, rampTarget, rampCurrent,
+  brewLogActive, brewLogEntries, brewLogData,
+  notificationsEnabled, notifyOnTempReached, notifyOnStepComplete,
+  targetTemp, currentTemp
 } from '../stores/state';
 
 class ConnectionManagerClass {
   constructor() {
     this._initialized = false;
+    this._tempReachedNotified = false;
+  }
+
+  async requestNotificationPermission() {
+    if (!('Notification' in window)) {
+      showToast('Notificações não suportadas', 'error');
+      return false;
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      notificationsEnabled.value = true;
+      showToast('Notificações ativadas', 'success');
+      return true;
+    } else {
+      notificationsEnabled.value = false;
+      showToast('Permissão negada', 'error');
+      return false;
+    }
   }
 
   init() {
@@ -152,6 +175,34 @@ class ConnectionManagerClass {
     return BLEService.request('req:ota:install');
   }
 
+  // Ramp Mode
+  async setRampRate(rate) {
+    return BLEService.request('req:ramp:set', { rate });
+  }
+
+  async stopRamp() {
+    return BLEService.request('req:ramp:stop');
+  }
+
+  // Brew Log
+  async startBrewLog() {
+    return BLEService.request('req:log:start');
+  }
+
+  async stopBrewLog() {
+    return BLEService.request('req:log:stop');
+  }
+
+  async exportBrewLog(format = 'csv') {
+    brewLogData.value = [];
+    const result = await BLEService.request('req:log:export', { fmt: format, chunk: 0 });
+    return result;
+  }
+
+  async fetchLogChunk(format, chunkIndex) {
+    return BLEService.request('req:log:export', { fmt: format, chunk: chunkIndex });
+  }
+
   _handleMessage(data) {
     switch (data.tp) {
       case 'evt:status':
@@ -206,6 +257,73 @@ class ConnectionManagerClass {
           showToast('Installing update... Device will restart', 'info', 10000);
         }
         break;
+
+      case 'evt:ramp:status':
+        rampActive.value = data.active || false;
+        rampRate.value = data.rate || 0;
+        rampTarget.value = data.target || 0;
+        rampCurrent.value = data.current || 0;
+        break;
+
+      case 'evt:ramp:complete':
+        rampActive.value = false;
+        showToast(`Rampa concluída: ${data.temp?.toFixed(1)}°C`, 'success');
+        this._sendNotification('Rampa Concluída', `Temperatura atingiu ${data.temp?.toFixed(1)}°C`);
+        break;
+
+      case 'evt:log:status':
+        brewLogActive.value = data.active || false;
+        brewLogEntries.value = data.entries || 0;
+        break;
+
+      case 'evt:log:data':
+        // Append chunk data
+        if (data.data) {
+          brewLogData.value = [...brewLogData.value, data.data];
+        }
+        break;
+    }
+
+    // Check for notification triggers
+    this._checkNotificationTriggers(data);
+  }
+
+  // Notification helpers
+  _checkNotificationTriggers(data) {
+    if (!notificationsEnabled.value) return;
+
+    // Notify when temperature is reached (within 0.5°C)
+    if (notifyOnTempReached.value && data.ct !== undefined && data.tt !== undefined) {
+      const current = data.ct;
+      const target = data.tt;
+      if (target > 0 && Math.abs(current - target) < 0.5 && !this._tempReachedNotified) {
+        this._tempReachedNotified = true;
+        this._sendNotification('Temperatura Atingida', `${current.toFixed(1)}°C de ${target.toFixed(1)}°C`);
+      } else if (Math.abs(current - target) >= 2) {
+        this._tempReachedNotified = false;
+      }
+    }
+
+    // Notify on recipe step completion
+    if (notifyOnStepComplete.value && data.rst === 'waiting_confirm') {
+      this._sendNotification('Etapa Concluída', 'Aguardando confirmação para continuar');
+    }
+  }
+
+  _sendNotification(title, body) {
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    
+    try {
+      new Notification(title, {
+        body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        tag: 'inversa-notification',
+        renotify: true
+      });
+    } catch (e) {
+      console.warn('Notification failed:', e);
     }
   }
 }

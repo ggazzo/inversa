@@ -222,6 +222,20 @@ private:
             doc[Protocol::FIELD_TIMER_LEFT]   = gState.timerRemainingMs / 1000;
         }
 
+        // Ramp info
+        if (gState.rampActive) {
+            doc["ra"]  = true;
+            doc["rr"]  = round2(gState.rampRate);
+            doc["rtg"] = round2(gState.rampTarget);
+            doc["rc"]  = round2(gState.rampCurrent);
+        }
+
+        // Brew Log info
+        if (gState.brewLogActive) {
+            doc["bla"] = true;
+            doc["ble"] = gState.brewLogEntries;
+        }
+
         sendJson(doc);
     }
 

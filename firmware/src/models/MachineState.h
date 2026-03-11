@@ -70,6 +70,17 @@ struct MachineState {
     String otaLatestVersion     = "";
     uint8_t otaProgress         = 0;
     String otaError             = "";
+
+    // Ramp Mode
+    bool   rampActive           = false;
+    float  rampTarget           = 0.0f;
+    float  rampCurrent          = 0.0f;
+    float  rampRate             = 0.0f;   // °C/min
+
+    // Brew Log
+    bool   brewLogActive        = false;
+    uint32_t brewLogStartTime   = 0;
+    uint16_t brewLogEntries     = 0;
 };
 
 // Global state — accessible by all plugins

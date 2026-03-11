@@ -4,6 +4,9 @@ import {
   isConnected, pidKp, pidKi, pidKd, showToast,
   wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
   otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion,
+  rampActive, rampRate,
+  brewLogActive, brewLogEntries, brewLogData,
+  notificationsEnabled, notifyOnTempReached, notifyOnStepComplete,
 } from '../stores/state';
 
 export function Settings() {
@@ -22,6 +25,13 @@ export function Settings() {
 
   // OTA state
   const [otaLoading, setOtaLoading] = useState(false);
+
+  // Ramp state
+  const [rampRateInput, setRampRateInput] = useState(rampRate.value || 1.0);
+
+  // BrewLog state
+  const [brewLogLoading, setBrewLogLoading] = useState(false);
+  const [exportFormat, setExportFormat] = useState('csv');
 
   // Sync local state with signal values when they change
   useEffect(() => {
@@ -151,6 +161,86 @@ export function Settings() {
       showToast(e.message, 'error');
     } finally {
       setOtaLoading(false);
+    }
+  }
+
+  // Ramp functions
+  async function setRamp() {
+    try {
+      await ConnectionManager.setRampRate(parseFloat(rampRateInput));
+      showToast(`Rampa: ${rampRateInput}°C/min`, 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  async function disableRamp() {
+    try {
+      await ConnectionManager.setRampRate(0);
+      showToast('Rampa desativada', 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  // BrewLog functions
+  async function toggleBrewLog() {
+    setBrewLogLoading(true);
+    try {
+      if (brewLogActive.value) {
+        await ConnectionManager.stopBrewLog();
+        showToast('Log parado', 'success');
+      } else {
+        await ConnectionManager.startBrewLog();
+        showToast('Log iniciado', 'success');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBrewLogLoading(false);
+    }
+  }
+
+  async function exportLog() {
+    setBrewLogLoading(true);
+    try {
+      const result = await ConnectionManager.exportBrewLog(exportFormat);
+      
+      // Fetch all chunks
+      const totalChunks = result.total || 1;
+      let allData = result.data || '';
+      
+      for (let i = 1; i < totalChunks; i++) {
+        const chunk = await ConnectionManager.fetchLogChunk(exportFormat, i);
+        allData += chunk.data || '';
+      }
+      
+      // Download file
+      const blob = new Blob([allData], { type: exportFormat === 'json' ? 'application/json' : 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `brewlog-${new Date().toISOString().slice(0, 10)}.${exportFormat}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      showToast('Log exportado', 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setBrewLogLoading(false);
+    }
+  }
+
+  // Notification functions
+  async function toggleNotifications() {
+    if (notificationsEnabled.value) {
+      notificationsEnabled.value = false;
+      showToast('Notificacoes desativadas', 'info');
+    } else {
+      await ConnectionManager.requestNotificationPermission();
     }
   }
 
@@ -312,6 +402,138 @@ export function Settings() {
             <p class="text-xs text-base-content/50 mt-2">
               Connect to WiFi to check for updates
             </p>
+          )}
+        </div>
+      </div>
+
+      {/* Ramp Mode */}
+      <div class="card bg-base-100 shadow-md">
+        <div class="card-body p-4">
+          <h3 class="text-sm font-semibold uppercase text-base-content/60 mb-3">Modo Rampa</h3>
+          
+          <p class="text-xs text-base-content/50 mb-3">
+            Aquecimento/resfriamento gradual em vez de ir direto ao setpoint.
+          </p>
+
+          <div class="flex items-center gap-2 mb-3">
+            <div class={`w-2 h-2 rounded-full ${rampActive.value ? 'bg-success animate-pulse' : 'bg-base-300'}`} />
+            <span class="text-sm">
+              {rampActive.value ? `Ativo: ${rampRate.value}°C/min` : 'Inativo'}
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2 mb-3">
+            <input
+              type="number"
+              class="input input-bordered input-sm w-24 font-mono"
+              value={rampRateInput}
+              onInput={(e) => setRampRateInput(e.target.value)}
+              min="0.1"
+              max="10"
+              step="0.1"
+            />
+            <span class="text-sm text-base-content/50">°C/min</span>
+          </div>
+
+          <div class="flex gap-2">
+            <button class="btn btn-sm btn-primary flex-1" onClick={setRamp}>
+              Ativar Rampa
+            </button>
+            <button 
+              class="btn btn-sm btn-outline flex-1" 
+              onClick={disableRamp}
+              disabled={!rampActive.value}
+            >
+              Desativar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Brew Log */}
+      <div class="card bg-base-100 shadow-md">
+        <div class="card-body p-4">
+          <h3 class="text-sm font-semibold uppercase text-base-content/60 mb-3">Log de Brasagem</h3>
+          
+          <div class="flex items-center gap-2 mb-3">
+            <div class={`w-2 h-2 rounded-full ${brewLogActive.value ? 'bg-error animate-pulse' : 'bg-base-300'}`} />
+            <span class="text-sm">
+              {brewLogActive.value 
+                ? `Gravando: ${brewLogEntries.value} registros` 
+                : 'Parado'}
+            </span>
+          </div>
+
+          <div class="flex gap-2 mb-3">
+            <button 
+              class={`btn btn-sm flex-1 ${brewLogActive.value ? 'btn-error' : 'btn-primary'}`}
+              onClick={toggleBrewLog}
+              disabled={brewLogLoading}
+            >
+              {brewLogLoading ? (
+                <span class="loading loading-spinner loading-xs" />
+              ) : brewLogActive.value ? 'Parar' : 'Iniciar'}
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <select 
+              class="select select-bordered select-sm flex-1"
+              value={exportFormat}
+              onChange={(e) => setExportFormat(e.target.value)}
+            >
+              <option value="csv">CSV</option>
+              <option value="json">JSON</option>
+            </select>
+            <button 
+              class="btn btn-sm btn-outline"
+              onClick={exportLog}
+              disabled={brewLogLoading || brewLogEntries.value === 0}
+            >
+              Exportar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Notifications */}
+      <div class="card bg-base-100 shadow-md">
+        <div class="card-body p-4">
+          <h3 class="text-sm font-semibold uppercase text-base-content/60 mb-3">Notificacoes</h3>
+
+          <div class="form-control">
+            <label class="label cursor-pointer justify-start gap-3">
+              <input 
+                type="checkbox" 
+                class="toggle toggle-primary toggle-sm"
+                checked={notificationsEnabled.value}
+                onChange={toggleNotifications}
+              />
+              <span class="label-text">Ativar notificacoes</span>
+            </label>
+          </div>
+
+          {notificationsEnabled.value && (
+            <div class="space-y-2 mt-2 pl-1">
+              <label class="label cursor-pointer justify-start gap-3 py-1">
+                <input 
+                  type="checkbox" 
+                  class="checkbox checkbox-sm"
+                  checked={notifyOnTempReached.value}
+                  onChange={(e) => notifyOnTempReached.value = e.target.checked}
+                />
+                <span class="label-text text-sm">Temperatura atingida</span>
+              </label>
+              <label class="label cursor-pointer justify-start gap-3 py-1">
+                <input 
+                  type="checkbox" 
+                  class="checkbox checkbox-sm"
+                  checked={notifyOnStepComplete.value}
+                  onChange={(e) => notifyOnStepComplete.value = e.target.checked}
+                />
+                <span class="label-text text-sm">Etapa concluida</span>
+              </label>
+            </div>
           )}
         </div>
       </div>
