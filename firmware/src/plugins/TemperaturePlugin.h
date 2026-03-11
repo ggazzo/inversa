@@ -13,7 +13,7 @@ public:
     bool setup() override {
         analogReadResolution(12);
         pinMode(PIN_NTC, INPUT);
-        Serial.println("[Temperature] NTC sensor initialized");
+        DEBUG_PRINTLN("[Temperature] NTC sensor initialized");
         return true;
     }
 

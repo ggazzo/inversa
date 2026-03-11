@@ -43,7 +43,7 @@ public:
             _currentTemp = e.floatValue;
         });
 
-        Serial.println("[Recipe] Engine initialized");
+        DEBUG_PRINTLN("[Recipe] Engine initialized");
         return true;
     }
 
@@ -108,7 +108,7 @@ public:
         gState.recipeTotalSteps = _commands.size();
         gState.recipeStep = 0;
 
-        Serial.printf("[Recipe] Loaded '%s' with %d steps\n", 
+        DEBUG_PRINTF("[Recipe] Loaded '%s' with %d steps\n", 
                       name.c_str(), _commands.size());
         return !_commands.empty();
     }
@@ -121,7 +121,7 @@ public:
         gState.mode = OperatingMode::Recipe;
         bus().publish(EventType::RecipeStarted, gState.recipeName);
         bus().publish(EventType::RecipeStepChanged, 0);
-        Serial.println("[Recipe] Started");
+        DEBUG_PRINTLN("[Recipe] Started");
     }
 
     void stop() {
@@ -133,7 +133,7 @@ public:
         bus().publish(EventType::SetpointChanged, 0.0f);
         bus().publish(EventType::HeaterStateChanged, false);
         RecoveryManager::instance().clearRecovery();
-        Serial.println("[Recipe] Stopped");
+        DEBUG_PRINTLN("[Recipe] Stopped");
     }
 
     void pause() {
@@ -142,7 +142,7 @@ public:
             _pausedState = gState.recipeState;
             gState.recipeState = RecipeState::Paused;
             bus().publish(EventType::RecipePaused);
-            Serial.println("[Recipe] Paused");
+            DEBUG_PRINTLN("[Recipe] Paused");
         }
     }
 
@@ -150,7 +150,7 @@ public:
         if (gState.recipeState == RecipeState::Paused) {
             gState.recipeState = _pausedState;
             bus().publish(EventType::RecipeResumed);
-            Serial.println("[Recipe] Resumed");
+            DEBUG_PRINTLN("[Recipe] Resumed");
         }
     }
 
@@ -182,7 +182,7 @@ public:
             _timerStart = millis();  // Start fresh with remaining time
         }
         
-        Serial.printf("[Recipe] Restored from recovery: step %d, state %d, target %.1f\n",
+        DEBUG_PRINTF("[Recipe] Restored from recovery: step %d, state %d, target %.1f\n",
                      _currentStep, data.recipeState, data.targetTemp);
         
         // Publish events to sync other plugins
@@ -244,7 +244,7 @@ private:
         }
         else {
             cmd.type = RecipeCommandType::Unknown;
-            Serial.printf("[Recipe] Unknown command: %s\n", line.c_str());
+            DEBUG_PRINTF("[Recipe] Unknown command: %s\n", line.c_str());
         }
 
         return cmd;
@@ -275,7 +275,7 @@ private:
             bus().publish(EventType::RecipeCompleted);
             bus().publish(EventType::HeaterStateChanged, false);
             RecoveryManager::instance().clearRecovery();
-            Serial.println("[Recipe] Completed!");
+            DEBUG_PRINTLN("[Recipe] Completed!");
             return;
         }
 
@@ -286,14 +286,14 @@ private:
                 gState.targetTemp = cmd.value;
                 bus().publish(EventType::SetpointChanged, cmd.value);
                 bus().publish(EventType::HeaterStateChanged, true);
-                Serial.printf("[Recipe] SET_TEMP %.1f\n", cmd.value);
+                DEBUG_PRINTF("[Recipe] SET_TEMP %.1f\n", cmd.value);
                 advanceStep();
                 break;
 
             case RecipeCommandType::WaitTemp:
                 gState.recipeState = RecipeState::WaitingForTemperature;
                 _waitTempTolerance = cmd.value;
-                Serial.printf("[Recipe] WAIT_TEMP (tol=%.1f)\n", cmd.value);
+                DEBUG_PRINTF("[Recipe] WAIT_TEMP (tol=%.1f)\n", cmd.value);
                 break;
 
             case RecipeCommandType::WaitTimer:
@@ -301,25 +301,25 @@ private:
                 _timerDuration = (uint32_t)(cmd.value * 60000);  // min to ms
                 gState.recipeState = RecipeState::WaitingForTimer;
                 gState.timerRemainingMs = _timerDuration;
-                Serial.printf("[Recipe] WAIT_TIMER %.0f min\n", cmd.value);
+                DEBUG_PRINTF("[Recipe] WAIT_TIMER %.0f min\n", cmd.value);
                 break;
 
             case RecipeCommandType::WaitConfirm:
                 gState.recipeState = RecipeState::WaitingForConfirm;
                 gState.confirmMessage = cmd.message;
                 bus().publish(EventType::RecipeWaitConfirm, cmd.message);
-                Serial.printf("[Recipe] WAIT_CONFIRM: %s\n", cmd.message.c_str());
+                DEBUG_PRINTF("[Recipe] WAIT_CONFIRM: %s\n", cmd.message.c_str());
                 break;
 
             case RecipeCommandType::PumpOn:
                 bus().publish(EventType::PumpStateChanged, true);
-                Serial.println("[Recipe] PUMP_ON");
+                DEBUG_PRINTLN("[Recipe] PUMP_ON");
                 advanceStep();
                 break;
 
             case RecipeCommandType::PumpOff:
                 bus().publish(EventType::PumpStateChanged, false);
-                Serial.println("[Recipe] PUMP_OFF");
+                DEBUG_PRINTLN("[Recipe] PUMP_OFF");
                 advanceStep();
                 break;
 
@@ -332,7 +332,7 @@ private:
     void checkTemperatureReached() {
         float diff = abs(_currentTemp - gState.targetTemp);
         if (diff <= _waitTempTolerance) {
-            Serial.printf("[Recipe] Temperature reached: %.1f (target %.1f)\n",
+            DEBUG_PRINTF("[Recipe] Temperature reached: %.1f (target %.1f)\n",
                          _currentTemp, gState.targetTemp);
             advanceStep();
         }
@@ -342,7 +342,7 @@ private:
         uint32_t elapsed = millis() - _timerStart;
         if (elapsed >= _timerDuration) {
             gState.timerRemainingMs = 0;
-            Serial.println("[Recipe] Timer expired");
+            DEBUG_PRINTLN("[Recipe] Timer expired");
             advanceStep();
         } else {
             gState.timerRemainingMs = _timerDuration - elapsed;

@@ -17,7 +17,7 @@ public:
         #endif
 
         if (!SD.begin(PIN_SD_CS)) {
-            Serial.println("[SDCard] Mount FAILED");
+            DEBUG_PRINTLN("[SDCard] Mount FAILED");
             _mounted = false;
             bus().publish(EventType::SDCardError);
             return false;
@@ -30,7 +30,7 @@ public:
             SD.mkdir(SD_RECIPES_DIR);
         }
 
-        Serial.println("[SDCard] Mounted successfully");
+        DEBUG_PRINTLN("[SDCard] Mounted successfully");
         bus().publish(EventType::SDCardMounted);
         return true;
     }

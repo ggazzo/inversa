@@ -30,7 +30,7 @@ public:
             }
         });
 
-        Serial.printf("[Heater] SSR on GPIO %d\n", PIN_HEATER_SSR);
+        DEBUG_PRINTF("[Heater] SSR on GPIO %d\n", PIN_HEATER_SSR);
         return true;
     }
 

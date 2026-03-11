@@ -22,15 +22,15 @@ public:
 
     // Initialize all plugins
     void setup() {
-        Serial.println("[PluginManager] Initializing plugins...");
+        DEBUG_PRINTLN("[PluginManager] Initializing plugins...");
         for (auto& p : _plugins) {
-            Serial.printf("[PluginManager] Setting up: %s\n", p->getName());
+            DEBUG_PRINTF("[PluginManager] Setting up: %s\n", p->getName());
             if (!p->setup()) {
-                Serial.printf("[PluginManager] DISABLED: %s\n", p->getName());
+                DEBUG_PRINTF("[PluginManager] DISABLED: %s\n", p->getName());
                 p->setEnabled(false);
             }
         }
-        Serial.printf("[PluginManager] %d plugins ready\n", _plugins.size());
+        DEBUG_PRINTF("[PluginManager] %d plugins ready\n", _plugins.size());
     }
 
     // Run all enabled plugins

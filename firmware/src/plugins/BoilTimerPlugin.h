@@ -26,7 +26,7 @@ public:
     const char* getName() const override { return "BoilTimer"; }
 
     bool setup() override {
-        Serial.println("[BoilTimer] Initialized");
+        DEBUG_PRINTLN("[BoilTimer] Initialized");
         return true;
     }
 
@@ -51,7 +51,7 @@ public:
             
             bus().publish(EventType::BoilCompleted);
             sendBoilEvent("complete");
-            Serial.println("[BoilTimer] Boil complete!");
+            DEBUG_PRINTLN("[BoilTimer] Boil complete!");
             return;
         }
 
@@ -64,7 +64,7 @@ public:
             if (!add.notified && remainingMin <= add.minutesRemaining) {
                 add.notified = true;
                 sendAdditionAlert(add);
-                Serial.printf("[BoilTimer] Addition alert: %s @ %d min\n", 
+                DEBUG_PRINTF("[BoilTimer] Addition alert: %s @ %d min\n", 
                              add.name, add.minutesRemaining);
             }
         }
@@ -94,7 +94,7 @@ public:
         bus().publish(EventType::HeaterStateChanged, true);
 
         sendBoilEvent("started");
-        Serial.printf("[BoilTimer] Started %d min boil with %d additions\n", 
+        DEBUG_PRINTF("[BoilTimer] Started %d min boil with %d additions\n", 
                      minutes, _additions.size());
     }
 
@@ -103,7 +103,7 @@ public:
         _paused = false;
         gState.boilActive = false;
         sendBoilEvent("stopped");
-        Serial.println("[BoilTimer] Stopped");
+        DEBUG_PRINTLN("[BoilTimer] Stopped");
     }
 
     void pause() {
@@ -111,7 +111,7 @@ public:
         _paused = true;
         _pauseStart = millis();
         sendBoilEvent("paused");
-        Serial.println("[BoilTimer] Paused");
+        DEBUG_PRINTLN("[BoilTimer] Paused");
     }
 
     void resume() {
@@ -119,7 +119,7 @@ public:
         _pausedDuration += millis() - _pauseStart;
         _paused = false;
         sendBoilEvent("resumed");
-        Serial.println("[BoilTimer] Resumed");
+        DEBUG_PRINTLN("[BoilTimer] Resumed");
     }
 
     // Add a hop/addition alert
@@ -141,14 +141,14 @@ public:
             });
         
         gState.boilAdditions = _additions.size();
-        Serial.printf("[BoilTimer] Added: %s @ %d min\n", name, minutesRemaining);
+        DEBUG_PRINTF("[BoilTimer] Added: %s @ %d min\n", name, minutesRemaining);
         return true;
     }
 
     void clearAdditions() {
         _additions.clear();
         gState.boilAdditions = 0;
-        Serial.println("[BoilTimer] Cleared all additions");
+        DEBUG_PRINTLN("[BoilTimer] Cleared all additions");
     }
 
     bool isRunning() const { return _running; }

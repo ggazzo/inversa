@@ -23,7 +23,7 @@ public:
             }
         });
 
-        Serial.printf("[Pump] Relay on GPIO %d\n", PIN_PUMP_RELAY);
+        DEBUG_PRINTF("[Pump] Relay on GPIO %d\n", PIN_PUMP_RELAY);
         return true;
     }
 
@@ -34,13 +34,13 @@ public:
     void turnOn() {
         digitalWrite(PIN_PUMP_RELAY, HIGH);
         gState.pumpOn = true;
-        Serial.println("[Pump] ON");
+        DEBUG_PRINTLN("[Pump] ON");
     }
 
     void turnOff() {
         digitalWrite(PIN_PUMP_RELAY, LOW);
         gState.pumpOn = false;
-        Serial.println("[Pump] OFF");
+        DEBUG_PRINTLN("[Pump] OFF");
     }
 
     bool isOn() const { return gState.pumpOn; }

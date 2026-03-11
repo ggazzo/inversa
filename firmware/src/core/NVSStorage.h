@@ -17,9 +17,9 @@ public:
     bool begin() {
         bool ok = _prefs.begin("inversa", false);  // false = read/write mode
         if (ok) {
-            Serial.println("[NVS] Storage initialized");
+            DEBUG_PRINTLN("[NVS] Storage initialized");
         } else {
-            Serial.println("[NVS] Failed to initialize");
+            DEBUG_PRINTLN("[NVS] Failed to initialize");
         }
         return ok;
     }
@@ -33,7 +33,7 @@ public:
         _prefs.putFloat("pid_kp", kp);
         _prefs.putFloat("pid_ki", ki);
         _prefs.putFloat("pid_kd", kd);
-        Serial.printf("[NVS] Saved PID: Kp=%.2f Ki=%.4f Kd=%.1f\n", kp, ki, kd);
+        DEBUG_PRINTF("[NVS] Saved PID: Kp=%.2f Ki=%.4f Kd=%.1f\n", kp, ki, kd);
     }
 
     float loadPIDKp(float defaultVal) {
@@ -56,7 +56,7 @@ public:
     void saveWiFiCredentials(const String& ssid, const String& password) {
         _prefs.putString("wifi_ssid", ssid);
         _prefs.putString("wifi_pwd", password);
-        Serial.printf("[NVS] Saved WiFi SSID: %s\n", ssid.c_str());
+        DEBUG_PRINTF("[NVS] Saved WiFi SSID: %s\n", ssid.c_str());
     }
 
     String getWiFiSSID() {
@@ -74,7 +74,7 @@ public:
     void clearWiFiCredentials() {
         _prefs.remove("wifi_ssid");
         _prefs.remove("wifi_pwd");
-        Serial.println("[NVS] WiFi credentials cleared");
+        DEBUG_PRINTLN("[NVS] WiFi credentials cleared");
     }
 
     // ── Generic Methods ─────────────────────────────────────

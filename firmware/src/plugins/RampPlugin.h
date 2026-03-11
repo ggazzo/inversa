@@ -34,7 +34,7 @@ public:
             }
         });
 
-        Serial.println("[Ramp] Initialized");
+        DEBUG_PRINTLN("[Ramp] Initialized");
         return true;
     }
 
@@ -72,7 +72,7 @@ public:
         if (abs(_currentSetpoint - _finalTarget) < 0.01f) {
             stopRamp();
             bus().publish(EventType::RampCompleted, _finalTarget);
-            Serial.printf("[Ramp] Completed at %.1f°C\n", _finalTarget);
+            DEBUG_PRINTF("[Ramp] Completed at %.1f°C\n", _finalTarget);
         }
     }
 
@@ -94,7 +94,7 @@ public:
         _lastUpdate = millis();
         gState.rampActive = true;
         
-        Serial.printf("[Ramp] Starting: %.1f -> %.1f at %.2f°C/min\n", 
+        DEBUG_PRINTF("[Ramp] Starting: %.1f -> %.1f at %.2f°C/min\n", 
                       _currentSetpoint, _finalTarget, _ratePerMin);
     }
 
