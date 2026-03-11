@@ -138,6 +138,7 @@ private:
                 _state.otaError = "";
                 DEBUG_PRINTF("[WiFi] Connected! IP: %s\n", _state.wifiIP.c_str());
                 sendWiFiStatus();
+                bus().publish(EventType::WiFiConnected);
                 break;
 
             case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
@@ -147,6 +148,7 @@ private:
                     _state.wifiSSID = "";
                     _state.wifiIP = "";
                     sendWiFiStatus();
+                    bus().publish(EventType::WiFiDisconnected);
                 }
                 break;
 

@@ -76,6 +76,18 @@ namespace Protocol {
     // Mash-Out (app → device)
     constexpr const char* REQ_MASHOUT_SET     = "req:mashout:set";  // {enabled: bool, temp: float}
 
+    // RTC (app → device)
+    constexpr const char* REQ_RTC_GET         = "req:rtc:get";      // Get current RTC time
+    constexpr const char* REQ_RTC_SET         = "req:rtc:set";      // {ts: unix_timestamp} or {iso: "YYYY-MM-DDTHH:MM:SS"}
+    constexpr const char* REQ_RTC_SYNC        = "req:rtc:sync";     // Trigger NTP sync
+
+    // Timer (app → device)
+    constexpr const char* REQ_TIMER_START     = "req:timer:start";  // {sec: uint32} or {min: uint32}
+    constexpr const char* REQ_TIMER_STOP      = "req:timer:stop";
+    constexpr const char* REQ_TIMER_PAUSE     = "req:timer:pause";
+    constexpr const char* REQ_TIMER_RESUME    = "req:timer:resume";
+    constexpr const char* REQ_TIMER_ADD       = "req:timer:add";    // {sec: int32} add/subtract time
+
     // WiFi Events (device → app)
     constexpr const char* EVT_WIFI_STATUS     = "evt:wifi:status";
 
@@ -93,6 +105,13 @@ namespace Protocol {
     // Boil Timer Events (device → app)
     constexpr const char* EVT_BOIL_STATUS     = "evt:boil:status";
     constexpr const char* EVT_BOIL_ADDITION   = "evt:boil:addition"; // Addition alert
+
+    // RTC Events (device → app)
+    constexpr const char* EVT_RTC_STATUS      = "evt:rtc:status";   // RTC status update
+
+    // Timer Events (device → app)
+    constexpr const char* EVT_TIMER_STATUS    = "evt:timer:status"; // Timer status update
+    constexpr const char* EVT_TIMER_COMPLETE  = "evt:timer:complete"; // Timer finished
 
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";

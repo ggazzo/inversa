@@ -53,6 +53,21 @@ enum class EventType : uint8_t {
     BLECommandReceived,     // string: JSON command
     BLESend,                // string: JSON message to send to client
 
+    // WiFi
+    WiFiConnected,
+    WiFiDisconnected,
+
+    // RTC
+    RTCTimeUpdated,         // float: unix timestamp
+
+    // Timer (generic countdown timer)
+    TimerStarted,           // int: duration in seconds
+    TimerTick,              // int: remaining seconds
+    TimerPaused,
+    TimerResumed,
+    TimerCompleted,
+    TimerCancelled,
+
     // System
     SystemReady,
     SystemError,
