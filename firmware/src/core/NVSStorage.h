@@ -52,6 +52,31 @@ public:
         return _prefs.isKey("pid_kp");
     }
 
+    // ── WiFi Credentials ─────────────────────────────────────
+    void saveWiFiCredentials(const String& ssid, const String& password) {
+        _prefs.putString("wifi_ssid", ssid);
+        _prefs.putString("wifi_pwd", password);
+        Serial.printf("[NVS] Saved WiFi SSID: %s\n", ssid.c_str());
+    }
+
+    String getWiFiSSID() {
+        return _prefs.getString("wifi_ssid", "");
+    }
+
+    String getWiFiPassword() {
+        return _prefs.getString("wifi_pwd", "");
+    }
+
+    bool hasWiFiCredentials() {
+        return _prefs.isKey("wifi_ssid") && _prefs.getString("wifi_ssid", "").length() > 0;
+    }
+
+    void clearWiFiCredentials() {
+        _prefs.remove("wifi_ssid");
+        _prefs.remove("wifi_pwd");
+        Serial.println("[NVS] WiFi credentials cleared");
+    }
+
     // ── Generic Methods ─────────────────────────────────────
     void putFloat(const char* key, float value) {
         _prefs.putFloat(key, value);

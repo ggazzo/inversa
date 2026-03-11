@@ -58,6 +58,18 @@ struct MachineState {
     // Recovery
     bool   hasRecoveryData      = false;
     String recoveryRecipeName   = "";
+
+    // WiFi
+    bool   wifiConnected        = false;
+    String wifiSSID             = "";
+    String wifiIP               = "";
+    String wifiConfiguredSSID   = "";  // Stored SSID (for display)
+
+    // OTA
+    String otaStatus            = "idle";  // idle, checking, available, downloading, installing, error, up-to-date
+    String otaLatestVersion     = "";
+    uint8_t otaProgress         = 0;
+    String otaError             = "";
 };
 
 // Global state — accessible by all plugins
