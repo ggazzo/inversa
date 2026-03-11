@@ -72,7 +72,7 @@ public:
             return false;
         }
         
-        Serial.printf("[Recovery] Valid recovery found: '%s' step %d/%d\n",
+        DEBUG_PRINTF("[Recovery] Valid recovery found: '%s' step %d/%d\n",
                      data.recipeName, data.currentStep, data.totalSteps);
         return true;
     }
@@ -122,7 +122,7 @@ public:
         bool ok = _sd->saveRecoveryData((uint8_t*)&data, sizeof(data));
         if (ok) {
             _lastSaveMs = millis();
-            Serial.printf("[Recovery] Saved state: step %d, state %d\n", 
+            DEBUG_PRINTF("[Recovery] Saved state: step %d, state %d\n", 
                          data.currentStep, data.recipeState);
         }
         return ok;
@@ -132,7 +132,7 @@ public:
     void clearRecovery() {
         if (_sd && _sd->isMounted()) {
             _sd->deleteRecoveryData();
-            Serial.println("[Recovery] Cleared");
+            DEBUG_PRINTLN("[Recovery] Cleared");
         }
     }
 

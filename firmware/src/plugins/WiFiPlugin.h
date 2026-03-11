@@ -26,7 +26,7 @@ public:
         // Load stored SSID for display (don't auto-connect)
         if (NVSStorage::instance().hasWiFiCredentials()) {
             _state.wifiConfiguredSSID = NVSStorage::instance().getWiFiSSID();
-            Serial.printf("[WiFi] Stored SSID: %s\n", _state.wifiConfiguredSSID.c_str());
+            DEBUG_PRINTF("[WiFi] Stored SSID: %s\n", _state.wifiConfiguredSSID.c_str());
         }
 
         // Register WiFi events
@@ -34,7 +34,7 @@ public:
             handleWiFiEvent(event, info);
         });
 
-        Serial.println("[WiFi] Plugin initialized (STA mode)");
+        DEBUG_PRINTLN("[WiFi] Plugin initialized (STA mode)");
         return true;
     }
 
@@ -44,7 +44,7 @@ public:
             _connecting = false;
             _state.wifiConnected = false;
             _state.otaError = "WiFi connection timeout";
-            Serial.println("[WiFi] Connection timeout");
+            DEBUG_PRINTLN("[WiFi] Connection timeout");
             sendWiFiStatus();
         }
     }
@@ -54,19 +54,19 @@ public:
     void configure(const String& ssid, const String& password) {
         NVSStorage::instance().saveWiFiCredentials(ssid, password);
         _state.wifiConfiguredSSID = ssid;
-        Serial.printf("[WiFi] Credentials saved for: %s\n", ssid.c_str());
+        DEBUG_PRINTF("[WiFi] Credentials saved for: %s\n", ssid.c_str());
     }
 
     void connect() {
         if (_state.wifiConnected) {
-            Serial.println("[WiFi] Already connected");
+            DEBUG_PRINTLN("[WiFi] Already connected");
             sendWiFiStatus();
             return;
         }
 
         if (!NVSStorage::instance().hasWiFiCredentials()) {
             _state.otaError = "No WiFi credentials configured";
-            Serial.println("[WiFi] No credentials stored");
+            DEBUG_PRINTLN("[WiFi] No credentials stored");
             sendWiFiStatus();
             return;
         }
@@ -74,7 +74,7 @@ public:
         String ssid = NVSStorage::instance().getWiFiSSID();
         String password = NVSStorage::instance().getWiFiPassword();
 
-        Serial.printf("[WiFi] Connecting to: %s\n", ssid.c_str());
+        DEBUG_PRINTF("[WiFi] Connecting to: %s\n", ssid.c_str());
         _connecting = true;
         _connectStartTime = millis();
 
@@ -83,7 +83,7 @@ public:
     }
 
     void disconnect() {
-        Serial.println("[WiFi] Disconnecting");
+        DEBUG_PRINTLN("[WiFi] Disconnecting");
         _connecting = false;
         WiFi.disconnect(true);
         _state.wifiConnected = false;
@@ -136,13 +136,13 @@ private:
                 _state.wifiSSID = WiFi.SSID();
                 _state.wifiIP = WiFi.localIP().toString();
                 _state.otaError = "";
-                Serial.printf("[WiFi] Connected! IP: %s\n", _state.wifiIP.c_str());
+                DEBUG_PRINTF("[WiFi] Connected! IP: %s\n", _state.wifiIP.c_str());
                 sendWiFiStatus();
                 break;
 
             case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
                 if (_state.wifiConnected) {
-                    Serial.println("[WiFi] Disconnected");
+                    DEBUG_PRINTLN("[WiFi] Disconnected");
                     _state.wifiConnected = false;
                     _state.wifiSSID = "";
                     _state.wifiIP = "";
@@ -151,7 +151,7 @@ private:
                 break;
 
             case ARDUINO_EVENT_WIFI_STA_CONNECTED:
-                Serial.println("[WiFi] Associated with AP");
+                DEBUG_PRINTLN("[WiFi] Associated with AP");
                 break;
 
             default:

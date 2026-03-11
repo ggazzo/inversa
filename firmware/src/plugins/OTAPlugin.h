@@ -26,9 +26,9 @@ public:
     const char* getName() const override { return "OTA"; }
 
     bool setup() override {
-        Serial.println("[OTA] Plugin initialized");
-        Serial.printf("[OTA] Current version: %s\n", BUILD_GIT_VERSION);
-        Serial.printf("[OTA] Firmware name: %s\n", FIRMWARE_NAME);
+        DEBUG_PRINTLN("[OTA] Plugin initialized");
+        DEBUG_PRINTF("[OTA] Current version: %s\n", BUILD_GIT_VERSION);
+        DEBUG_PRINTF("[OTA] Firmware name: %s\n", FIRMWARE_NAME);
         return true;
     }
 
@@ -45,7 +45,7 @@ public:
         }
 
         setStatus("checking");
-        Serial.println("[OTA] Checking for updates...");
+        DEBUG_PRINTLN("[OTA] Checking for updates...");
 
         WiFiClientSecure client;
         client.setInsecure();  // Skip certificate validation
@@ -84,13 +84,13 @@ public:
         }
 
         _state.otaLatestVersion = tagName;
-        Serial.printf("[OTA] Latest version: %s, Current: %s\n", 
+        DEBUG_PRINTF("[OTA] Latest version: %s, Current: %s\n", 
                       tagName, BUILD_GIT_VERSION);
 
         // Compare versions
         if (!Semver::isNewer(tagName, BUILD_GIT_VERSION)) {
             setStatus("up-to-date");
-            Serial.println("[OTA] Already on latest version");
+            DEBUG_PRINTLN("[OTA] Already on latest version");
             return;
         }
 
@@ -118,7 +118,7 @@ public:
         _downloadSize = assetSize;
         
         setStatus("available");
-        Serial.printf("[OTA] Update available: %s (%d bytes)\n", 
+        DEBUG_PRINTF("[OTA] Update available: %s (%d bytes)\n", 
                       tagName, assetSize);
     }
 
@@ -137,7 +137,7 @@ public:
         _state.otaProgress = 0;
         sendStatus();
 
-        Serial.printf("[OTA] Downloading: %s\n", _downloadUrl.c_str());
+        DEBUG_PRINTF("[OTA] Downloading: %s\n", _downloadUrl.c_str());
 
         WiFiClientSecure client;
         client.setInsecure();
@@ -163,7 +163,7 @@ public:
             return;
         }
 
-        Serial.printf("[OTA] Content length: %d bytes\n", contentLength);
+        DEBUG_PRINTF("[OTA] Content length: %d bytes\n", contentLength);
 
         if (!Update.begin(contentLength)) {
             http.end();
@@ -199,7 +199,7 @@ public:
                     lastReportedPct = pct;
                     _state.otaProgress = pct;
                     sendStatus();
-                    Serial.printf("[OTA] Progress: %d%%\n", pct);
+                    DEBUG_PRINTF("[OTA] Progress: %d%%\n", pct);
                 }
             }
             delay(1);  // Yield to watchdog
@@ -219,7 +219,7 @@ public:
         }
 
         setStatus("installing");
-        Serial.println("[OTA] Update complete, restarting...");
+        DEBUG_PRINTLN("[OTA] Update complete, restarting...");
         
         delay(1000);  // Give time for BLE message to send
         ESP.restart();
@@ -240,7 +240,7 @@ private:
     void setError(const String& error) {
         _state.otaStatus = "error";
         _state.otaError = error;
-        Serial.printf("[OTA] Error: %s\n", error.c_str());
+        DEBUG_PRINTF("[OTA] Error: %s\n", error.c_str());
         sendStatus();
     }
 

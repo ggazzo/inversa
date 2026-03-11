@@ -34,12 +34,12 @@ void setup() {
     Serial.begin(115200);
     delay(500);
     
-    Serial.println();
-    Serial.println("╔══════════════════════════════════════╗");
-    Serial.println("║        Inversa v2 Brewing            ║");
-    Serial.printf( "║  FW: %-32s║\n", BUILD_GIT_VERSION);
-    Serial.println("╚══════════════════════════════════════╝");
-    Serial.println();
+    DEBUG_PRINTLN();
+    DEBUG_PRINTLN("╔══════════════════════════════════════╗");
+    DEBUG_PRINTLN("║        Inversa v2 Brewing            ║");
+    DEBUG_PRINTF( "║  FW: %-32s║\n", BUILD_GIT_VERSION);
+    DEBUG_PRINTLN("╚══════════════════════════════════════╝");
+    DEBUG_PRINTLN();
 
     // Initialize NVS storage for persistent settings
     NVSStorage::instance().begin();
@@ -73,7 +73,7 @@ void setup() {
     if (RecoveryManager::instance().hasValidRecovery()) {
         RecoveryData recoveryData;
         if (RecoveryManager::instance().loadRecovery(recoveryData)) {
-            Serial.printf("[System] Recovery available: '%s' step %d/%d\n", 
+            DEBUG_PRINTF("[System] Recovery available: '%s' step %d/%d\n", 
                          recoveryData.recipeName, recoveryData.currentStep, recoveryData.totalSteps);
             gState.hasRecoveryData = true;
             gState.recoveryRecipeName = String(recoveryData.recipeName);
@@ -84,9 +84,9 @@ void setup() {
     // System ready
     EventBus::instance().publish(EventType::SystemReady);
     
-    Serial.println();
-    Serial.printf("[System] Free heap: %d bytes\n", ESP.getFreeHeap());
-    Serial.println("[System] Ready. Waiting for BLE connection...");
+    DEBUG_PRINTLN();
+    DEBUG_PRINTF("[System] Free heap: %d bytes\n", ESP.getFreeHeap());
+    DEBUG_PRINTLN("[System] Ready. Waiting for BLE connection...");
 }
 
 void loop() {

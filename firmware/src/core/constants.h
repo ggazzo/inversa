@@ -1,5 +1,18 @@
 #pragma once
 
+// ─── Debug Macros ───────────────────────────────────────────
+// Use DEBUG_PRINT/DEBUG_PRINTF instead of Serial.print/printf
+// These are stripped in release builds (CORE_DEBUG_LEVEL=0)
+#if CORE_DEBUG_LEVEL > 0 || defined(DEBUG_MODE)
+    #define DEBUG_PRINT(x)    Serial.print(x)
+    #define DEBUG_PRINTLN(x)  Serial.println(x)
+    #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+#else
+    #define DEBUG_PRINT(x)
+    #define DEBUG_PRINTLN(x)
+    #define DEBUG_PRINTF(...)
+#endif
+
 // ─── Board Detection ────────────────────────────────────────
 #if defined(BOARD_S3_MINI)
     #include "boards/s3_mini.h"

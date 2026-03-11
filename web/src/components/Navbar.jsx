@@ -11,7 +11,7 @@ const NAV_ITEMS = [
 
 export function Navbar() {
   return (
-    <div class="btm-nav btm-nav-sm z-50">
+    <div class="btm-nav btm-nav-sm z-50" style="display: flex; justify-content: space-around;">
       {NAV_ITEMS.map(({ path, label, icon: Icon }) => (
         <button
           key={path}

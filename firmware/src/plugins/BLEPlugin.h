@@ -50,7 +50,7 @@ public:
             send(e.stringValue);
         });
 
-        Serial.println("[BLE] Service started, advertising...");
+        DEBUG_PRINTLN("[BLE] Service started, advertising...");
         return true;
     }
 
@@ -124,7 +124,7 @@ private:
         _connected = true;
         gState.bleConnected = true;
         bus().publish(EventType::BLEClientConnected);
-        Serial.printf("[BLE] Client connected: %s\n", 
+        DEBUG_PRINTF("[BLE] Client connected: %s\n", 
                       connInfo.getAddress().toString().c_str());
         
         // Allow multiple connections
@@ -142,7 +142,7 @@ private:
         doc[Protocol::FIELD_TYPE] = Protocol::EVT_RECIPE_RECOVERY;
         doc["recipe"] = gState.recoveryRecipeName;
         sendJson(doc);
-        Serial.printf("[BLE] Sent recovery notification: %s\n", 
+        DEBUG_PRINTF("[BLE] Sent recovery notification: %s\n", 
                      gState.recoveryRecipeName.c_str());
     }
 
@@ -152,7 +152,7 @@ private:
         if (!_connected) {
             bus().publish(EventType::BLEClientDisconnected);
         }
-        Serial.printf("[BLE] Client disconnected (reason=%d)\n", reason);
+        DEBUG_PRINTF("[BLE] Client disconnected (reason=%d)\n", reason);
         NimBLEDevice::getAdvertising()->start();
     }
 
@@ -174,7 +174,7 @@ private:
             handleCommand(doc);
         } else if (err != DeserializationError::IncompleteInput) {
             // Bad JSON, reset
-            Serial.printf("[BLE] JSON parse error: %s\n", err.c_str());
+            DEBUG_PRINTF("[BLE] JSON parse error: %s\n", err.c_str());
             _rxBuffer = "";
         }
         // If IncompleteInput, keep accumulating
@@ -186,7 +186,7 @@ private:
         const char* type = doc[Protocol::FIELD_TYPE] | "";
         String rid = doc[Protocol::FIELD_REQUEST_ID] | "";
 
-        Serial.printf("[BLE] Command: %s\n", type);
+        DEBUG_PRINTF("[BLE] Command: %s\n", type);
 
         // Publish raw command for other plugins
         String raw;

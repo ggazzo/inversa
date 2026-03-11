@@ -25,7 +25,7 @@ public:
         gState.pidKd = _kd;
         
         if (nvs.hasPIDParams()) {
-            Serial.printf("[PID] Loaded from NVS: Kp=%.2f Ki=%.4f Kd=%.1f\n", _kp, _ki, _kd);
+            DEBUG_PRINTF("[PID] Loaded from NVS: Kp=%.2f Ki=%.4f Kd=%.1f\n", _kp, _ki, _kd);
         }
 
         // Listen for setpoint changes (direct or ramped)
@@ -56,7 +56,7 @@ public:
             _input = e.floatValue;
         });
 
-        Serial.printf("[PID] Initialized Kp=%.2f Ki=%.4f Kd=%.1f\n", _kp, _ki, _kd);
+        DEBUG_PRINTF("[PID] Initialized Kp=%.2f Ki=%.4f Kd=%.1f\n", _kp, _ki, _kd);
         return true;
     }
 

@@ -44,7 +44,7 @@ public:
             handle(doc);
         });
 
-        Serial.println("[CommandHandler] Initialized");
+        DEBUG_PRINTLN("[CommandHandler] Initialized");
     }
 
     void handle(JsonDocument& doc) {

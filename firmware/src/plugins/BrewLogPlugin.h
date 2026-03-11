@@ -27,7 +27,7 @@ public:
     const char* getName() const override { return "BrewLog"; }
 
     bool setup() override {
-        Serial.println("[BrewLog] Initialized");
+        DEBUG_PRINTLN("[BrewLog] Initialized");
         return true;
     }
 
@@ -68,13 +68,13 @@ public:
         gState.brewLogStartTime = _startTime;
         gState.brewLogEntries = 0;
         
-        Serial.println("[BrewLog] Started recording");
+        DEBUG_PRINTLN("[BrewLog] Started recording");
     }
 
     void stop() {
         _logging = false;
         gState.brewLogActive = false;
-        Serial.printf("[BrewLog] Stopped. %d entries recorded\n", _entries.size());
+        DEBUG_PRINTF("[BrewLog] Stopped. %d entries recorded\n", _entries.size());
     }
 
     bool isLogging() const { return _logging; }
