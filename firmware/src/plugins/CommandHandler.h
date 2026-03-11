@@ -16,6 +16,8 @@
 #include "RampPlugin.h"
 #include "BrewLogPlugin.h"
 #include "BoilTimerPlugin.h"
+#include "RTCPlugin.h"
+#include "TimerPlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -26,7 +28,8 @@ public:
     void init(BLEPlugin* ble, SDCardPlugin* sd, RecipePlugin* recipe, PIDPlugin* pid,
               WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr,
               RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr,
-              BoilTimerPlugin* boilTimer = nullptr) {
+              BoilTimerPlugin* boilTimer = nullptr, RTCPlugin* rtc = nullptr,
+              TimerPlugin* timer = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
@@ -36,6 +39,8 @@ public:
         _ramp = ramp;
         _brewLog = brewLog;
         _boilTimer = boilTimer;
+        _rtc = rtc;
+        _timer = timer;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             JsonDocument doc;
@@ -415,6 +420,88 @@ public:
             gState.mashOutTemp = temp;
             sendOk(rid);
         }
+        // ── RTC: Get ────────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_RTC_GET) == 0) {
+            JsonDocument res;
+            res[Protocol::FIELD_TYPE] = Protocol::EVT_RTC_STATUS;
+            res[Protocol::FIELD_REQUEST_ID] = rid;
+            res["avail"] = gState.rtcAvailable;
+            res["ts"] = gState.rtcTimestamp;
+            res["ntp"] = gState.rtcNtpSynced;
+            if (_rtc && _rtc->isAvailable()) {
+                res["time"] = _rtc->getTimeString();
+                res["date"] = _rtc->getDateString();
+            }
+            _ble->sendJson(res);
+        }
+        // ── RTC: Set ────────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_RTC_SET) == 0) {
+            if (!_rtc) { sendError(rid, "RTC not available"); return; }
+            
+            // Accept either unix timestamp or ISO string
+            if (doc["ts"].is<uint32_t>()) {
+                uint32_t ts = doc["ts"] | 0;
+                _rtc->setTime(ts);
+                sendOk(rid);
+            } else if (doc["iso"].is<const char*>()) {
+                const char* iso = doc["iso"] | "";
+                _rtc->setTimeFromISO(iso);
+                sendOk(rid);
+            } else {
+                sendError(rid, "Provide ts or iso");
+            }
+        }
+        // ── RTC: Sync NTP ───────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_RTC_SYNC) == 0) {
+            if (!_rtc) { sendError(rid, "RTC not available"); return; }
+            if (!gState.wifiConnected) { sendError(rid, "WiFi not connected"); return; }
+            _rtc->syncNTP();
+            sendOk(rid);
+        }
+        // ── Timer: Start ────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_TIMER_START) == 0) {
+            if (!_timer) { sendError(rid, "Timer not available"); return; }
+            
+            // Accept seconds or minutes
+            if (doc["sec"].is<uint32_t>()) {
+                uint32_t sec = doc["sec"] | 0;
+                if (sec == 0) { sendError(rid, "Duration must be > 0"); return; }
+                _timer->start(sec);
+                sendOk(rid);
+            } else if (doc["min"].is<uint32_t>()) {
+                uint32_t min = doc["min"] | 0;
+                if (min == 0) { sendError(rid, "Duration must be > 0"); return; }
+                _timer->startMinutes(min);
+                sendOk(rid);
+            } else {
+                sendError(rid, "Provide sec or min");
+            }
+        }
+        // ── Timer: Stop ─────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_TIMER_STOP) == 0) {
+            if (!_timer) { sendError(rid, "Timer not available"); return; }
+            _timer->stop();
+            sendOk(rid);
+        }
+        // ── Timer: Pause ────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_TIMER_PAUSE) == 0) {
+            if (!_timer) { sendError(rid, "Timer not available"); return; }
+            _timer->pause();
+            sendOk(rid);
+        }
+        // ── Timer: Resume ───────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_TIMER_RESUME) == 0) {
+            if (!_timer) { sendError(rid, "Timer not available"); return; }
+            _timer->resume();
+            sendOk(rid);
+        }
+        // ── Timer: Add Time ─────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_TIMER_ADD) == 0) {
+            if (!_timer) { sendError(rid, "Timer not available"); return; }
+            int32_t sec = doc["sec"] | 0;
+            _timer->addTime(sec);
+            sendOk(rid);
+        }
         else {
             sendError(rid, "Unknown command");
         }
@@ -430,6 +517,8 @@ private:
     RampPlugin* _ramp = nullptr;
     BrewLogPlugin* _brewLog = nullptr;
     BoilTimerPlugin* _boilTimer = nullptr;
+    RTCPlugin* _rtc = nullptr;
+    TimerPlugin* _timer = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;

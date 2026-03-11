@@ -250,6 +250,21 @@ private:
             doc["mot"] = round2(gState.mashOutTemp);
         }
 
+        // RTC info
+        if (gState.rtcAvailable) {
+            doc["rtca"] = true;
+            doc["rtct"] = gState.rtcTimestamp;
+            doc["rtcn"] = gState.rtcNtpSynced;
+        }
+
+        // Timer info (generic countdown timer)
+        if (gState.timerActive) {
+            doc["ta"] = true;
+            doc["tp"] = gState.timerPaused;
+            doc["tt"] = gState.timerTotal;
+            doc["tr"] = gState.timerRemaining;
+        }
+
         sendJson(doc);
     }
 

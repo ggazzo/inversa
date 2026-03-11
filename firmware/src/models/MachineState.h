@@ -91,6 +91,17 @@ struct MachineState {
     // Mash-Out
     bool     mashOutEnabled     = false;
     float    mashOutTemp        = 76.0f;  // Default mash-out temperature
+
+    // RTC
+    bool     rtcAvailable       = false;
+    uint32_t rtcTimestamp       = 0;      // Current unix timestamp
+    bool     rtcNtpSynced       = false;
+
+    // Timer (generic countdown timer, independent from recipe timer)
+    bool     timerActive        = false;
+    bool     timerPaused        = false;
+    uint32_t timerTotal         = 0;      // Total duration in seconds
+    uint32_t timerRemaining     = 0;      // Remaining time in seconds
 };
 
 // Global state — accessible by all plugins
