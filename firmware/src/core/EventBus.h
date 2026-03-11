@@ -22,6 +22,13 @@ enum class EventType : uint8_t {
     RampedSetpointChanged,  // float: current ramped setpoint
     RampCompleted,          // float: final temperature reached
 
+    // Boil Timer
+    BoilStarted,
+    BoilPaused,
+    BoilResumed,
+    BoilCompleted,
+    BoilAdditionAlert,      // string: addition name
+
     // Pump
     PumpStateChanged,       // bool: on/off
 

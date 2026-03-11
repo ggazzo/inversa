@@ -21,6 +21,7 @@
 #include "plugins/OTAPlugin.h"
 #include "plugins/RampPlugin.h"
 #include "plugins/BrewLogPlugin.h"
+#include "plugins/BoilTimerPlugin.h"
 #include "plugins/CommandHandler.h"
 
 // ─── Global State ───────────────────────────────────────────
@@ -55,8 +56,9 @@ void setup() {
     auto* ble     = pm.add<BLEPlugin>();
     auto* wifi    = pm.add<WiFiPlugin>(gState);
     auto* ota     = pm.add<OTAPlugin>(gState, *wifi);
-    auto* ramp    = pm.add<RampPlugin>();
-    auto* brewLog = pm.add<BrewLogPlugin>();
+    auto* ramp      = pm.add<RampPlugin>();
+    auto* brewLog   = pm.add<BrewLogPlugin>();
+    auto* boilTimer = pm.add<BoilTimerPlugin>();
 
     // Initialize all plugins
     pm.setup();
@@ -65,7 +67,7 @@ void setup() {
     RecoveryManager::instance().init(sd);
 
     // Wire up command handler (routes BLE commands to plugins)
-    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog);
+    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer);
 
     // Check for power loss recovery
     if (RecoveryManager::instance().hasValidRecovery()) {

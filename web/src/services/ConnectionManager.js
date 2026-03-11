@@ -8,7 +8,9 @@ import {
   rampActive, rampRate, rampTarget, rampCurrent,
   brewLogActive, brewLogEntries, brewLogData,
   notificationsEnabled, notifyOnTempReached, notifyOnStepComplete,
-  targetTemp, currentTemp
+  targetTemp, currentTemp,
+  boilActive, boilTotal, boilRemaining, boilAlerts,
+  mashOutEnabled, mashOutTemp
 } from '../stores/state';
 
 class ConnectionManagerClass {
@@ -203,6 +205,32 @@ class ConnectionManagerClass {
     return BLEService.request('req:log:export', { fmt: format, chunk: chunkIndex });
   }
 
+  // Boil Timer
+  async startBoil(minutes, additions = []) {
+    return BLEService.request('req:boil:start', { min: minutes, additions });
+  }
+
+  async stopBoil() {
+    return BLEService.request('req:boil:stop');
+  }
+
+  async pauseBoil() {
+    return BLEService.request('req:boil:pause');
+  }
+
+  async resumeBoil() {
+    return BLEService.request('req:boil:resume');
+  }
+
+  async addBoilAddition(minutes, name) {
+    return BLEService.request('req:boil:add', { min: minutes, name });
+  }
+
+  // Mash-Out
+  async setMashOut(enabled, temp = 76.0) {
+    return BLEService.request('req:mashout:set', { enabled, temp });
+  }
+
   _handleMessage(data) {
     switch (data.tp) {
       case 'evt:status':
@@ -281,6 +309,31 @@ class ConnectionManagerClass {
         if (data.data) {
           brewLogData.value = [...brewLogData.value, data.data];
         }
+        break;
+
+      case 'evt:boil:status':
+        if (data.st === 'started') {
+          boilActive.value = true;
+          showToast('Fervura iniciada', 'success');
+        } else if (data.st === 'stopped' || data.st === 'complete') {
+          boilActive.value = false;
+          if (data.st === 'complete') {
+            showToast('Fervura completa!', 'success');
+            this._sendNotification('Fervura Completa', 'O tempo de fervura acabou');
+          }
+        } else if (data.st === 'paused') {
+          showToast('Fervura pausada', 'info');
+        } else if (data.st === 'resumed') {
+          showToast('Fervura retomada', 'info');
+        }
+        if (data.rem !== undefined) boilRemaining.value = data.rem;
+        if (data.total !== undefined) boilTotal.value = data.total;
+        break;
+
+      case 'evt:boil:addition':
+        boilAlerts.value = [...boilAlerts.value, { name: data.name, min: data.min, time: new Date() }];
+        showToast(`Adicionar: ${data.name} (${data.min} min)`, 'warning', 10000);
+        this._sendNotification('Adição de Lúpulo', `Adicionar ${data.name} agora! (${data.min} min)`);
         break;
     }
 
