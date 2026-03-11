@@ -102,6 +102,11 @@ struct MachineState {
     bool     timerPaused        = false;
     uint32_t timerTotal         = 0;      // Total duration in seconds
     uint32_t timerRemaining     = 0;      // Remaining time in seconds
+
+    // Auto-Tune
+    bool     autoTuneActive     = false;
+    uint8_t  autoTuneProgress   = 0;      // Progress percentage (0-100)
+    String   autoTuneStatus     = "";     // Status message
 };
 
 // Global state — accessible by all plugins

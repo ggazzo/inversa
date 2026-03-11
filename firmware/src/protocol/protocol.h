@@ -113,6 +113,10 @@ namespace Protocol {
     constexpr const char* EVT_TIMER_STATUS    = "evt:timer:status"; // Timer status update
     constexpr const char* EVT_TIMER_COMPLETE  = "evt:timer:complete"; // Timer finished
 
+    // Auto-Tune Events (device → app)
+    constexpr const char* EVT_AUTOTUNE_STATUS = "evt:autotune:status"; // Progress/status
+    constexpr const char* EVT_AUTOTUNE_RESULT = "evt:autotune:result"; // Final Kp, Ki, Kd
+
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";
     constexpr const char* RES_ERROR         = "res:error";

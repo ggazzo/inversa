@@ -18,6 +18,7 @@
 #include "BoilTimerPlugin.h"
 #include "RTCPlugin.h"
 #include "TimerPlugin.h"
+#include "AutoTunePlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -29,7 +30,7 @@ public:
               WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr,
               RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr,
               BoilTimerPlugin* boilTimer = nullptr, RTCPlugin* rtc = nullptr,
-              TimerPlugin* timer = nullptr) {
+              TimerPlugin* timer = nullptr, AutoTunePlugin* autoTune = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
@@ -41,6 +42,7 @@ public:
         _boilTimer = boilTimer;
         _rtc = rtc;
         _timer = timer;
+        _autoTune = autoTune;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             JsonDocument doc;
@@ -502,6 +504,26 @@ public:
             _timer->addTime(sec);
             sendOk(rid);
         }
+        // ── Auto-Tune: Start ────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_AUTOTUNE_START) == 0) {
+            if (!_autoTune) { sendError(rid, "AutoTune not available"); return; }
+            if (_autoTune->isRunning()) { sendError(rid, "AutoTune already running"); return; }
+            
+            float setpoint = doc["temp"] | 65.0f;  // Default target 65°C
+            if (setpoint < 30.0f || setpoint > 100.0f) {
+                sendError(rid, "Temp must be 30-100C");
+                return;
+            }
+            
+            _autoTune->start(setpoint);
+            sendOk(rid);
+        }
+        // ── Auto-Tune: Stop ─────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_AUTOTUNE_STOP) == 0) {
+            if (!_autoTune) { sendError(rid, "AutoTune not available"); return; }
+            _autoTune->stop();
+            sendOk(rid);
+        }
         else {
             sendError(rid, "Unknown command");
         }
@@ -519,6 +541,7 @@ private:
     BoilTimerPlugin* _boilTimer = nullptr;
     RTCPlugin* _rtc = nullptr;
     TimerPlugin* _timer = nullptr;
+    AutoTunePlugin* _autoTune = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;
