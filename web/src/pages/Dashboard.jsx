@@ -6,6 +6,7 @@ import {
   mode, modeLabel, isRecipeRunning, recipeName, recipeStep,
   recipeTotalSteps, recipeState, formattedTimer, isConnected,
   tempSensorOk, safetyShutoff, hasRecovery, recoveryRecipeName, showToast,
+  brewingStepName,
 } from '../stores/state';
 
 export function Dashboard() {
@@ -165,7 +166,12 @@ export function Dashboard() {
       {connected && isRecipeRunning.value && (
         <div class="card bg-base-100 shadow-md">
           <div class="card-body p-4">
-            <div class="text-xs uppercase text-base-content/50 font-medium mb-2">Receita</div>
+            <div class="flex items-center justify-between mb-2">
+              <div class="text-xs uppercase text-base-content/50 font-medium">Receita</div>
+              {brewingStepName.value && (
+                <div class="badge badge-primary badge-sm">{brewingStepName.value}</div>
+              )}
+            </div>
             <div class="flex items-center justify-between">
               <div>
                 <div class="font-semibold">{recipeName.value || 'Sem nome'}</div>

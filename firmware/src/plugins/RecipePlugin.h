@@ -37,6 +37,9 @@ enum class RecipeCommandType : uint8_t {
     WaitConfirm,    // WAIT_CONFIRM ["message"]
     WaitBoil,       // WAIT_BOIL - wait for boil timer to complete
     
+    // UI/Visualization
+    Step,           // STEP <name> - set brewing step for UI display
+    
     // Other
     Comment,        // # comment line (ignored)
     Unknown
@@ -370,6 +373,33 @@ private:
                 cmd.message = "Confirmar para continuar";
             }
         }
+        // UI Step
+        else if (upper.startsWith("STEP")) {
+            cmd.type = RecipeCommandType::Step;
+            cmd.message = extractQuotedString(line, 4);
+            // Try to match known step names
+            String stepUpper = cmd.message;
+            stepUpper.toUpperCase();
+            if (stepUpper == "PRE_HEATING" || stepUpper == "PREHEATING" || stepUpper == "PRE-AQUECIMENTO") {
+                cmd.value = (float)BrewingStep::PreHeating;
+            } else if (stepUpper == "MASHING" || stepUpper == "MOSTURA") {
+                cmd.value = (float)BrewingStep::Mashing;
+            } else if (stepUpper == "MASH_OUT" || stepUpper == "MASHOUT" || stepUpper == "MASH-OUT") {
+                cmd.value = (float)BrewingStep::MashOut;
+            } else if (stepUpper == "SPARGE" || stepUpper == "LAVAGEM") {
+                cmd.value = (float)BrewingStep::Sparge;
+            } else if (stepUpper == "BOILING" || stepUpper == "BOIL" || stepUpper == "FERVURA") {
+                cmd.value = (float)BrewingStep::Boiling;
+            } else if (stepUpper == "HOPPING" || stepUpper == "LUPULAGEM") {
+                cmd.value = (float)BrewingStep::Hopping;
+            } else if (stepUpper == "COOLING" || stepUpper == "RESFRIAMENTO") {
+                cmd.value = (float)BrewingStep::Cooling;
+            } else if (stepUpper == "DONE" || stepUpper == "CONCLUIDO") {
+                cmd.value = (float)BrewingStep::Done;
+            } else {
+                cmd.value = 0;  // Custom step - use message
+            }
+        }
         else {
             cmd.type = RecipeCommandType::Unknown;
             DEBUG_PRINTF("[Recipe] Unknown command: %s\n", line.c_str());
@@ -540,6 +570,19 @@ private:
                 gState.confirmMessage = cmd.message;
                 bus().publish(EventType::RecipeWaitConfirm, cmd.message);
                 DEBUG_PRINTF("[Recipe] WAIT_CONFIRM: %s\n", cmd.message.c_str());
+                break;
+
+            // ── UI Step ─────────────────────────────────────
+            case RecipeCommandType::Step:
+                if (cmd.value > 0) {
+                    gState.brewingStep = (BrewingStep)(int)cmd.value;
+                    gState.brewingStepCustom = "";
+                } else {
+                    gState.brewingStep = BrewingStep::None;
+                    gState.brewingStepCustom = cmd.message;
+                }
+                DEBUG_PRINTF("[Recipe] STEP: %s\n", cmd.message.c_str());
+                advanceStep();
                 break;
 
             default:

@@ -21,6 +21,35 @@ enum class RecipeState : uint8_t {
     Completed
 };
 
+// ─── Brewing Step (for UI visualization) ────────────────────
+// Represents the current phase in the brewing process
+enum class BrewingStep : uint8_t {
+    None        = 0,    // No active step
+    PreHeating  = 1,    // Pre-heating water
+    Mashing     = 2,    // Mashing (starch conversion)
+    MashOut     = 3,    // Mash-out (stop enzyme activity)
+    Sparge      = 4,    // Sparging (grain rinse)
+    Boiling     = 5,    // Boiling wort
+    Hopping     = 6,    // Adding hops
+    Cooling     = 7,    // Cooling wort
+    Done        = 8     // Process complete
+};
+
+// Step names for display (Portuguese)
+inline const char* getStepName(BrewingStep step) {
+    switch (step) {
+        case BrewingStep::PreHeating: return "Pre-aquecimento";
+        case BrewingStep::Mashing:    return "Mostura";
+        case BrewingStep::MashOut:    return "Mash-out";
+        case BrewingStep::Sparge:     return "Lavagem";
+        case BrewingStep::Boiling:    return "Fervura";
+        case BrewingStep::Hopping:    return "Lupulagem";
+        case BrewingStep::Cooling:    return "Resfriamento";
+        case BrewingStep::Done:       return "Concluido";
+        default:                      return "";
+    }
+}
+
 // ─── Machine State ──────────────────────────────────────────
 struct MachineState {
     // Temperature
@@ -119,6 +148,17 @@ struct MachineState {
     bool     autoTuneActive     = false;
     uint8_t  autoTuneProgress   = 0;      // Progress percentage (0-100)
     String   autoTuneStatus     = "";     // Status message
+
+    // Brewing Step (for UI visualization)
+    BrewingStep brewingStep     = BrewingStep::None;
+    String   brewingStepCustom  = "";     // Custom step name (from STEP command)
+
+    // Thermal parameters (for heat loss calculation)
+    float    volumeLiters       = 20.0f;  // Water/wort volume
+    float    heaterPowerWatts   = 3000.0f; // Heater power
+    float    ambientTemp        = 25.0f;  // Ambient temperature
+    float    vesselDiameter     = 0.35f;  // Vessel diameter in meters (~35cm)
+    float    heatLossCoeff      = 10.0f;  // Heat transfer coefficient (W/m²K)
 };
 
 // Global state — accessible by all plugins

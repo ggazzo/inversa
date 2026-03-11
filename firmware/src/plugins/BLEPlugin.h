@@ -286,6 +286,14 @@ private:
             doc["atp"] = gState.autoTuneProgress;
         }
 
+        // Brewing step (for UI)
+        if (gState.brewingStep != BrewingStep::None || !gState.brewingStepCustom.isEmpty()) {
+            doc["bs"] = (int)gState.brewingStep;
+            if (!gState.brewingStepCustom.isEmpty()) {
+                doc["bsc"] = gState.brewingStepCustom;
+            }
+        }
+
         sendJson(doc);
     }
 

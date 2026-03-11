@@ -86,6 +86,28 @@ export const schedulerStatus = signal('');
 export const autoTuneActive = signal(false);
 export const autoTuneProgress = signal(0);
 
+// ─── Brewing Step (UI visualization) ────────────────────────
+export const brewingStep = signal(0);
+export const brewingStepCustom = signal('');
+
+// Step names mapping
+const STEP_NAMES = {
+  0: '',
+  1: 'Pre-aquecimento',
+  2: 'Mostura',
+  3: 'Mash-out',
+  4: 'Lavagem',
+  5: 'Fervura',
+  6: 'Lupulagem',
+  7: 'Resfriamento',
+  8: 'Concluido'
+};
+
+export const brewingStepName = computed(() => {
+  if (brewingStepCustom.value) return brewingStepCustom.value;
+  return STEP_NAMES[brewingStep.value] || '';
+});
+
 // ─── Recipe State ───────────────────────────────────────────
 export const recipeName = signal('');
 export const recipeStep = signal(0);
@@ -235,6 +257,10 @@ export function updateFromTelemetry(data) {
   // Auto-Tune state
   if (data.ata !== undefined) autoTuneActive.value = data.ata;
   if (data.atp !== undefined) autoTuneProgress.value = data.atp;
+
+  // Brewing step
+  if (data.bs !== undefined) brewingStep.value = data.bs;
+  if (data.bsc !== undefined) brewingStepCustom.value = data.bsc;
 
   // Add to history
   addTelemetryPoint(

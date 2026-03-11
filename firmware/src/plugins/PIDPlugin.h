@@ -4,6 +4,7 @@
 #include "../core/Plugin.h"
 #include "../core/constants.h"
 #include "../core/NVSStorage.h"
+#include "../core/ThermalCalc.h"
 #include "../models/MachineState.h"
 
 class PIDPlugin : public Plugin {
@@ -84,8 +85,20 @@ public:
         float dInput = (_input - _lastInput) / (elapsed / 1000.0f);
         float dTerm = -_kd * dInput;
 
-        // Output
-        _output = constrain(pTerm + _integral + dTerm, _outputMin, _outputMax);
+        // Feed-forward: compensate for heat loss
+        float ffTerm = 0;
+        if (_feedForwardEnabled && _setpoint > gState.ambientTemp) {
+            float surfaceArea = ThermalCalc::cylinderSurfaceArea(
+                gState.volumeLiters, gState.vesselDiameter);
+            float ffOutput = ThermalCalc::calculateFeedForward(
+                _setpoint, _input, gState.heaterPowerWatts,
+                gState.volumeLiters, gState.ambientTemp, surfaceArea,
+                gState.heatLossCoeff);
+            ffTerm = ffOutput * _outputMax;
+        }
+
+        // Output = PID + Feed-forward
+        _output = constrain(pTerm + _integral + dTerm + ffTerm, _outputMin, _outputMax);
 
         _lastInput = _input;
         _lastCompute = now;
@@ -119,6 +132,10 @@ public:
     float getOutput() const { return _output; }
     float getSetpoint() const { return _setpoint; }
 
+    // Enable/disable feed-forward
+    void setFeedForward(bool enabled) { _feedForwardEnabled = enabled; }
+    bool isFeedForwardEnabled() const { return _feedForwardEnabled; }
+
 private:
     float _kp = 0, _ki = 0, _kd = 0;
     float _setpoint = 0;
@@ -129,4 +146,5 @@ private:
     float _outputMin = 0, _outputMax = 255;
     uint32_t _sampleTime = 1000;
     uint32_t _lastCompute = 0;
+    bool _feedForwardEnabled = true;  // Enable by default
 };
