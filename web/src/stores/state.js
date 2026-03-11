@@ -60,6 +60,32 @@ export const boilAlerts = signal([]);     // Triggered alerts
 export const mashOutEnabled = signal(false);
 export const mashOutTemp = signal(76.0);
 
+// ─── RTC State ──────────────────────────────────────────────
+export const rtcAvailable = signal(false);
+export const rtcTimestamp = signal(0);
+export const rtcNtpSynced = signal(false);
+
+// ─── Timer State (generic countdown/alarm) ──────────────────
+export const timerActive = signal(false);
+export const timerPaused = signal(false);
+export const timerTotal = signal(0);       // Total seconds
+export const timerRemaining = signal(0);   // Remaining seconds
+export const timerMode = signal(0);        // 0=relative, 1=absolute
+export const timerAlarmHour = signal(0);   // Alarm hour (absolute mode)
+export const timerAlarmMinute = signal(0); // Alarm minute (absolute mode)
+
+// ─── Scheduler State ("be ready at HH:MM") ──────────────────
+export const schedulerActive = signal(false);
+export const schedulerTargetHour = signal(0);
+export const schedulerTargetMinute = signal(0);
+export const schedulerTargetTemp = signal(0);
+export const schedulerVolume = signal(0);
+export const schedulerStatus = signal('');
+
+// ─── Auto-Tune State ────────────────────────────────────────
+export const autoTuneActive = signal(false);
+export const autoTuneProgress = signal(0);
+
 // ─── Recipe State ───────────────────────────────────────────
 export const recipeName = signal('');
 export const recipeStep = signal(0);
@@ -122,6 +148,32 @@ export const formattedTimer = computed(() => {
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 });
 
+// Format timer remaining as HH:MM:SS or MM:SS
+export const formattedTimerRemaining = computed(() => {
+  const secs = timerRemaining.value;
+  if (secs <= 0) return '00:00';
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+});
+
+// Format RTC time from timestamp
+export const formattedRtcTime = computed(() => {
+  if (!rtcAvailable.value || rtcTimestamp.value === 0) return '--:--';
+  const d = new Date(rtcTimestamp.value * 1000);
+  return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+});
+
+// Format scheduler target time
+export const formattedSchedulerTarget = computed(() => {
+  if (!schedulerActive.value) return '--:--';
+  return `${String(schedulerTargetHour.value).padStart(2, '0')}:${String(schedulerTargetMinute.value).padStart(2, '0')}`;
+});
+
 // ─── Update from telemetry event ────────────────────────────
 export function updateFromTelemetry(data) {
   if (data.ct !== undefined) currentTemp.value = data.ct;
@@ -157,6 +209,32 @@ export function updateFromTelemetry(data) {
   // Mash-Out state
   if (data.moe !== undefined) mashOutEnabled.value = data.moe;
   if (data.mot !== undefined) mashOutTemp.value = data.mot;
+
+  // RTC state
+  if (data.rtca !== undefined) rtcAvailable.value = data.rtca;
+  if (data.rtct !== undefined) rtcTimestamp.value = data.rtct;
+  if (data.rtcn !== undefined) rtcNtpSynced.value = data.rtcn;
+
+  // Timer state
+  if (data.ta !== undefined) timerActive.value = data.ta;
+  if (data.tp !== undefined) timerPaused.value = data.tp;
+  if (data.tt !== undefined) timerTotal.value = data.tt;
+  if (data.tr !== undefined) timerRemaining.value = data.tr;
+  if (data.tm !== undefined) timerMode.value = data.tm;
+  if (data.tah !== undefined) timerAlarmHour.value = data.tah;
+  if (data.tam !== undefined) timerAlarmMinute.value = data.tam;
+
+  // Scheduler state
+  if (data.sa !== undefined) schedulerActive.value = data.sa;
+  if (data.sth !== undefined) schedulerTargetHour.value = data.sth;
+  if (data.stm !== undefined) schedulerTargetMinute.value = data.stm;
+  if (data.stt !== undefined) schedulerTargetTemp.value = data.stt;
+  if (data.sv !== undefined) schedulerVolume.value = data.sv;
+  if (data.ss !== undefined) schedulerStatus.value = data.ss;
+
+  // Auto-Tune state
+  if (data.ata !== undefined) autoTuneActive.value = data.ata;
+  if (data.atp !== undefined) autoTuneProgress.value = data.atp;
 
   // Add to history
   addTelemetryPoint(

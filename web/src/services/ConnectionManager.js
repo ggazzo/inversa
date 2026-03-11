@@ -10,7 +10,10 @@ import {
   notificationsEnabled, notifyOnTempReached, notifyOnStepComplete,
   targetTemp, currentTemp,
   boilActive, boilTotal, boilRemaining, boilAlerts,
-  mashOutEnabled, mashOutTemp
+  mashOutEnabled, mashOutTemp,
+  timerActive, timerRemaining,
+  schedulerActive, schedulerStatus,
+  autoTuneActive, autoTuneProgress
 } from '../stores/state';
 
 class ConnectionManagerClass {
@@ -231,6 +234,67 @@ class ConnectionManagerClass {
     return BLEService.request('req:mashout:set', { enabled, temp });
   }
 
+  // RTC
+  async getRtcTime() {
+    return BLEService.request('req:rtc:get');
+  }
+
+  async setRtcTime(timestamp) {
+    return BLEService.request('req:rtc:set', { ts: timestamp });
+  }
+
+  async syncRtcNtp() {
+    return BLEService.request('req:rtc:sync');
+  }
+
+  // Timer (relative countdown)
+  async startTimer(seconds) {
+    return BLEService.request('req:timer:start', { sec: seconds });
+  }
+
+  async startTimerMinutes(minutes) {
+    return BLEService.request('req:timer:start', { min: minutes });
+  }
+
+  // Timer (absolute alarm at HH:MM)
+  async setTimerAlarm(hour, minute) {
+    return BLEService.request('req:timer:alarm', { hour, min: minute });
+  }
+
+  async stopTimer() {
+    return BLEService.request('req:timer:stop');
+  }
+
+  async pauseTimer() {
+    return BLEService.request('req:timer:pause');
+  }
+
+  async resumeTimer() {
+    return BLEService.request('req:timer:resume');
+  }
+
+  async addTimerTime(seconds) {
+    return BLEService.request('req:timer:add', { sec: seconds });
+  }
+
+  // Scheduler ("be ready at HH:MM")
+  async setScheduler(hour, minute, temp, volume) {
+    return BLEService.request('req:sched:set', { hour, min: minute, temp, vol: volume });
+  }
+
+  async stopScheduler() {
+    return BLEService.request('req:sched:stop');
+  }
+
+  // Auto-Tune
+  async startAutoTune(targetTemp = 65) {
+    return BLEService.request('req:autotune:start', { temp: targetTemp });
+  }
+
+  async stopAutoTune() {
+    return BLEService.request('req:autotune:stop');
+  }
+
   _handleMessage(data) {
     switch (data.tp) {
       case 'evt:status':
@@ -334,6 +398,44 @@ class ConnectionManagerClass {
         boilAlerts.value = [...boilAlerts.value, { name: data.name, min: data.min, time: new Date() }];
         showToast(`Adicionar: ${data.name} (${data.min} min)`, 'warning', 10000);
         this._sendNotification('Adição de Lúpulo', `Adicionar ${data.name} agora! (${data.min} min)`);
+        break;
+
+      case 'evt:timer:status':
+        if (data.rem !== undefined) timerRemaining.value = data.rem;
+        break;
+
+      case 'evt:timer:complete':
+        timerActive.value = false;
+        showToast('Timer concluído!', 'success');
+        this._sendNotification('Timer Concluído', 'O timer terminou');
+        break;
+
+      case 'evt:sched:status':
+        if (data.status !== undefined) schedulerStatus.value = data.status;
+        break;
+
+      case 'evt:sched:starting':
+        showToast('Agendamento: Aquecimento iniciado', 'info');
+        this._sendNotification('Agendamento', 'Aquecimento iniciado automaticamente');
+        break;
+
+      case 'evt:sched:ready':
+        schedulerActive.value = false;
+        showToast('Agendamento: Pronto!', 'success');
+        this._sendNotification('Pronto!', 'A temperatura foi atingida no horário agendado');
+        break;
+
+      case 'evt:autotune:status':
+        if (data.pct !== undefined) autoTuneProgress.value = data.pct;
+        if (data.status !== undefined) {
+          showToast(`Auto-Tune: ${data.status}`, 'info');
+        }
+        break;
+
+      case 'evt:autotune:result':
+        autoTuneActive.value = false;
+        showToast(`Auto-Tune concluído! Kp=${data.kp?.toFixed(2)}, Ki=${data.ki?.toFixed(4)}, Kd=${data.kd?.toFixed(0)}`, 'success', 10000);
+        this._sendNotification('Auto-Tune Concluído', `Novos valores PID calculados`);
         break;
     }
 

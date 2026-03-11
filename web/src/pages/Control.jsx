@@ -3,6 +3,11 @@ import { ConnectionManager } from '../services/ConnectionManager';
 import {
   isConnected, currentTemp, targetTemp, heaterOn, pumpOn,
   mode, showToast,
+  timerActive, timerPaused, timerRemaining, timerMode,
+  timerAlarmHour, timerAlarmMinute, formattedTimerRemaining,
+  schedulerActive, schedulerTargetHour, schedulerTargetMinute,
+  schedulerTargetTemp, schedulerVolume, schedulerStatus,
+  rtcAvailable, formattedRtcTime,
 } from '../stores/state';
 
 export function Control() {
@@ -163,8 +168,319 @@ export function Control() {
               <span class="text-base-content/50">Alvo:</span>
               <span class="font-mono">{targetTemp.value.toFixed(1)}°C</span>
             </div>
+            {rtcAvailable.value && (
+              <div class="flex justify-between col-span-2">
+                <span class="text-base-content/50">Hora:</span>
+                <span class="font-mono">{formattedRtcTime.value}</span>
+              </div>
+            )}
           </div>
         </div>
+      </div>
+
+      {/* Timer */}
+      <TimerCard />
+
+      {/* Scheduler */}
+      <SchedulerCard />
+    </div>
+  );
+}
+
+// ─── Timer Card Component ────────────────────────────────────
+function TimerCard() {
+  const [timerMinutes, setTimerMinutes] = useState(10);
+  const [alarmHour, setAlarmHour] = useState(8);
+  const [alarmMinute, setAlarmMinute] = useState(0);
+  const [timerType, setTimerType] = useState('countdown'); // countdown | alarm
+  const [loading, setLoading] = useState(false);
+
+  async function startTimer() {
+    setLoading(true);
+    try {
+      if (timerType === 'countdown') {
+        await ConnectionManager.startTimerMinutes(timerMinutes);
+        showToast(`Timer: ${timerMinutes} minutos`, 'success');
+      } else {
+        if (!rtcAvailable.value) {
+          showToast('RTC nao disponivel', 'error');
+          return;
+        }
+        await ConnectionManager.setTimerAlarm(alarmHour, alarmMinute);
+        showToast(`Alarme: ${String(alarmHour).padStart(2, '0')}:${String(alarmMinute).padStart(2, '0')}`, 'success');
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function stopTimer() {
+    try {
+      await ConnectionManager.stopTimer();
+      showToast('Timer cancelado', 'info');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  async function togglePause() {
+    try {
+      if (timerPaused.value) {
+        await ConnectionManager.resumeTimer();
+      } else {
+        await ConnectionManager.pauseTimer();
+      }
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  return (
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body p-4">
+        <h3 class="text-sm font-semibold uppercase text-base-content/60 mb-3">Timer</h3>
+
+        {timerActive.value ? (
+          // Active timer display
+          <div>
+            <div class="text-center mb-3">
+              <div class="text-4xl font-mono font-bold">
+                {formattedTimerRemaining.value}
+              </div>
+              <div class="text-xs text-base-content/50 mt-1">
+                {timerMode.value === 1 
+                  ? `Alarme: ${String(timerAlarmHour.value).padStart(2, '0')}:${String(timerAlarmMinute.value).padStart(2, '0')}`
+                  : 'Contagem regressiva'}
+              </div>
+            </div>
+            <div class="flex gap-2">
+              <button
+                class={`btn btn-sm flex-1 ${timerPaused.value ? 'btn-success' : 'btn-warning'}`}
+                onClick={togglePause}
+              >
+                {timerPaused.value ? 'Retomar' : 'Pausar'}
+              </button>
+              <button class="btn btn-sm btn-error flex-1" onClick={stopTimer}>
+                Parar
+              </button>
+            </div>
+          </div>
+        ) : (
+          // Timer setup
+          <div>
+            {/* Timer type selector */}
+            <div class="tabs tabs-boxed mb-3">
+              <button 
+                class={`tab tab-sm flex-1 ${timerType === 'countdown' ? 'tab-active' : ''}`}
+                onClick={() => setTimerType('countdown')}
+              >
+                Contagem
+              </button>
+              <button 
+                class={`tab tab-sm flex-1 ${timerType === 'alarm' ? 'tab-active' : ''}`}
+                onClick={() => setTimerType('alarm')}
+                disabled={!rtcAvailable.value}
+              >
+                Alarme
+              </button>
+            </div>
+
+            {timerType === 'countdown' ? (
+              <div class="flex items-center gap-2 mb-3">
+                <input
+                  type="number"
+                  class="input input-bordered input-sm w-20 font-mono"
+                  value={timerMinutes}
+                  onInput={(e) => setTimerMinutes(parseInt(e.target.value) || 0)}
+                  min="1"
+                  max="999"
+                />
+                <span class="text-sm text-base-content/50">minutos</span>
+              </div>
+            ) : (
+              <div class="flex items-center gap-2 mb-3">
+                <input
+                  type="number"
+                  class="input input-bordered input-sm w-16 font-mono text-center"
+                  value={alarmHour}
+                  onInput={(e) => setAlarmHour(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)))}
+                  min="0"
+                  max="23"
+                />
+                <span class="text-lg font-bold">:</span>
+                <input
+                  type="number"
+                  class="input input-bordered input-sm w-16 font-mono text-center"
+                  value={alarmMinute}
+                  onInput={(e) => setAlarmMinute(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                  min="0"
+                  max="59"
+                />
+              </div>
+            )}
+
+            {/* Quick presets */}
+            {timerType === 'countdown' && (
+              <div class="flex flex-wrap gap-2 mb-3">
+                {[5, 10, 15, 30, 60].map((m) => (
+                  <button
+                    key={m}
+                    class={`btn btn-xs ${timerMinutes === m ? 'btn-primary' : 'btn-ghost'}`}
+                    onClick={() => setTimerMinutes(m)}
+                  >
+                    {m} min
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <button
+              class="btn btn-primary btn-sm w-full"
+              onClick={startTimer}
+              disabled={loading}
+            >
+              {loading ? <span class="loading loading-spinner loading-xs" /> : 'Iniciar Timer'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Scheduler Card Component ────────────────────────────────
+function SchedulerCard() {
+  const [targetHour, setTargetHour] = useState(8);
+  const [targetMinute, setTargetMinute] = useState(0);
+  const [targetTempInput, setTargetTempInput] = useState(65);
+  const [volumeInput, setVolumeInput] = useState(20);
+  const [loading, setLoading] = useState(false);
+
+  async function startScheduler() {
+    if (!rtcAvailable.value) {
+      showToast('RTC nao disponivel', 'error');
+      return;
+    }
+    setLoading(true);
+    try {
+      await ConnectionManager.setScheduler(targetHour, targetMinute, targetTempInput, volumeInput);
+      showToast(`Agendado para ${String(targetHour).padStart(2, '0')}:${String(targetMinute).padStart(2, '0')}`, 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function stopScheduler() {
+    try {
+      await ConnectionManager.stopScheduler();
+      showToast('Agendamento cancelado', 'info');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  if (!rtcAvailable.value) {
+    return null; // Don't show scheduler if RTC not available
+  }
+
+  return (
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body p-4">
+        <h3 class="text-sm font-semibold uppercase text-base-content/60 mb-3">
+          Agendamento
+          <span class="text-xs font-normal text-base-content/40 ml-2">"Pronto as..."</span>
+        </h3>
+
+        {schedulerActive.value ? (
+          // Active scheduler display
+          <div>
+            <div class="text-center mb-3">
+              <div class="text-2xl font-mono font-bold">
+                {String(schedulerTargetHour.value).padStart(2, '0')}:{String(schedulerTargetMinute.value).padStart(2, '0')}
+              </div>
+              <div class="text-sm text-base-content/60 mt-1">
+                {schedulerTargetTemp.value.toFixed(0)}°C - {schedulerVolume.value.toFixed(0)}L
+              </div>
+              <div class="badge badge-info badge-sm mt-2">
+                {schedulerStatus.value}
+              </div>
+            </div>
+            <button class="btn btn-sm btn-error w-full" onClick={stopScheduler}>
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          // Scheduler setup
+          <div>
+            <p class="text-xs text-base-content/50 mb-3">
+              Calcular automaticamente quando iniciar o aquecimento para atingir a temperatura no horario desejado.
+            </p>
+
+            {/* Target time */}
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-sm text-base-content/50 w-16">Horario:</span>
+              <input
+                type="number"
+                class="input input-bordered input-sm w-16 font-mono text-center"
+                value={targetHour}
+                onInput={(e) => setTargetHour(Math.min(23, Math.max(0, parseInt(e.target.value) || 0)))}
+                min="0"
+                max="23"
+              />
+              <span class="text-lg font-bold">:</span>
+              <input
+                type="number"
+                class="input input-bordered input-sm w-16 font-mono text-center"
+                value={targetMinute}
+                onInput={(e) => setTargetMinute(Math.min(59, Math.max(0, parseInt(e.target.value) || 0)))}
+                min="0"
+                max="59"
+              />
+            </div>
+
+            {/* Target temperature */}
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-sm text-base-content/50 w-16">Temp:</span>
+              <input
+                type="number"
+                class="input input-bordered input-sm w-20 font-mono"
+                value={targetTempInput}
+                onInput={(e) => setTargetTempInput(parseFloat(e.target.value) || 0)}
+                min="20"
+                max="100"
+                step="0.5"
+              />
+              <span class="text-sm text-base-content/50">°C</span>
+            </div>
+
+            {/* Volume */}
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-sm text-base-content/50 w-16">Volume:</span>
+              <input
+                type="number"
+                class="input input-bordered input-sm w-20 font-mono"
+                value={volumeInput}
+                onInput={(e) => setVolumeInput(parseFloat(e.target.value) || 0)}
+                min="1"
+                max="100"
+                step="1"
+              />
+              <span class="text-sm text-base-content/50">litros</span>
+            </div>
+
+            <button
+              class="btn btn-primary btn-sm w-full"
+              onClick={startScheduler}
+              disabled={loading}
+            >
+              {loading ? <span class="loading loading-spinner loading-xs" /> : 'Agendar'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

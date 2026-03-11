@@ -8,6 +8,8 @@ import {
   brewLogActive, brewLogEntries, brewLogData,
   notificationsEnabled, notifyOnTempReached, notifyOnStepComplete,
   mashOutEnabled, mashOutTemp,
+  autoTuneActive, autoTuneProgress,
+  rtcAvailable, rtcNtpSynced, formattedRtcTime,
 } from '../stores/state';
 
 export function Settings() {
@@ -628,6 +630,9 @@ export function Settings() {
         </div>
       </div>
 
+      {/* Auto-Tune */}
+      <AutoTuneCard />
+
       {/* Device Info */}
       <div class="card bg-base-100 shadow-md">
         <div class="card-body p-4">
@@ -701,4 +706,105 @@ function formatUptime(seconds) {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
+}
+
+// ─── Auto-Tune Card Component ────────────────────────────────
+function AutoTuneCard() {
+  const [targetTemp, setTargetTemp] = useState(65);
+  const [loading, setLoading] = useState(false);
+
+  async function startAutoTune() {
+    if (!confirm('Iniciar Auto-Tune? O processo leva alguns minutos e vai ligar/desligar o aquecedor automaticamente.')) {
+      return;
+    }
+    setLoading(true);
+    try {
+      await ConnectionManager.startAutoTune(targetTemp);
+      showToast('Auto-Tune iniciado', 'success');
+    } catch (e) {
+      showToast(e.message, 'error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function stopAutoTune() {
+    try {
+      await ConnectionManager.stopAutoTune();
+      showToast('Auto-Tune cancelado', 'info');
+    } catch (e) {
+      showToast(e.message, 'error');
+    }
+  }
+
+  return (
+    <div class="card bg-base-100 shadow-md">
+      <div class="card-body p-4">
+        <h3 class="text-sm font-semibold uppercase text-base-content/60 mb-3">Auto-Tune PID</h3>
+
+        <p class="text-xs text-base-content/50 mb-3">
+          Calcula automaticamente os parametros PID usando o metodo de relay feedback (Ziegler-Nichols).
+          O processo oscila a temperatura em torno do setpoint para medir a resposta do sistema.
+        </p>
+
+        {autoTuneActive.value ? (
+          // Auto-Tune in progress
+          <div>
+            <div class="mb-3">
+              <div class="flex justify-between text-sm mb-1">
+                <span>Progresso</span>
+                <span>{autoTuneProgress.value}%</span>
+              </div>
+              <progress 
+                class="progress progress-primary w-full" 
+                value={autoTuneProgress.value} 
+                max="100" 
+              />
+            </div>
+            <div class="alert alert-warning py-2 mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span class="text-xs">Nao interrompa o processo. Aguarde a conclusao.</span>
+            </div>
+            <button class="btn btn-error btn-sm w-full" onClick={stopAutoTune}>
+              Cancelar
+            </button>
+          </div>
+        ) : (
+          // Auto-Tune setup
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-sm text-base-content/50">Temp. alvo:</span>
+              <input
+                type="number"
+                class="input input-bordered input-sm w-20 font-mono"
+                value={targetTemp}
+                onInput={(e) => setTargetTemp(parseFloat(e.target.value) || 65)}
+                min="30"
+                max="100"
+                step="1"
+              />
+              <span class="text-sm text-base-content/50">°C</span>
+            </div>
+
+            <div class="alert alert-info py-2 mb-3">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span class="text-xs">Use uma temperatura proxima a que voce normalmente usa na mostura (ex: 65°C).</span>
+            </div>
+
+            <button
+              class="btn btn-warning btn-sm w-full"
+              onClick={startAutoTune}
+              disabled={loading}
+            >
+              {loading ? <span class="loading loading-spinner loading-xs" /> : 'Iniciar Auto-Tune'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
