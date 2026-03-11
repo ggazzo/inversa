@@ -49,11 +49,92 @@ Inversa is a complete system for brewing automation, featuring ESP32 firmware an
 ### Required Components
 
 - ESP32-S3 Mini or ESP32-C3 Mini
-- NTC 10K temperature sensor
+- NTC 10K temperature sensor with 10K pull-up resistor
 - SSR relay for heater (e.g., SSR-25DA)
-- Relay for pump (optional)
+- Relay module for pump (optional)
 - DS1307 RTC module (optional, for scheduling)
 - SD Card module (optional, for recipes and logs)
+
+### Wiring Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           INVERSA WIRING DIAGRAM                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   ESP32-S3 Mini                          ESP32-C3 Mini                      │
+│   ─────────────                          ─────────────                      │
+│                                                                             │
+│   ┌─────────────┐                        ┌─────────────┐                    │
+│   │  S3 MINI    │                        │  C3 MINI    │                    │
+│   │             │                        │             │                    │
+│   │  GPIO1  ────┼── NTC Sensor           │  GPIO3  ────┼── NTC Sensor       │
+│   │  GPIO4  ────┼── SSR (Heater)         │  GPIO2  ────┼── SSR (Heater)     │
+│   │  GPIO16 ────┼── Relay (Pump)         │  GPIO6  ────┼── Relay (Pump)     │
+│   │  GPIO47 ────┼── NeoPixel (opt)       │  GPIO7  ────┼── NeoPixel (opt)   │
+│   │             │                        │             │                    │
+│   │  GPIO35 ────┼── I2C SDA (RTC)        │  GPIO8  ────┼── I2C SDA (RTC)    │
+│   │  GPIO36 ────┼── I2C SCL (RTC)        │  GPIO10 ────┼── I2C SCL (RTC)    │
+│   │             │                        │             │                    │
+│   │  SS     ────┼── SD CS                │  GPIO5  ────┼── SD CS            │
+│   │  SCK    ────┼── SD SCK               │  GPIO1  ────┼── SD SCK           │
+│   │  MISO   ────┼── SD MISO              │  GPIO0  ────┼── SD MISO          │
+│   │  MOSI   ────┼── SD MOSI              │  GPIO4  ────┼── SD MOSI          │
+│   │             │                        │             │                    │
+│   │  3V3    ────┼── VCC (sensors)        │  3V3    ────┼── VCC (sensors)    │
+│   │  GND    ────┼── GND (common)         │  GND    ────┼── GND (common)     │
+│   │  5V     ────┼── VCC (relays)         │  5V     ────┼── VCC (relays)     │
+│   └─────────────┘                        └─────────────┘                    │
+│                                                                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│   NTC TEMPERATURE SENSOR                 SSR RELAY (HEATER)                 │
+│   ──────────────────────                 ─────────────────                  │
+│                                                                             │
+│        3V3                                    ESP32                         │
+│         │                                       │                           │
+│         ├──┤ 10K ├──┬── NTC Pin                GPIO ──── SSR Input (+)      │
+│         │          │                           GND ───── SSR Input (-)      │
+│        NTC         │                                                        │
+│         │          │                      SSR Output ── Heater (AC Live)    │
+│        GND        GND                     AC Neutral ── Heater (AC Neutral) │
+│                                                                             │
+│   PUMP RELAY MODULE                      DS1307 RTC MODULE                  │
+│   ─────────────────                      ────────────────                   │
+│                                                                             │
+│   VCC ───── 5V                           VCC ───── 3V3                      │
+│   GND ───── GND                          GND ───── GND                      │
+│   IN  ───── Pump GPIO                    SDA ───── I2C SDA                  │
+│   NO  ───── Pump (+)                     SCL ───── I2C SCL                  │
+│   COM ───── Power Supply (+)                                                │
+│                                                                             │
+│   SD CARD MODULE                         NEOPIXEL (OPTIONAL)                │
+│   ──────────────                         ───────────────────                │
+│                                                                             │
+│   VCC ───── 3V3                          VCC ───── 5V                       │
+│   GND ───── GND                          GND ───── GND                      │
+│   CS  ───── SD CS                        DIN ───── NeoPixel GPIO            │
+│   SCK ───── SD SCK                                                          │
+│   MISO ──── SD MISO                                                         │
+│   MOSI ──── SD MOSI                                                         │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Pin Reference Table
+
+| Function     | ESP32-S3 Mini | ESP32-C3 Mini | Notes                    |
+| ------------ | ------------- | ------------- | ------------------------ |
+| NTC Sensor   | GPIO1 (A1)    | GPIO3 (A3)    | Analog input + 10K pull-up |
+| Heater SSR   | GPIO4         | GPIO2         | 3.3V logic, active HIGH  |
+| Pump Relay   | GPIO16        | GPIO6         | 5V relay module          |
+| NeoPixel     | GPIO47        | GPIO7         | WS2812B compatible       |
+| I2C SDA      | GPIO35        | GPIO8         | For RTC (DS1307)         |
+| I2C SCL      | GPIO36        | GPIO10        | For RTC (DS1307)         |
+| SD Card CS   | SS (default)  | GPIO5         | SPI chip select          |
+| SD Card SCK  | SCK (default) | GPIO1         | SPI clock                |
+| SD Card MISO | MISO (default)| GPIO0         | SPI data in              |
+| SD Card MOSI | MOSI (default)| GPIO4         | SPI data out             |
 
 ## Installation
 
