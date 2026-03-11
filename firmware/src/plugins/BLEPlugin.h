@@ -263,6 +263,21 @@ private:
             doc["tp"] = gState.timerPaused;
             doc["tt"] = gState.timerTotal;
             doc["tr"] = gState.timerRemaining;
+            doc["tm"] = gState.timerMode;  // 0=relative, 1=absolute
+            if (gState.timerMode == 1) {   // Absolute mode
+                doc["tah"] = gState.timerAlarmHour;
+                doc["tam"] = gState.timerAlarmMinute;
+            }
+        }
+
+        // Scheduler info ("be ready at HH:MM")
+        if (gState.schedulerActive) {
+            doc["sa"] = true;
+            doc["sth"] = gState.schedulerTargetHour;
+            doc["stm"] = gState.schedulerTargetMinute;
+            doc["stt"] = gState.schedulerTargetTemp;
+            doc["sv"] = gState.schedulerVolume;
+            doc["ss"] = gState.schedulerStatus;
         }
 
         // Auto-Tune info

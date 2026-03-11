@@ -74,6 +74,12 @@ enum class EventType : uint8_t {
     AutoTuneCompleted,      // string: JSON with Kp, Ki, Kd
     AutoTuneFailed,         // string: error message
 
+    // Scheduler ("be ready at HH:MM")
+    SchedulerSet,           // Scheduler configured with target time
+    SchedulerStarting,      // Heating started (calculated start time reached)
+    SchedulerReady,         // Target temperature reached at target time
+    SchedulerCancelled,     // Scheduler cancelled
+
     // System
     SystemReady,
     SystemError,

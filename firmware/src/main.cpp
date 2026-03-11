@@ -25,6 +25,7 @@
 #include "plugins/RTCPlugin.h"
 #include "plugins/TimerPlugin.h"
 #include "plugins/AutoTunePlugin.h"
+#include "plugins/SchedulerPlugin.h"
 #include "plugins/CommandHandler.h"
 
 // ─── Global State ───────────────────────────────────────────
@@ -63,8 +64,9 @@ void setup() {
     auto* brewLog   = pm.add<BrewLogPlugin>();
     auto* boilTimer = pm.add<BoilTimerPlugin>();
     auto* rtc       = pm.add<RTCPlugin>(gState, *wifi);
-    auto* timer     = pm.add<TimerPlugin>(gState);
+    auto* timer     = pm.add<TimerPlugin>(gState, rtc);
     auto* autoTune  = pm.add<AutoTunePlugin>(gState, *pid);
+    auto* scheduler = pm.add<SchedulerPlugin>(gState, *rtc);
 
     // Initialize all plugins
     pm.setup();
@@ -73,7 +75,7 @@ void setup() {
     RecoveryManager::instance().init(sd);
 
     // Wire up command handler (routes BLE commands to plugins)
-    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune);
+    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler);
 
     // Check for power loss recovery
     if (RecoveryManager::instance().hasValidRecovery()) {

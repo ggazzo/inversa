@@ -6,15 +6,26 @@
 #include "../core/constants.h"
 #include "../models/MachineState.h"
 
+// Forward declaration
+class RTCPlugin;
+
+// ─── Timer Mode ─────────────────────────────────────────────
+enum class TimerMode : uint8_t {
+    Relative,   // Countdown from duration (e.g., "10 minutes")
+    Absolute    // Alarm at specific time (e.g., "08:00")
+};
+
 // ─── Timer Plugin ───────────────────────────────────────────
 // Generic countdown timer for brewing operations.
-// - Relative timers (duration-based)
+// - Relative timers (duration-based countdown)
+// - Absolute timers (alarm at HH:MM, requires RTC)
 // - Start, stop, pause, resume functionality
 // - Publishes tick events every second
 
 class TimerPlugin : public Plugin {
 public:
-    TimerPlugin(MachineState& state) : _state(state) {}
+    TimerPlugin(MachineState& state, RTCPlugin* rtc = nullptr) 
+        : _state(state), _rtc(rtc) {}
 
     const char* getName() const override { return "Timer"; }
 
@@ -34,10 +45,17 @@ public:
         if (currentMillis - _lastTick >= 1000) {
             _lastTick = currentMillis;
 
-            if (_state.timerRemaining > 0) {
-                _state.timerRemaining--;
-                bus().publish(EventType::TimerTick, (int)_state.timerRemaining);
+            // For absolute timers, recalculate remaining from RTC
+            if (getMode() == TimerMode::Absolute) {
+                updateAbsoluteRemaining();
+            } else {
+                // Relative timer - just decrement
+                if (_state.timerRemaining > 0) {
+                    _state.timerRemaining--;
+                }
             }
+
+            bus().publish(EventType::TimerTick, (int)_state.timerRemaining);
 
             if (_state.timerRemaining == 0) {
                 complete();
@@ -47,13 +65,14 @@ public:
 
     // ── Public API ───────────────────────────────────────────
 
-    // Start timer with duration in seconds
+    // Start timer with duration in seconds (relative mode)
     void start(uint32_t durationSec) {
         if (durationSec == 0) {
             DEBUG_PRINTLN("[Timer] Cannot start timer with 0 duration");
             return;
         }
 
+        _state.timerMode = (uint8_t)TimerMode::Relative;
         _state.timerActive = true;
         _state.timerPaused = false;
         _state.timerTotal = durationSec;
@@ -145,9 +164,56 @@ public:
         return String(buf);
     }
 
+    // ── Absolute Timer API ────────────────────────────────────
+
+    // Set RTC reference (for absolute timers)
+    void setRTC(RTCPlugin* rtc) { _rtc = rtc; }
+
+    // Start absolute timer (alarm at HH:MM)
+    // Returns false if RTC not available
+    bool startAt(uint8_t hour, uint8_t minute) {
+        if (!_rtc) {
+            DEBUG_PRINTLN("[Timer] Cannot start absolute timer - no RTC");
+            return false;
+        }
+
+        _state.timerMode = (uint8_t)TimerMode::Absolute;
+        _state.timerAlarmHour = hour;
+        _state.timerAlarmMinute = minute;
+        
+        // Calculate initial remaining seconds
+        if (!updateAbsoluteRemaining()) {
+            DEBUG_PRINTLN("[Timer] Alarm time already passed");
+            return false;
+        }
+
+        _state.timerActive = true;
+        _state.timerPaused = false;
+        _lastTick = millis();
+
+        DEBUG_PRINTF("[Timer] Absolute timer set for %02d:%02d\n", hour, minute);
+        bus().publish(EventType::TimerStarted, (int)_state.timerRemaining);
+        return true;
+    }
+
+    // Get timer mode
+    TimerMode getMode() const { 
+        return (TimerMode)_state.timerMode; 
+    }
+
+    // Get alarm time (for absolute mode)
+    void getAlarmTime(uint8_t& hour, uint8_t& minute) const {
+        hour = _state.timerAlarmHour;
+        minute = _state.timerAlarmMinute;
+    }
+
 private:
     MachineState& _state;
+    RTCPlugin* _rtc = nullptr;
     uint32_t _lastTick = 0;
+
+    // Update remaining time for absolute timer based on current RTC time
+    bool updateAbsoluteRemaining();
 
     void complete() {
         _state.timerActive = false;
@@ -157,3 +223,29 @@ private:
         bus().publish(EventType::TimerCompleted);
     }
 };
+
+// ─── Implementation requiring RTCPlugin ─────────────────────
+// Include RTCPlugin header for implementation
+#include "RTCPlugin.h"
+
+inline bool TimerPlugin::updateAbsoluteRemaining() {
+    if (!_rtc || !_rtc->isAvailable()) {
+        return false;
+    }
+
+    // Get current time from RTC
+    DateTime now = _rtc->getDateTime();
+    uint32_t currentSec = now.hour() * 3600 + now.minute() * 60 + now.second();
+    uint32_t targetSec = _state.timerAlarmHour * 3600 + _state.timerAlarmMinute * 60;
+
+    // If target time is in the past (today), it means tomorrow
+    if (targetSec <= currentSec) {
+        // Add 24 hours
+        targetSec += 24 * 3600;
+    }
+
+    _state.timerRemaining = targetSec - currentSec;
+    _state.timerTotal = _state.timerRemaining;
+    
+    return true;
+}
