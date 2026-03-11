@@ -116,8 +116,12 @@ jobs:
 
       - name: Prepare release files
         run: |
-          mv release/s3/firmware.bin release/inversa-s3-mini-${{ github.ref_name }}.bin
-          mv release/c3/firmware.bin release/inversa-c3-mini-${{ github.ref_name }}.bin
+          # Versioned files (for users to download manually)
+          cp release/s3/firmware.bin release/inversa-s3-mini-${{ github.ref_name }}.bin
+          cp release/c3/firmware.bin release/inversa-c3-mini-${{ github.ref_name }}.bin
+          # Unversioned files (for OTA auto-update lookup)
+          cp release/s3/firmware.bin release/wemos_s3_mini.bin
+          cp release/c3/firmware.bin release/wemos_c3_mini.bin
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -125,4 +129,6 @@ jobs:
           files: |
             release/inversa-s3-mini-${{ github.ref_name }}.bin
             release/inversa-c3-mini-${{ github.ref_name }}.bin
+            release/wemos_s3_mini.bin
+            release/wemos_c3_mini.bin
           generate_release_notes: true
