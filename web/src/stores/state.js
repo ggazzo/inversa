@@ -33,6 +33,22 @@ export const otaProgress = signal(0);
 export const otaError = signal('');
 export const firmwareVersion = signal('');  // Current firmware version
 
+// ─── Ramp State ─────────────────────────────────────────────
+export const rampActive = signal(false);
+export const rampRate = signal(0);      // °C/min
+export const rampTarget = signal(0);
+export const rampCurrent = signal(0);
+
+// ─── Brew Log State ─────────────────────────────────────────
+export const brewLogActive = signal(false);
+export const brewLogEntries = signal(0);
+export const brewLogData = signal([]);  // Collected log entries for export
+
+// ─── Notifications State ────────────────────────────────────
+export const notificationsEnabled = signal(false);
+export const notifyOnTempReached = signal(true);
+export const notifyOnStepComplete = signal(true);
+
 // ─── Recipe State ───────────────────────────────────────────
 export const recipeName = signal('');
 export const recipeStep = signal(0);
@@ -111,6 +127,16 @@ export function updateFromTelemetry(data) {
   if (data.sok !== undefined) tempSensorOk.value = data.sok;
   if (data.saf !== undefined) safetyShutoff.value = data.saf;
   if (data.rst !== undefined) recipeState.value = data.rst;
+  
+  // Ramp state
+  if (data.ra !== undefined) rampActive.value = data.ra;
+  if (data.rr !== undefined) rampRate.value = data.rr;
+  if (data.rtg !== undefined) rampTarget.value = data.rtg;
+  if (data.rc !== undefined) rampCurrent.value = data.rc;
+  
+  // Brew Log state
+  if (data.bla !== undefined) brewLogActive.value = data.bla;
+  if (data.ble !== undefined) brewLogEntries.value = data.ble;
 
   // Add to history
   addTelemetryPoint(

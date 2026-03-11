@@ -28,8 +28,16 @@ public:
             Serial.printf("[PID] Loaded from NVS: Kp=%.2f Ki=%.4f Kd=%.1f\n", _kp, _ki, _kd);
         }
 
-        // Listen for setpoint changes
+        // Listen for setpoint changes (direct or ramped)
         bus().subscribe(EventType::SetpointChanged, [this](const Event& e) {
+            // Only use direct setpoint if ramp is not active
+            if (!gState.rampActive) {
+                _setpoint = e.floatValue;
+            }
+        });
+
+        // Listen for ramped setpoint (takes priority when ramping)
+        bus().subscribe(EventType::RampedSetpointChanged, [this](const Event& e) {
             _setpoint = e.floatValue;
         });
 

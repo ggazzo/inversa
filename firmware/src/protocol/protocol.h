@@ -57,11 +57,28 @@ namespace Protocol {
     constexpr const char* REQ_OTA_CHECK       = "req:ota:check";
     constexpr const char* REQ_OTA_INSTALL     = "req:ota:install";
 
+    // Ramp Mode (app → device)
+    constexpr const char* REQ_RAMP_SET        = "req:ramp:set";     // {rate: float} °C/min, 0 = disabled
+    constexpr const char* REQ_RAMP_STOP       = "req:ramp:stop";
+
+    // Brew Log (app → device)
+    constexpr const char* REQ_LOG_START       = "req:log:start";
+    constexpr const char* REQ_LOG_STOP        = "req:log:stop";
+    constexpr const char* REQ_LOG_EXPORT      = "req:log:export";   // {fmt: "csv"|"json"}
+
     // WiFi Events (device → app)
     constexpr const char* EVT_WIFI_STATUS     = "evt:wifi:status";
 
     // OTA Events (device → app)
     constexpr const char* EVT_OTA_STATUS      = "evt:ota:status";
+
+    // Ramp Events (device → app)
+    constexpr const char* EVT_RAMP_STATUS     = "evt:ramp:status";
+    constexpr const char* EVT_RAMP_COMPLETE   = "evt:ramp:complete";
+
+    // Brew Log Events (device → app)
+    constexpr const char* EVT_LOG_STATUS      = "evt:log:status";
+    constexpr const char* EVT_LOG_DATA        = "evt:log:data";     // Chunked export data
 
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";

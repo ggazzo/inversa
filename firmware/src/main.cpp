@@ -19,6 +19,8 @@
 #include "plugins/BLEPlugin.h"
 #include "plugins/WiFiPlugin.h"
 #include "plugins/OTAPlugin.h"
+#include "plugins/RampPlugin.h"
+#include "plugins/BrewLogPlugin.h"
 #include "plugins/CommandHandler.h"
 
 // ─── Global State ───────────────────────────────────────────
@@ -44,15 +46,17 @@ void setup() {
     auto& pm = PluginManager::instance();
 
     // Register plugins in dependency order
-    auto* temp   = pm.add<TemperaturePlugin>();
-    auto* pid    = pm.add<PIDPlugin>();
-    auto* heater = pm.add<HeaterPlugin>();
-    auto* pump   = pm.add<PumpPlugin>();
-    auto* sd     = pm.add<SDCardPlugin>();
-    auto* recipe = pm.add<RecipePlugin>();
-    auto* ble    = pm.add<BLEPlugin>();
-    auto* wifi   = pm.add<WiFiPlugin>(gState);
-    auto* ota    = pm.add<OTAPlugin>(gState, *wifi);
+    auto* temp    = pm.add<TemperaturePlugin>();
+    auto* pid     = pm.add<PIDPlugin>();
+    auto* heater  = pm.add<HeaterPlugin>();
+    auto* pump    = pm.add<PumpPlugin>();
+    auto* sd      = pm.add<SDCardPlugin>();
+    auto* recipe  = pm.add<RecipePlugin>();
+    auto* ble     = pm.add<BLEPlugin>();
+    auto* wifi    = pm.add<WiFiPlugin>(gState);
+    auto* ota     = pm.add<OTAPlugin>(gState, *wifi);
+    auto* ramp    = pm.add<RampPlugin>();
+    auto* brewLog = pm.add<BrewLogPlugin>();
 
     // Initialize all plugins
     pm.setup();
@@ -61,7 +65,7 @@ void setup() {
     RecoveryManager::instance().init(sd);
 
     // Wire up command handler (routes BLE commands to plugins)
-    commandHandler.init(ble, sd, recipe, pid, wifi, ota);
+    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog);
 
     // Check for power loss recovery
     if (RecoveryManager::instance().hasValidRecovery()) {

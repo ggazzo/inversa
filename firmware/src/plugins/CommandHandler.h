@@ -13,6 +13,8 @@
 #include "PIDPlugin.h"
 #include "WiFiPlugin.h"
 #include "OTAPlugin.h"
+#include "RampPlugin.h"
+#include "BrewLogPlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -21,13 +23,16 @@
 class CommandHandler {
 public:
     void init(BLEPlugin* ble, SDCardPlugin* sd, RecipePlugin* recipe, PIDPlugin* pid,
-              WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr) {
+              WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr,
+              RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
         _pid = pid;
         _wifi = wifi;
         _ota = ota;
+        _ramp = ramp;
+        _brewLog = brewLog;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             JsonDocument doc;
@@ -293,6 +298,58 @@ public:
             // Note: if successful, device will restart and won't send response
             sendOk(rid);
         }
+        // ── Ramp: Set Rate ──────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_RAMP_SET) == 0) {
+            if (!_ramp) { sendError(rid, "Ramp not available"); return; }
+            float rate = doc["rate"] | 0.0f;
+            if (rate < 0 || rate > 10.0f) { sendError(rid, "Invalid rate (0-10)"); return; }
+            _ramp->setRate(rate);
+            EventBus::instance().publish(EventType::RampConfigChanged, rate);
+            sendOk(rid);
+        }
+        // ── Ramp: Stop ──────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_RAMP_STOP) == 0) {
+            if (!_ramp) { sendError(rid, "Ramp not available"); return; }
+            _ramp->stopRamp();
+            sendOk(rid);
+        }
+        // ── Brew Log: Start ─────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_LOG_START) == 0) {
+            if (!_brewLog) { sendError(rid, "BrewLog not available"); return; }
+            _brewLog->start();
+            sendOk(rid);
+        }
+        // ── Brew Log: Stop ──────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_LOG_STOP) == 0) {
+            if (!_brewLog) { sendError(rid, "BrewLog not available"); return; }
+            _brewLog->stop();
+            sendOk(rid);
+        }
+        // ── Brew Log: Export ────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_LOG_EXPORT) == 0) {
+            if (!_brewLog) { sendError(rid, "BrewLog not available"); return; }
+            String fmt = doc["fmt"] | "csv";
+            uint16_t chunk = doc["chunk"] | 0;
+            
+            uint16_t total = _brewLog->getEntryCount();
+            uint16_t chunkSize = (fmt == "json") ? 30 : 50;
+            uint16_t totalChunks = _brewLog->getTotalChunks(chunkSize);
+            
+            JsonDocument res;
+            res[Protocol::FIELD_TYPE] = Protocol::EVT_LOG_DATA;
+            res[Protocol::FIELD_REQUEST_ID] = rid;
+            res["chunk"] = chunk;
+            res["total"] = totalChunks;
+            res["entries"] = total;
+            
+            if (fmt == "json") {
+                res["data"] = _brewLog->exportJSON(chunk * chunkSize, chunkSize);
+            } else {
+                res["data"] = _brewLog->exportCSV(chunk * chunkSize, chunkSize);
+            }
+            
+            _ble->sendJson(res);
+        }
         else {
             sendError(rid, "Unknown command");
         }
@@ -305,6 +362,8 @@ private:
     PIDPlugin* _pid = nullptr;
     WiFiPlugin* _wifi = nullptr;
     OTAPlugin* _ota = nullptr;
+    RampPlugin* _ramp = nullptr;
+    BrewLogPlugin* _brewLog = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;
