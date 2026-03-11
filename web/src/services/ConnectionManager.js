@@ -1,6 +1,11 @@
 // ConnectionManager.js — Manages BLE connection lifecycle and message routing
 import { BLEService } from './BLEService';
-import { isConnected, deviceName, updateFromTelemetry, showToast, hasRecovery, recoveryRecipeName } from '../stores/state';
+import { 
+  isConnected, deviceName, updateFromTelemetry, showToast, 
+  hasRecovery, recoveryRecipeName,
+  wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
+  otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion
+} from '../stores/state';
 
 class ConnectionManagerClass {
   constructor() {
@@ -121,6 +126,32 @@ class ConnectionManagerClass {
     return BLEService.request('req:recovery:discard');
   }
 
+  // WiFi
+  async configureWiFi(ssid, password) {
+    return BLEService.request('req:wifi:config', { ssid, pwd: password });
+  }
+
+  async connectWiFi() {
+    return BLEService.request('req:wifi:connect');
+  }
+
+  async disconnectWiFi() {
+    return BLEService.request('req:wifi:disconnect');
+  }
+
+  async getWiFiStatus() {
+    return BLEService.request('req:wifi:status');
+  }
+
+  // OTA
+  async checkForUpdates() {
+    return BLEService.request('req:ota:check');
+  }
+
+  async installUpdate() {
+    return BLEService.request('req:ota:install');
+  }
+
   _handleMessage(data) {
     switch (data.tp) {
       case 'evt:status':
@@ -147,6 +178,33 @@ class ConnectionManagerClass {
         hasRecovery.value = true;
         recoveryRecipeName.value = data.recipe || '';
         showToast(`Receita "${data.recipe}" pode ser recuperada`, 'info', 10000);
+        break;
+
+      case 'evt:wifi:status':
+        wifiConnected.value = data.conn || false;
+        wifiSSID.value = data.ssid || '';
+        wifiIP.value = data.ip || '';
+        if (data.cfg) wifiConfiguredSSID.value = data.cfg;
+        if (data.err) showToast(data.err, 'error');
+        break;
+
+      case 'evt:ota:status':
+        otaStatus.value = data.st || 'idle';
+        otaLatestVersion.value = data.ver || '';
+        otaProgress.value = data.pct || 0;
+        otaError.value = data.err || '';
+        if (data.cur) firmwareVersion.value = data.cur;
+        
+        // Show toasts for important OTA events
+        if (data.st === 'available') {
+          showToast(`Update available: ${data.ver}`, 'info');
+        } else if (data.st === 'error') {
+          showToast(data.err || 'OTA error', 'error');
+        } else if (data.st === 'up-to-date') {
+          showToast('Firmware is up to date', 'success');
+        } else if (data.st === 'installing') {
+          showToast('Installing update... Device will restart', 'info', 10000);
+        }
         break;
     }
   }
