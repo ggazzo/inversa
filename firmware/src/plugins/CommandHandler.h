@@ -11,6 +11,8 @@
 #include "SDCardPlugin.h"
 #include "RecipePlugin.h"
 #include "PIDPlugin.h"
+#include "WiFiPlugin.h"
+#include "OTAPlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -18,11 +20,14 @@
 
 class CommandHandler {
 public:
-    void init(BLEPlugin* ble, SDCardPlugin* sd, RecipePlugin* recipe, PIDPlugin* pid) {
+    void init(BLEPlugin* ble, SDCardPlugin* sd, RecipePlugin* recipe, PIDPlugin* pid,
+              WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
         _pid = pid;
+        _wifi = wifi;
+        _ota = ota;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             JsonDocument doc;
@@ -248,6 +253,46 @@ public:
             gState.recoveryRecipeName = "";
             sendOk(rid);
         }
+        // ── WiFi: Configure ─────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_WIFI_CONFIG) == 0) {
+            if (!_wifi) { sendError(rid, "WiFi not available"); return; }
+            String ssid = doc["ssid"] | "";
+            String pwd = doc["pwd"] | "";
+            if (ssid.isEmpty()) { sendError(rid, "SSID required"); return; }
+            _wifi->configure(ssid, pwd);
+            sendOk(rid);
+        }
+        // ── WiFi: Connect ───────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_WIFI_CONNECT) == 0) {
+            if (!_wifi) { sendError(rid, "WiFi not available"); return; }
+            _wifi->connect();
+            sendOk(rid);
+        }
+        // ── WiFi: Disconnect ────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_WIFI_DISCONNECT) == 0) {
+            if (!_wifi) { sendError(rid, "WiFi not available"); return; }
+            _wifi->disconnect();
+            sendOk(rid);
+        }
+        // ── WiFi: Status ────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_WIFI_STATUS) == 0) {
+            if (!_wifi) { sendError(rid, "WiFi not available"); return; }
+            _wifi->sendWiFiStatus();
+            sendOk(rid);
+        }
+        // ── OTA: Check ──────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_OTA_CHECK) == 0) {
+            if (!_ota) { sendError(rid, "OTA not available"); return; }
+            _ota->checkForUpdate();
+            sendOk(rid);
+        }
+        // ── OTA: Install ────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_OTA_INSTALL) == 0) {
+            if (!_ota) { sendError(rid, "OTA not available"); return; }
+            _ota->installUpdate();
+            // Note: if successful, device will restart and won't send response
+            sendOk(rid);
+        }
         else {
             sendError(rid, "Unknown command");
         }
@@ -258,6 +303,8 @@ private:
     SDCardPlugin* _sd = nullptr;
     RecipePlugin* _recipe = nullptr;
     PIDPlugin* _pid = nullptr;
+    WiFiPlugin* _wifi = nullptr;
+    OTAPlugin* _ota = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;

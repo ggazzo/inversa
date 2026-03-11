@@ -45,6 +45,11 @@ public:
         advertising->setName(BLE_DEVICE_NAME);
         advertising->start();
 
+        // Subscribe to BLESend events from other plugins
+        bus().subscribe(EventType::BLESend, [this](const Event& e) {
+            send(e.stringValue);
+        });
+
         Serial.println("[BLE] Service started, advertising...");
         return true;
     }

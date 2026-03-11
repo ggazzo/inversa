@@ -17,6 +17,8 @@
 #include "plugins/SDCardPlugin.h"
 #include "plugins/RecipePlugin.h"
 #include "plugins/BLEPlugin.h"
+#include "plugins/WiFiPlugin.h"
+#include "plugins/OTAPlugin.h"
 #include "plugins/CommandHandler.h"
 
 // ─── Global State ───────────────────────────────────────────
@@ -49,6 +51,8 @@ void setup() {
     auto* sd     = pm.add<SDCardPlugin>();
     auto* recipe = pm.add<RecipePlugin>();
     auto* ble    = pm.add<BLEPlugin>();
+    auto* wifi   = pm.add<WiFiPlugin>(gState);
+    auto* ota    = pm.add<OTAPlugin>(gState, *wifi);
 
     // Initialize all plugins
     pm.setup();
@@ -57,7 +61,7 @@ void setup() {
     RecoveryManager::instance().init(sd);
 
     // Wire up command handler (routes BLE commands to plugins)
-    commandHandler.init(ble, sd, recipe, pid);
+    commandHandler.init(ble, sd, recipe, pid, wifi, ota);
 
     // Check for power loss recovery
     if (RecoveryManager::instance().hasValidRecovery()) {
