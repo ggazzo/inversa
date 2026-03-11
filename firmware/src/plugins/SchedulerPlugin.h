@@ -4,6 +4,7 @@
 #include "../core/Plugin.h"
 #include "../core/EventBus.h"
 #include "../core/constants.h"
+#include "../core/ThermalCalc.h"
 #include "../models/MachineState.h"
 #include "RTCPlugin.h"
 
@@ -171,9 +172,7 @@ public:
 
 private:
     // Scheduler configuration constants
-    static constexpr float HEATER_POWER_WATTS = 3000.0f;      // 3kW heater
-    static constexpr float HEATER_EFFICIENCY = 0.85f;          // 85% efficiency
-    static constexpr float SPECIFIC_HEAT_WATER = 4186.0f;      // J/(kg*K)
+    static constexpr float HEATER_EFFICIENCY = 0.90f;          // 90% efficiency
     static constexpr uint8_t SCHEDULER_MARGIN_MINUTES = 5;     // Extra margin
 
     MachineState& _state;
@@ -182,20 +181,28 @@ private:
     bool _heatingStarted = false;
 
     // Calculate time needed to heat water (seconds)
+    // Now uses ThermalCalc with heat loss compensation
     uint32_t calculateHeatingTime(float targetTemp, float volumeLiters) {
         // Get current temperature
         float currentTemp = _state.currentTemp;
-        if (currentTemp < 5.0f) currentTemp = 20.0f;  // Assume room temp if sensor error
+        if (currentTemp < 5.0f) currentTemp = _state.ambientTemp;  // Use ambient if sensor error
         
-        float deltaTemp = targetTemp - currentTemp;
-        if (deltaTemp <= 0) return 0;  // Already at or above target
+        if (targetTemp <= currentTemp) return 0;  // Already at or above target
 
-        // Energy needed: Q = m * c * dT (mass in kg = volume in liters for water)
-        float energyJoules = volumeLiters * SPECIFIC_HEAT_WATER * deltaTemp;
-        
-        // Time: t = Q / (P * efficiency)
-        float powerEffective = HEATER_POWER_WATTS * HEATER_EFFICIENCY;
-        float timeSec = energyJoules / powerEffective;
+        // Use thermal parameters from state (can be configured)
+        float power = _state.heaterPowerWatts;
+        float ambient = _state.ambientTemp;
+        float diameter = _state.vesselDiameter;
+        float heatCoeff = _state.heatLossCoeff;
+
+        // Calculate surface area from volume and diameter
+        float surfaceArea = ThermalCalc::cylinderSurfaceArea(volumeLiters, diameter);
+
+        // Calculate heating time with heat loss compensation
+        float timeSec = ThermalCalc::calculateHeatingTimeWithLoss(
+            volumeLiters, power, currentTemp, targetTemp,
+            ambient, surfaceArea, HEATER_EFFICIENCY, heatCoeff
+        );
 
         return (uint32_t)timeSec;
     }
