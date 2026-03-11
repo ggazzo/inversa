@@ -20,6 +20,19 @@ export const safetyShutoff = signal(false);
 export const hasRecovery = signal(false);
 export const recoveryRecipeName = signal('');
 
+// ─── WiFi State ─────────────────────────────────────────────
+export const wifiConnected = signal(false);
+export const wifiSSID = signal('');
+export const wifiIP = signal('');
+export const wifiConfiguredSSID = signal('');  // Stored SSID in NVS
+
+// ─── OTA State ──────────────────────────────────────────────
+export const otaStatus = signal('idle');  // idle, checking, available, downloading, installing, error, up-to-date
+export const otaLatestVersion = signal('');
+export const otaProgress = signal(0);
+export const otaError = signal('');
+export const firmwareVersion = signal('');  // Current firmware version
+
 // ─── Recipe State ───────────────────────────────────────────
 export const recipeName = signal('');
 export const recipeStep = signal(0);
