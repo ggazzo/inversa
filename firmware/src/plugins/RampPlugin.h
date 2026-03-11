@@ -99,13 +99,11 @@ public:
     }
 
     void stopRamp() {
-        _ramping = false;
-        gState.rampActive = false;
-        
-        // Set final target immediately
         if (_ramping) {
             bus().publish(EventType::RampedSetpointChanged, _finalTarget);
         }
+        _ramping = false;
+        gState.rampActive = false;
     }
 
     bool isRamping() const { return _ramping; }
