@@ -19,6 +19,7 @@
 #include "RTCPlugin.h"
 #include "TimerPlugin.h"
 #include "AutoTunePlugin.h"
+#include "SchedulerPlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -30,7 +31,8 @@ public:
               WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr,
               RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr,
               BoilTimerPlugin* boilTimer = nullptr, RTCPlugin* rtc = nullptr,
-              TimerPlugin* timer = nullptr, AutoTunePlugin* autoTune = nullptr) {
+              TimerPlugin* timer = nullptr, AutoTunePlugin* autoTune = nullptr,
+              SchedulerPlugin* scheduler = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
@@ -43,6 +45,7 @@ public:
         _rtc = rtc;
         _timer = timer;
         _autoTune = autoTune;
+        _scheduler = scheduler;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             JsonDocument doc;
@@ -524,6 +527,58 @@ public:
             _autoTune->stop();
             sendOk(rid);
         }
+        // ── Timer: Alarm (absolute time) ────────────────────
+        else if (strcmp(type, Protocol::REQ_TIMER_ALARM) == 0) {
+            if (!_timer) { sendError(rid, "Timer not available"); return; }
+            
+            uint8_t hour = doc["hour"] | 0;
+            uint8_t minute = doc["min"] | 0;
+            
+            if (hour > 23 || minute > 59) {
+                sendError(rid, "Invalid time");
+                return;
+            }
+            
+            if (_timer->startAt(hour, minute)) {
+                sendOk(rid);
+            } else {
+                sendError(rid, "RTC not available");
+            }
+        }
+        // ── Scheduler: Set ──────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_SCHEDULER_SET) == 0) {
+            if (!_scheduler) { sendError(rid, "Scheduler not available"); return; }
+            
+            uint8_t hour = doc["hour"] | 0;
+            uint8_t minute = doc["min"] | 0;
+            float temp = doc["temp"] | 65.0f;
+            float vol = doc["vol"] | 20.0f;
+            
+            if (hour > 23 || minute > 59) {
+                sendError(rid, "Invalid time");
+                return;
+            }
+            if (temp < 20.0f || temp > 100.0f) {
+                sendError(rid, "Temp must be 20-100C");
+                return;
+            }
+            if (vol < 1.0f || vol > 100.0f) {
+                sendError(rid, "Volume must be 1-100L");
+                return;
+            }
+            
+            if (_scheduler->schedule(hour, minute, temp, vol)) {
+                sendOk(rid);
+            } else {
+                sendError(rid, "Scheduling failed");
+            }
+        }
+        // ── Scheduler: Stop ─────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_SCHEDULER_STOP) == 0) {
+            if (!_scheduler) { sendError(rid, "Scheduler not available"); return; }
+            _scheduler->cancel();
+            sendOk(rid);
+        }
         else {
             sendError(rid, "Unknown command");
         }
@@ -542,6 +597,7 @@ private:
     RTCPlugin* _rtc = nullptr;
     TimerPlugin* _timer = nullptr;
     AutoTunePlugin* _autoTune = nullptr;
+    SchedulerPlugin* _scheduler = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;

@@ -83,10 +83,15 @@ namespace Protocol {
 
     // Timer (app → device)
     constexpr const char* REQ_TIMER_START     = "req:timer:start";  // {sec: uint32} or {min: uint32}
+    constexpr const char* REQ_TIMER_ALARM     = "req:timer:alarm";  // {hour: uint8, min: uint8} absolute alarm
     constexpr const char* REQ_TIMER_STOP      = "req:timer:stop";
     constexpr const char* REQ_TIMER_PAUSE     = "req:timer:pause";
     constexpr const char* REQ_TIMER_RESUME    = "req:timer:resume";
     constexpr const char* REQ_TIMER_ADD       = "req:timer:add";    // {sec: int32} add/subtract time
+
+    // Scheduler (app → device) - "be ready at HH:MM"
+    constexpr const char* REQ_SCHEDULER_SET   = "req:sched:set";    // {hour, min, temp, vol}
+    constexpr const char* REQ_SCHEDULER_STOP  = "req:sched:stop";
 
     // WiFi Events (device → app)
     constexpr const char* EVT_WIFI_STATUS     = "evt:wifi:status";
@@ -112,6 +117,11 @@ namespace Protocol {
     // Timer Events (device → app)
     constexpr const char* EVT_TIMER_STATUS    = "evt:timer:status"; // Timer status update
     constexpr const char* EVT_TIMER_COMPLETE  = "evt:timer:complete"; // Timer finished
+
+    // Scheduler Events (device → app)
+    constexpr const char* EVT_SCHEDULER_STATUS  = "evt:sched:status";  // Scheduler status
+    constexpr const char* EVT_SCHEDULER_STARTING = "evt:sched:starting"; // Heating started
+    constexpr const char* EVT_SCHEDULER_READY   = "evt:sched:ready";   // Target reached
 
     // Auto-Tune Events (device → app)
     constexpr const char* EVT_AUTOTUNE_STATUS = "evt:autotune:status"; // Progress/status

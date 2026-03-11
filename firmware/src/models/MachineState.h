@@ -102,6 +102,18 @@ struct MachineState {
     bool     timerPaused        = false;
     uint32_t timerTotal         = 0;      // Total duration in seconds
     uint32_t timerRemaining     = 0;      // Remaining time in seconds
+    uint8_t  timerMode          = 0;      // 0=Relative, 1=Absolute
+    uint8_t  timerAlarmHour     = 0;      // Alarm hour (0-23) for absolute mode
+    uint8_t  timerAlarmMinute   = 0;      // Alarm minute (0-59) for absolute mode
+
+    // Scheduler ("be ready at HH:MM")
+    bool     schedulerActive    = false;
+    uint8_t  schedulerTargetHour   = 0;   // Target ready time hour
+    uint8_t  schedulerTargetMinute = 0;   // Target ready time minute
+    float    schedulerTargetTemp   = 0;   // Target temperature
+    float    schedulerVolume       = 0;   // Water volume in liters
+    uint32_t schedulerStartTime    = 0;   // Calculated start unix timestamp
+    String   schedulerStatus       = "";  // Status message
 
     // Auto-Tune
     bool     autoTuneActive     = false;
