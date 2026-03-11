@@ -138,12 +138,13 @@ public:
             return;
         }
 
+        bool wasHeating = _heatingStarted;
         _state.schedulerActive = false;
         _heatingStarted = false;
         _state.schedulerStatus = "";
 
-        // Turn off heater if we started it
-        if (_heatingStarted) {
+        // Turn off heater if we had started it
+        if (wasHeating) {
             bus().publish(EventType::HeaterStateChanged, false);
             gState.mode = OperatingMode::Idle;
         }
