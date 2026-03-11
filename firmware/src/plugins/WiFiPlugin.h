@@ -120,7 +120,7 @@ public:
 
         String json;
         serializeJson(doc, json);
-        bus().publish(Event{EventType::BLESend, json});
+        bus().publish(Event(EventType::BLESend, json));
     }
 
 private:
