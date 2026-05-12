@@ -29,7 +29,7 @@
 //     from the native app.
 
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
-import type { BleAdapter } from './BleAdapter';
+import type { BleAdapter, BleScanDevice } from './BleAdapter';
 
 const NUS_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NUS_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notify: device → app
@@ -137,6 +137,7 @@ class NativeBleAdapter implements BleAdapter {
     private rxBuffer  = '';
     private monitorSub: any | null = null;
     private connectSub: any | null = null;
+    private scanning  = false;
 
     private _onMessage:    ((data: any) => void) | null = null;
     private _onConnect:    (() => void) | null = null;
@@ -161,6 +162,17 @@ class NativeBleAdapter implements BleAdapter {
             || Platform.OS === 'ios' || Platform.OS === 'android';
     }
 
+    /** Sim mode hard-wires the URL — no device to pick. Real BLE needs
+     *  the UI to drive a scan-and-select flow. */
+    needsPicker(): boolean {
+        return getSimUrl() === null;
+    }
+
+    /** Convenience: in sim mode opens the WebSocket directly; in real
+     *  BLE mode, scans for 10s and auto-connects to the first match.
+     *  UI prefers the explicit picker flow (`startScan` +
+     *  `connectToDevice`) on real BLE so users can choose between
+     *  multiple devices in range. */
     async connect(): Promise<void> {
         const simUrl = getSimUrl();
         if (simUrl) return this.connectSim(simUrl);
@@ -170,10 +182,6 @@ class NativeBleAdapter implements BleAdapter {
 
         const manager = this.ensureManager();
 
-        // Scan with a service-UUID filter so we don't get every
-        // advertisement on the air. Stop scanning the moment we find
-        // any Inversa device — the user can manage multiple devices
-        // later through a picker; for now, first hit wins.
         const device = await new Promise<any>((resolve, reject) => {
             const timer = setTimeout(() => {
                 manager.stopDeviceScan();
@@ -196,6 +204,81 @@ class NativeBleAdapter implements BleAdapter {
         });
 
         const connected = await device.connect();
+        await this.attachToDevice(connected);
+    }
+
+    startScan(
+        onDevice: (d: BleScanDevice) => void,
+        onError?: (e: Error) => void,
+    ): () => void {
+        // Sim mode: yield a single pseudo-device immediately. The UI
+        // picker then "connects" by routing through connectToDevice,
+        // which opens the WebSocket like the bare `connect()` does.
+        const simUrl = getSimUrl();
+        if (simUrl) {
+            queueMicrotask(() => onDevice({ id: '__sim__', name: `Simulador (${simUrl})` }));
+            return () => { /* noop */ };
+        }
+
+        let active = true;
+
+        const begin = async () => {
+            const ok = await ensureAndroidPermissions();
+            if (!active) return;
+            if (!ok) {
+                onError?.(new Error('Bluetooth: permissões negadas'));
+                return;
+            }
+            try {
+                const manager = this.ensureManager();
+                this.scanning = true;
+                manager.startDeviceScan([NUS_SERVICE_UUID], null, (error: any, d: any) => {
+                    if (!active) return;
+                    if (error) {
+                        onError?.(error);
+                        return;
+                    }
+                    if (d) {
+                        onDevice({
+                            id:   d.id,
+                            name: d.name ?? d.localName ?? null,
+                            rssi: d.rssi ?? null,
+                        });
+                    }
+                });
+            } catch (e: any) {
+                onError?.(e);
+            }
+        };
+
+        begin();
+
+        return () => {
+            active = false;
+            if (this.scanning && this.manager) {
+                try { this.manager.stopDeviceScan(); } catch { /* noop */ }
+                this.scanning = false;
+            }
+        };
+    }
+
+    async connectToDevice(id: string): Promise<void> {
+        const simUrl = getSimUrl();
+        if (simUrl) return this.connectSim(simUrl);
+
+        const manager = this.ensureManager();
+        // ble-plx's connectToDevice() does the GATT handshake; we still
+        // need our own service/characteristic discovery + monitor setup
+        // on top, which attachToDevice handles.
+        const device = await manager.connectToDevice(id);
+        await this.attachToDevice(device);
+    }
+
+    /** Shared post-scan wiring: discover services, subscribe to the TX
+     *  characteristic, register disconnect handler. Caller hands us an
+     *  already-connected Device (either via manager.connectToDevice or
+     *  device.connect()). */
+    private async attachToDevice(connected: any): Promise<void> {
         await connected.discoverAllServicesAndCharacteristics();
 
         // Track disconnects so the UI updates. ble-plx fires this for

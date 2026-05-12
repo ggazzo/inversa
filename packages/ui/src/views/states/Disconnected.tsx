@@ -1,6 +1,6 @@
 // Disconnected.tsx — single CTA card; adapts text for sim mode.
 import { Button, Card, H2, Paragraph, Text, YStack } from 'tamagui';
-import { showToast } from '@inversa/stores';
+import { showToast, devicePickerOpen } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { BleClient } from '@inversa/services';
 
@@ -8,6 +8,20 @@ export function Disconnected() {
     const supported = BleClient.isSupported();
     const simMode   = typeof location !== 'undefined'
         && !!new URLSearchParams(location.search).get('sim');
+
+    function onTap() {
+        // RN real BLE: open the in-app picker so the user can choose
+        // between nearby devices. Web's `requestDevice` and the sim
+        // WebSocket path don't need a picker — they fall through to
+        // a direct connect().
+        if (BleClient.needsPicker()) {
+            devicePickerOpen.value = true;
+            return;
+        }
+        ConnectionManager.connect().catch((err: any) => {
+            showToast(err?.message || 'Falha na conexão', 'error');
+        });
+    }
 
     return (
         <Card elevate size="$4" padded>
@@ -34,9 +48,7 @@ export function Disconnected() {
                 <Button
                     size="$5" theme="active"
                     disabled={!supported}
-                    onPress={() => ConnectionManager.connect().catch((err: any) => {
-                        showToast(err?.message || 'Falha na conexão', 'error');
-                    })}
+                    onPress={onTap}
                 >
                     {simMode ? 'Iniciar sessão simulada' : 'Conectar'}
                 </Button>

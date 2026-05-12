@@ -15,7 +15,9 @@
 // declared in BleAdapter.ts, which keeps the type-checker happy
 // without forcing per-platform .d.ts shims.
 
-import { createBleAdapter, type BleAdapter } from './BleAdapter';
+import { createBleAdapter, type BleAdapter, type BleScanDevice } from './BleAdapter';
+
+export type { BleScanDevice };
 
 class BleClientClass {
     private adapter: BleAdapter;
@@ -42,7 +44,12 @@ class BleClientClass {
     }
 
     isSupported(): boolean { return this.adapter.isSupported(); }
+    needsPicker(): boolean { return this.adapter.needsPicker(); }
     async connect(): Promise<void> { return this.adapter.connect(); }
+    startScan(onDevice: (d: BleScanDevice) => void, onError?: (e: Error) => void): () => void {
+        return this.adapter.startScan(onDevice, onError);
+    }
+    async connectToDevice(id: string): Promise<void> { return this.adapter.connectToDevice(id); }
     disconnect(): void { this.adapter.disconnect(); }
     async send(message: object): Promise<void> { return this.adapter.send(message); }
 
