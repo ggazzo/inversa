@@ -1,5 +1,6 @@
 // BrewLogSheet.tsx — start/stop the BrewLog + CSV/JSON multi-chunk export.
 import { useState } from 'react';
+import { Platform } from '../../platform';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, RadioGroup, Separator, Text, XStack, YStack } from 'tamagui';
 import { brewLogActive, brewLogEntries, showToast } from '@inversa/stores';
@@ -37,6 +38,16 @@ export function BrewLogSheet({ open, onClose }: Props) {
     function download() {
         const text = chunks.join('');
         if (!text) { showToast('Nada pra baixar — faça o export primeiro', 'error'); return; }
+
+        // Native file output needs expo-file-system + expo-sharing
+        // (write to documents dir, hand the URI to the share sheet).
+        // Out of scope for the Phase E audit pass — toast a stub so
+        // the button doesn't silently fail.
+        if (Platform.OS !== 'web') {
+            showToast('Export pra arquivo: em breve no app native', 'info');
+            return;
+        }
+
         const blob = new Blob([text], { type: fmt === 'json' ? 'application/json' : 'text/csv' });
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement('a');

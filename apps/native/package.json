@@ -18,6 +18,7 @@
     "@preact/signals-react": "^3.0.0",
     "@tamagui/config": "^1.121.0",
     "@tamagui/toast": "^1.121.0",
+    "burnt": "^0.13.0",
     "expo": "~55.0.23",
     "expo-dev-client": "~55.0.32",
     "expo-status-bar": "~55.0.6",

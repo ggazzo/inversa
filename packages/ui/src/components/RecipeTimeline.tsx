@@ -1,5 +1,6 @@
 // RecipeTimeline.tsx — full vertical timeline of the loaded recipe.
 import { useEffect, useRef } from 'react';
+import { Platform } from '../platform';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Card, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
@@ -69,9 +70,16 @@ export function RecipeTimeline() {
         }
     }, [recipeName.value]);
 
-    // Auto-scroll the current step into view.
+    // Auto-scroll the current step into view. Web uses scrollIntoView
+    // on the DOM child marked with `data-current`. RN's equivalent
+    // (`ScrollView.scrollTo` with a measured offset) needs per-row
+    // refs and `onLayout` plumbing — deferred. Manual scroll on
+    // mobile is acceptable for the timeline.
     useEffect(() => {
-        const el = listRef.current?.querySelector('[data-current="true"]') as HTMLElement | null;
+        if (Platform.OS !== 'web') return;
+        const el = (listRef.current as any)?.querySelector?.(
+            '[data-current="true"]',
+        ) as HTMLElement | null;
         if (el && typeof el.scrollIntoView === 'function') {
             el.scrollIntoView({ block: 'center', behavior: 'smooth' });
         }

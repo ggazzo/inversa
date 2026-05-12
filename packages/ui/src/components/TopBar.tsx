@@ -3,6 +3,7 @@
 // an overflow popover that opens the wizard/sheet dispatcher.
 
 import { useState } from 'react';
+import { Platform } from '../platform';
 import { Button, Popover, Text, XStack, YStack, useTheme } from 'tamagui';
 import { isConnected, deviceName, mode, modeLabel } from '@inversa/stores';
 import { isStale } from '@inversa/stores';
@@ -64,12 +65,15 @@ export function TopBar({ onMenuSelect }: Props) {
     return (
         <XStack
             tag="header"
-            // position:sticky isn't part of RN-style positioning the Tamagui
-            // compiler models; we drop to raw style for it. We keep the
-            // z-index low (10) and rely on the Sheet's portal+zIndex
-            // ladder to layer above us — `sticky` creates a stacking
-            // context, so a too-high zi here would compete with modals.
-            style={{ position: 'sticky', top: 0, zIndex: 10 }}
+            // position:sticky is web-only; RN's StyleSheet rejects it and
+            // warns. On RN the TopBar lives inside a flex column above
+            // the brew screen, so a static layout is fine — no sticky
+            // needed. zIndex stays low because the Sheet portal layers
+            // above us via its own zIndex ladder; sticky creates a
+            // stacking context on web so a high value here would compete.
+            style={Platform.OS === 'web'
+                ? { position: 'sticky' as any, top: 0, zIndex: 10 }
+                : undefined}
             height={48}
             backgroundColor="$background"
             borderBottomWidth={1} borderBottomColor="$borderColor"
