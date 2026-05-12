@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "build:firmware": "vite build --outDir ../firmware/data --emptyOutDir",
+    "build:firmware": "vite build --outDir ../../firmware/data --emptyOutDir",
     "icons": "node scripts/generate-icons.mjs",
     "prebuild": "node scripts/generate-icons.mjs",
     "prebuild:firmware": "node scripts/generate-icons.mjs"
