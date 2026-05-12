@@ -130,15 +130,26 @@ export const confirmMessage = signal('');
 
 // ─── Temperature History (for chart) ────────────────────────
 const MAX_HISTORY = 300;  // 5 minutes at 1Hz
+// Throttle interval — the chart only needs one sample per second to
+// show a useful trend, and the firmware's real BLE link runs at 1Hz
+// anyway. The sim bridge with the default `--scale 60` pushes
+// telemetry at ~60Hz; without this gate the chart's polyline rebuild
+// + SVG re-render saturates the JS thread on RN and starves the
+// native gesture queue, freezing taps and scroll.
+const HISTORY_MIN_INTERVAL_MS = 1000;
+let _lastHistoryPushMs = 0;
+
 export const tempHistory   = signal<number[]>([]);
 export const targetHistory = signal<number[]>([]);
 export const outputHistory = signal<number[]>([]);
 export const timeLabels    = signal<string[]>([]);
 
 export function addTelemetryPoint(temp: number, target: number, output: number): void {
-  const now = new Date();
-  const label = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-  
+  const nowMs = Date.now();
+  if (nowMs - _lastHistoryPushMs < HISTORY_MIN_INTERVAL_MS) return;
+  _lastHistoryPushMs = nowMs;
+
+  const label = new Date(nowMs).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   tempHistory.value = [...tempHistory.value.slice(-(MAX_HISTORY - 1)), temp];
   targetHistory.value = [...targetHistory.value.slice(-(MAX_HISTORY - 1)), target];
   outputHistory.value = [...outputHistory.value.slice(-(MAX_HISTORY - 1)), output];
