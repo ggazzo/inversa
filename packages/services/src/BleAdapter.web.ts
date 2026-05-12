@@ -17,7 +17,7 @@
 // The rid/request-correlation layer used to live here too; it now
 // belongs to BleClient (portable, runs above any transport).
 
-import type { BleAdapter } from './BleAdapter';
+import type { BleAdapter, BleScanDevice } from './BleAdapter';
 
 const NUS_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NUS_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notify: device → app
@@ -37,6 +37,23 @@ class WebBleAdapter implements BleAdapter {
 
     isSupported(): boolean {
         return !!navigator.bluetooth || this._simUrl() !== null;
+    }
+
+    /** Web's BLE picker lives inside `navigator.bluetooth.requestDevice`
+     *  — the browser draws it. So we never need an in-app picker. */
+    needsPicker(): boolean { return false; }
+
+    /** No-op on web: the browser's `requestDevice` picker doesn't
+     *  expose a scan stream to us. Kept so the BleAdapter interface
+     *  is satisfied; UI calls connect() directly on web. */
+    startScan(_onDevice: (d: BleScanDevice) => void, _onError?: (e: Error) => void): () => void {
+        return () => { /* noop */ };
+    }
+
+    async connectToDevice(_id: string): Promise<void> {
+        // Web doesn't expose a scan-then-connect-by-id flow — connect()
+        // pops the browser picker which already lets the user choose.
+        return this.connect();
     }
 
     _simUrl(): string | null {

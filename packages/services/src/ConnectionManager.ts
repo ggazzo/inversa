@@ -74,6 +74,25 @@ class ConnectionManagerClass {
     BleClient.disconnect();
   }
 
+  /** True when the UI must show its own device-picker (RN real BLE).
+   *  False on web (browser picker) and RN sim (single fixed WS URL). */
+  needsPicker() {
+    return BleClient.needsPicker();
+  }
+
+  /** Start scanning for nearby Inversa devices. UI must call the
+   *  returned stop function when the picker is dismissed. */
+  scanForDevices(onDevice, onError) {
+    this.init();
+    return BleClient.startScan(onDevice, onError);
+  }
+
+  /** Connect to a specific device picked from a scan result. */
+  async connectToDevice(id) {
+    this.init();
+    await BleClient.connectToDevice(id);
+  }
+
   // Shorthand for requests
   async setTemp(value) {
     return BleClient.request('req:set-temp', { v: value });
