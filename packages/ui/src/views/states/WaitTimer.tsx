@@ -5,6 +5,7 @@ import {
 } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { fmtMmSs } from '../../components/util';
+import { confirm } from '../../platform';
 
 export function WaitTimer() {
     return (
@@ -33,7 +34,7 @@ export function WaitTimer() {
                         Pausar
                     </Button>
                     <Button flex={1} size="$2" variant="outlined" theme="red"
-                        onPress={() => { if (confirm('Parar receita?')) ConnectionManager.stopRecipe(); }}>
+                        onPress={async () => { if (await confirm('Parar receita?')) ConnectionManager.stopRecipe(); }}>
                         Parar
                     </Button>
                 </XStack>
