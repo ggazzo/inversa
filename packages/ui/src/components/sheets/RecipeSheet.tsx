@@ -4,6 +4,7 @@ import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { showToast, loadedRecipeContent } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { WizardSheet } from '../wizards/WizardSheet';
+import { confirm } from '../../platform';
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -42,8 +43,8 @@ export function RecipeSheet({ open, onClose }: Props) {
             .catch((e: any) => showToast(e?.message || 'Falha', 'error'));
     }
 
-    function del(file: string) {
-        if (!window.confirm(`Apagar ${file}?`)) return;
+    async function del(file: string) {
+        if (!(await confirm(`Apagar ${file}?`))) return;
         ConnectionManager.deleteRecipe(file)
             .then(() => { showToast('Apagado'); refresh(); })
             .catch((e: any) => showToast(e?.message || 'Falha', 'error'));

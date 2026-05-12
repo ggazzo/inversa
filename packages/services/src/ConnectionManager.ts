@@ -4,7 +4,8 @@
 //
 // ConnectionManager.ts — Manages BLE connection lifecycle and message routing.
 import { BleClient } from './BleClient';
-// Note: prior versions imported `BLEService` from './BLEService' — the
+import { Notifications } from './notifications';
+// Note: prior versions imported `BLEService` from './BLEService` — the
 // rename to BleClient is the only public-API delta from Phase D.
 
 import { lastTelemetryMs } from '@inversa/stores';
@@ -32,21 +33,15 @@ class ConnectionManagerClass {
   }
 
   async requestNotificationPermission() {
-    if (!('Notification' in window)) {
-      showToast('Notificações não suportadas', 'error');
+    if (!Notifications.isSupported()) {
+      showToast('Notificações não suportadas nesta plataforma', 'error');
       return false;
     }
-
-    const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      notificationsEnabled.value = true;
-      showToast('Notificações ativadas', 'success');
-      return true;
-    } else {
-      notificationsEnabled.value = false;
-      showToast('Permissão negada', 'error');
-      return false;
-    }
+    const granted = await Notifications.requestPermission();
+    notificationsEnabled.value = granted;
+    showToast(granted ? 'Notificações ativadas' : 'Permissão negada',
+              granted ? 'success' : 'error');
+    return granted;
   }
 
   init() {
@@ -497,20 +492,7 @@ class ConnectionManagerClass {
   }
 
   _sendNotification(title, body) {
-    if (!('Notification' in window)) return;
-    if (Notification.permission !== 'granted') return;
-    
-    try {
-      new Notification(title, {
-        body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
-        tag: 'inversa-notification',
-        renotify: true
-      });
-    } catch (e) {
-      console.warn('Notification failed:', e);
-    }
+    Notifications.send(title, body);
   }
 }
 
