@@ -1,18 +1,22 @@
-// App.tsx — RN shell. Mirrors apps/web/src/App.tsx but adds the RN-only
-// providers (GestureHandlerRootView, SafeAreaProvider) and the Tamagui
-// provider that the web side doesn't need at this level.
+// App.tsx — RN shell. Diagnostic build to isolate the post-connect
+// interaction lockup. Everything previously suspected (bare <Toast />,
+// burnt adapter, all-mounted sheets) has been removed; this version
+// also temporarily drops <ToastViewport> and <HopAlertOverlay> from
+// the tree so the only thing layered above BrewView is the TopBar.
+//
+// Once tap + scroll come back, we can add the pieces back one by one.
 
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
-import { ToastProvider, ToastViewport } from '@tamagui/toast';
+import { ToastProvider } from '@tamagui/toast';
 import { ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
 import { theme, mode } from '@inversa/stores';
 import {
-    TopBar, BrewView, HopAlertOverlay, ToastBridge,
+    TopBar, BrewView, ToastBridge,
     RecipeSheet, BrewLogSheet,
     WizardEquipment, WizardConnectivity, WizardTuning,
     WizardNotifications, WizardAbout,
@@ -34,19 +38,11 @@ export default function App() {
             <SafeAreaProvider>
                 <TamaguiProvider config={config} defaultTheme={theme.value}>
                     <Theme name={theme.value}>
-                        {/* native={[]} disables Tamagui's burnt-backed native
-                            toast adapter; we use the in-tree ToastViewport
-                            instead so the toast Z-layer stays inside our
-                            React view hierarchy (matching the web build). */}
                         <ToastProvider swipeDirection="horizontal" duration={3000} native={[]}>
                             <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
                                 <YStack flex={1} backgroundColor="$background">
                                     <TopBar onMenuSelect={setOpenSheet} />
 
-                                    {/* Tamagui's ScrollView (RN ScrollView + tamagui styling)
-                                        is the canonical pattern for scrolling content inside a
-                                        Tamagui tree. RN's bare <ScrollView> caused weird touch
-                                        propagation when nested in Tamagui flex layouts. */}
                                     <ScrollView
                                         flex={1}
                                         contentContainerStyle={{ flexGrow: 1 }}
@@ -59,10 +55,6 @@ export default function App() {
                                         />
                                     </ScrollView>
 
-                                    {/* Only mount the sheet that's actually open. Mounting all
-                                        7 at once leaves their Portal containers in the tree at
-                                        zIndex 100k+; on RN those swallowed touches even with
-                                        `open={false}`. */}
                                     {openSheet === 'recipes'       && <RecipeSheet        open onClose={close} />}
                                     {openSheet === 'brewlog'       && <BrewLogSheet       open onClose={close} />}
                                     {openSheet === 'equipment'     && <WizardEquipment    open onClose={close} />}
@@ -71,12 +63,16 @@ export default function App() {
                                     {openSheet === 'notifications' && <WizardNotifications open onClose={close} />}
                                     {openSheet === 'about'         && <WizardAbout        open onClose={close} />}
 
-                                    <HopAlertOverlay />
                                     <ToastBridge />
                                 </YStack>
                             </SafeAreaView>
-
-                            <ToastViewport top={8} right={8} />
+                            {/* TEMPORARILY REMOVED for diagnostic:
+                                <ToastViewport top={8} right={8} />
+                                <HopAlertOverlay />
+                                These were the most likely candidates for an
+                                invisible overlay blocking taps. If they're
+                                gone and clicks still don't work, the issue
+                                is in the BrewView subtree or the chart. */}
                         </ToastProvider>
                     </Theme>
                 </TamaguiProvider>
