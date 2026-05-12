@@ -258,13 +258,15 @@ private:
         }
 
         // Timer info (generic countdown timer)
+        // P1 fix: tmrP/tmrT keys avoid collision with FIELD_TYPE("tp") and
+        // FIELD_TARGET_TEMP("tt") — old keys froze the UI when timer was active.
         if (gState.timerActive) {
-            doc["ta"] = true;
-            doc["tp"] = gState.timerPaused;
-            doc["tt"] = gState.timerTotal;
-            doc["tr"] = gState.timerRemaining;
-            doc["tm"] = gState.timerMode;  // 0=relative, 1=absolute
-            if (gState.timerMode == 1) {   // Absolute mode
+            doc["ta"]   = true;
+            doc["tmrP"] = gState.timerPaused;
+            doc["tmrT"] = gState.timerTotal;
+            doc["tr"]   = gState.timerRemaining;
+            doc["tm"]   = gState.timerMode;  // 0=relative, 1=absolute
+            if (gState.timerMode == 1) {     // Absolute mode
                 doc["tah"] = gState.timerAlarmHour;
                 doc["tam"] = gState.timerAlarmMinute;
             }

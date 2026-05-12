@@ -77,6 +77,59 @@ public:
         DEBUG_PRINTLN("[NVS] WiFi credentials cleared");
     }
 
+    // ── Thermal Parameters (P13) ────────────────────────────
+    // Persist vessel thermal params so feed-forward survives reboot.
+    // Keys ≤15 chars (NVS limit).
+    void saveThermalParams(float volumeL, float powerW, float ambientC,
+                           float diameterM, float lossCoeff) {
+        _prefs.putFloat("therm_vol_l",  volumeL);
+        _prefs.putFloat("therm_pwr_w",  powerW);
+        _prefs.putFloat("therm_amb_c",  ambientC);
+        _prefs.putFloat("therm_diam_m", diameterM);
+        _prefs.putFloat("therm_loss_c", lossCoeff);
+        DEBUG_PRINTF("[NVS] Saved thermal: V=%.1fL P=%.0fW Tamb=%.1f D=%.2fm h=%.1f\n",
+                     volumeL, powerW, ambientC, diameterM, lossCoeff);
+    }
+
+    float loadThermalVolumeL(float defaultVal)    { return _prefs.getFloat("therm_vol_l",  defaultVal); }
+    float loadThermalPowerW(float defaultVal)     { return _prefs.getFloat("therm_pwr_w",  defaultVal); }
+    float loadThermalAmbientC(float defaultVal)   { return _prefs.getFloat("therm_amb_c",  defaultVal); }
+    float loadThermalDiameterM(float defaultVal)  { return _prefs.getFloat("therm_diam_m", defaultVal); }
+    float loadThermalLossCoeff(float defaultVal)  { return _prefs.getFloat("therm_loss_c", defaultVal); }
+
+    bool hasThermalParams() {
+        return _prefs.isKey("therm_vol_l");
+    }
+
+    // ── RTC / Timezone (P14) ────────────────────────────────
+    // UTC offset in minutes — supports half-hour zones (e.g., India = 330).
+    // Default −180 = UTC-3 (Brazil; matches previous hardcoded behavior).
+    void saveTimezoneOffsetMin(int16_t minutes) {
+        _prefs.putInt("rtc_tz_min", (int32_t)minutes);
+        DEBUG_PRINTF("[NVS] Saved timezone offset: %d min\n", minutes);
+    }
+
+    int16_t loadTimezoneOffsetMin(int16_t defaultVal = -180) {
+        return (int16_t)_prefs.getInt("rtc_tz_min", defaultVal);
+    }
+
+    bool hasTimezoneOffset() {
+        return _prefs.isKey("rtc_tz_min");
+    }
+
+    // ── Factory Reset (P7 — guarded clear) ──────────────────
+    // Apaga todo o namespace `inversa`. Caller deve confirmar com magic
+    // string antes de chamar; ver CommandHandler::handleFactoryReset.
+    bool factoryReset(const String& confirm) {
+        if (confirm != "ERASE_ALL") {
+            DEBUG_PRINTLN("[NVS] factoryReset rejected — missing confirm");
+            return false;
+        }
+        _prefs.clear();
+        DEBUG_PRINTLN("[NVS] Factory reset — namespace 'inversa' cleared");
+        return true;
+    }
+
     // ── Generic Methods ─────────────────────────────────────
     void putFloat(const char* key, float value) {
         _prefs.putFloat(key, value);

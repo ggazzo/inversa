@@ -5,6 +5,7 @@
 #include <RTClib.h>
 #include "../core/Plugin.h"
 #include "../core/EventBus.h"
+#include "../core/NVSStorage.h"
 #include "../core/constants.h"
 #include "../models/MachineState.h"
 #include "WiFiPlugin.h"
@@ -23,9 +24,16 @@ public:
     const char* getName() const override { return "RTC"; }
 
     bool setup() override {
+        // P14 — load persisted timezone offset (defaults to UTC-3 / Brazil).
+        _tzOffsetMin = NVSStorage::instance().loadTimezoneOffsetMin(-180);
+        DEBUG_PRINTF("[RTC] Timezone offset: %d min (UTC%+d:%02u)\n",
+                     _tzOffsetMin,
+                     _tzOffsetMin / 60,
+                     (unsigned)(_tzOffsetMin < 0 ? -_tzOffsetMin : _tzOffsetMin) % 60);
+
         // Initialize I2C with board-specific pins
         Wire.begin(PIN_I2C_SDA, PIN_I2C_SCL);
-        
+
         // Try to initialize RTC
         if (_rtc.begin()) {
             _rtcAvailable = true;
@@ -129,9 +137,9 @@ public:
         }
 
         DEBUG_PRINTLN("[RTC] Syncing with NTP...");
-        
-        // Use configTime for ESP32 built-in NTP
-        configTime(NTP_UTC_OFFSET_SEC, 0, NTP_SERVER);
+
+        // P14 — use the user-configurable offset (was hardcoded UTC-3).
+        configTime((long)_tzOffsetMin * 60L, 0, NTP_SERVER);
         
         // Wait for time to be set (with timeout)
         uint32_t start = millis();
@@ -176,20 +184,34 @@ public:
     bool isAvailable() const { return _rtcAvailable; }
     bool isNtpSynced() const { return _state.rtcNtpSynced; }
 
+    // P14 — timezone API. Offset in minutes from UTC (e.g., -180 for UTC-3).
+    // Persists to NVS and re-applies on next NTP sync. Valid range covers all
+    // real-world zones (−12:00 to +14:00) plus the few half-hour ones.
+    int16_t getTimezoneOffsetMin() const { return _tzOffsetMin; }
+
+    bool setTimezoneOffsetMin(int16_t minutes) {
+        if (minutes < -720 || minutes > 840) return false;  // -12:00..+14:00
+        _tzOffsetMin = minutes;
+        NVSStorage::instance().saveTimezoneOffsetMin(minutes);
+        // Re-apply immediately if we already have NTP / WiFi.
+        if (_wifi.isConnected()) syncNTP();
+        return true;
+    }
+
 private:
     static constexpr const char* NTP_SERVER = "pool.ntp.org";
-    static constexpr int32_t NTP_UTC_OFFSET_SEC = -3 * 3600;  // UTC-3 (Brazil)
     static constexpr uint32_t NTP_SYNC_INTERVAL_MS = 3600000;  // 1 hour
     static constexpr uint32_t NTP_RETRY_INTERVAL_MS = 30000;   // 30 seconds
 
     MachineState& _state;
     WiFiPlugin& _wifi;
     RTC_DS1307 _rtc;
-    
+
     bool _rtcAvailable = false;
     bool _ntpSyncPending = false;
     uint32_t _lastUpdate = 0;
     uint32_t _lastNtpAttempt = 0;
     uint32_t _lastNtpSuccess = 0;
     uint32_t _bootTimestamp = 0;  // Fallback if no RTC
+    int16_t  _tzOffsetMin = -180; // P14 — default UTC-3 (Brazil)
 };

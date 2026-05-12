@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include "../core/EventBus.h"
+#include "../core/NVSStorage.h"
 #include "../core/constants.h"
 #include "../core/RecoveryManager.h"
 #include "../models/MachineState.h"
@@ -118,6 +119,11 @@ public:
             if (!_sd || !_recipe) { sendError(rid, "Not available"); return; }
             String filename = doc["file"] | "";
             if (filename.isEmpty()) { sendError(rid, "No filename"); return; }
+            // P2 — defense in depth: SDCardPlugin also validates, but we want a
+            // clean "Invalid filename" error instead of silent "File not found".
+            if (!SDCardPlugin::isValidRecipeFilename(filename)) {
+                sendError(rid, "Invalid filename"); return;
+            }
 
             String content = _sd->readRecipe(filename);
             if (content.isEmpty()) { sendError(rid, "File not found"); return; }
@@ -135,7 +141,10 @@ public:
             String filename = doc["file"] | "";
             String content = doc["content"] | "";
             if (filename.isEmpty()) { sendError(rid, "No filename"); return; }
-            
+            if (!SDCardPlugin::isValidRecipeFilename(filename)) {
+                sendError(rid, "Invalid filename"); return;
+            }
+
             if (_sd->writeRecipe(filename, content)) {
                 sendOk(rid);
             } else {
@@ -146,6 +155,9 @@ public:
         else if (strcmp(type, Protocol::REQ_RECIPE_DELETE) == 0) {
             if (!_sd) { sendError(rid, "No SD card"); return; }
             String filename = doc["file"] | "";
+            if (!SDCardPlugin::isValidRecipeFilename(filename)) {
+                sendError(rid, "Invalid filename"); return;
+            }
             if (_sd->deleteRecipe(filename)) {
                 sendOk(rid);
             } else {
@@ -157,6 +169,9 @@ public:
             if (!_recipe || !_sd) { sendError(rid, "Not available"); return; }
             String filename = doc["file"] | "";
             if (filename.isEmpty()) { sendError(rid, "No filename"); return; }
+            if (!SDCardPlugin::isValidRecipeFilename(filename)) {
+                sendError(rid, "Invalid filename"); return;
+            }
 
             String content = _sd->readRecipe(filename);
             if (content.isEmpty()) { sendError(rid, "File not found"); return; }
@@ -247,8 +262,10 @@ public:
                 return;
             }
             
-            // Load the recipe content
-            String content = _sd->readRecipe(String(recoveryData.recipeName) + ".txt");
+            // P4 — recoveryData.recipeName already includes ".txt" (v2 stores
+            // the full filename). Stop concatenating, which produced ".txt.txt"
+            // and broke resume.
+            String content = _sd->readRecipe(String(recoveryData.recipeName));
             if (content.isEmpty()) {
                 sendError(rid, "Recipe file not found");
                 RecoveryManager::instance().clearRecovery();
@@ -463,6 +480,26 @@ public:
             _rtc->syncNTP();
             sendOk(rid);
         }
+        // ── RTC: Timezone Get (P14) ─────────────────────────
+        else if (strcmp(type, Protocol::REQ_RTC_TZ_GET) == 0) {
+            if (!_rtc) { sendError(rid, "RTC not available"); return; }
+            JsonDocument res;
+            res[Protocol::FIELD_TYPE] = Protocol::RES_OK;
+            res[Protocol::FIELD_REQUEST_ID] = rid;
+            res["min"] = _rtc->getTimezoneOffsetMin();
+            _ble->sendJson(res);
+        }
+        // ── RTC: Timezone Set (P14) ─────────────────────────
+        else if (strcmp(type, Protocol::REQ_RTC_TZ_SET) == 0) {
+            if (!_rtc) { sendError(rid, "RTC not available"); return; }
+            int min = doc["min"] | -181;  // sentinel for missing
+            if (min < -720 || min > 840) { sendError(rid, "min out of range [-720,840]"); return; }
+            if (!_rtc->setTimezoneOffsetMin((int16_t)min)) {
+                sendError(rid, "Failed to set timezone");
+                return;
+            }
+            sendOk(rid);
+        }
         // ── Timer: Start ────────────────────────────────────
         else if (strcmp(type, Protocol::REQ_TIMER_START) == 0) {
             if (!_timer) { sendError(rid, "Timer not available"); return; }
@@ -578,6 +615,53 @@ public:
             if (!_scheduler) { sendError(rid, "Scheduler not available"); return; }
             _scheduler->cancel();
             sendOk(rid);
+        }
+        // ── Thermal Settings: Get (P13) ─────────────────────
+        else if (strcmp(type, Protocol::REQ_SETTINGS_THERMAL_GET) == 0) {
+            JsonDocument res;
+            res[Protocol::FIELD_TYPE] = Protocol::RES_SETTINGS_THERMAL;
+            res[Protocol::FIELD_REQUEST_ID] = rid;
+            res["volumeL"]   = gState.volumeLiters;
+            res["powerW"]    = gState.heaterPowerWatts;
+            res["ambientC"]  = gState.ambientTemp;
+            res["diameterM"] = gState.vesselDiameter;
+            res["lossCoeff"] = gState.heatLossCoeff;
+            res["persisted"] = NVSStorage::instance().hasThermalParams();
+            _ble->sendJson(res);
+        }
+        // ── Thermal Settings: Set + persist (P13) ───────────
+        else if (strcmp(type, Protocol::REQ_SETTINGS_THERMAL_SET) == 0) {
+            float volumeL   = doc["volumeL"]   | gState.volumeLiters;
+            float powerW    = doc["powerW"]    | gState.heaterPowerWatts;
+            float ambientC  = doc["ambientC"]  | gState.ambientTemp;
+            float diameterM = doc["diameterM"] | gState.vesselDiameter;
+            float lossCoeff = doc["lossCoeff"] | gState.heatLossCoeff;
+
+            // Physical ranges — defensive against typos in the app.
+            if (volumeL   < 1.0f   || volumeL   > 200.0f) { sendError(rid, "volumeL must be 1-200L"); return; }
+            if (powerW    < 500.0f || powerW    > 10000.0f) { sendError(rid, "powerW must be 500-10000W"); return; }
+            if (ambientC  < -10.0f || ambientC  > 50.0f)  { sendError(rid, "ambientC must be -10..50C"); return; }
+            if (diameterM < 0.1f   || diameterM > 1.0f)   { sendError(rid, "diameterM must be 0.1-1.0m"); return; }
+            if (lossCoeff < 1.0f   || lossCoeff > 50.0f)  { sendError(rid, "lossCoeff must be 1-50 W/m²K"); return; }
+
+            gState.volumeLiters     = volumeL;
+            gState.heaterPowerWatts = powerW;
+            gState.ambientTemp      = ambientC;
+            gState.vesselDiameter   = diameterM;
+            gState.heatLossCoeff    = lossCoeff;
+            NVSStorage::instance().saveThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff);
+            sendOk(rid);
+        }
+        // ── Factory Reset (P7, guarded) ─────────────────────
+        // Requires {confirm: "ERASE_ALL"} to wipe the NVS namespace.
+        else if (strcmp(type, Protocol::REQ_FACTORY_RESET) == 0) {
+            String confirm = doc["confirm"] | "";
+            if (!NVSStorage::instance().factoryReset(confirm)) {
+                sendError(rid, "Missing confirm: \"ERASE_ALL\""); return;
+            }
+            sendOk(rid);
+            // Device should be rebooted by the user; we don't auto-restart so
+            // the cervejeiro can decide.
         }
         else {
             sendError(rid, "Unknown command");

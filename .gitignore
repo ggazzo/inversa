@@ -23,3 +23,10 @@ firmware/data/
 
 # OS
 Thumbs.db
+
+# Reversa
+.reversa/config.user.toml
+_reversa_sdd/
+
+# OTA signing keys (P8) — NEVER commit private keys
+firmware/secrets/

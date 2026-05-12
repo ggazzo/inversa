@@ -1,7 +1,8 @@
-// Inversa v2 — Homebrewing Temperature Controller
+// Inversa v3 — Homebrewing Temperature Controller
 // main.cpp — Entry point
 
 #include <Arduino.h>
+#include <esp_ota_ops.h>           // P9: rollback automático pós-OTA
 #include "core/constants.h"
 #include "core/EventBus.h"
 #include "core/PluginManager.h"
@@ -48,6 +49,23 @@ void setup() {
     // Initialize NVS storage for persistent settings
     NVSStorage::instance().begin();
 
+    // P13: load persisted thermal params into gState before any plugin reads them
+    // (PIDPlugin feed-forward depends on these). Defaults from MachineState are
+    // used on fresh installs (hasThermalParams() == false).
+    {
+        auto& nvs = NVSStorage::instance();
+        if (nvs.hasThermalParams()) {
+            gState.volumeLiters     = nvs.loadThermalVolumeL(gState.volumeLiters);
+            gState.heaterPowerWatts = nvs.loadThermalPowerW(gState.heaterPowerWatts);
+            gState.ambientTemp      = nvs.loadThermalAmbientC(gState.ambientTemp);
+            gState.vesselDiameter   = nvs.loadThermalDiameterM(gState.vesselDiameter);
+            gState.heatLossCoeff    = nvs.loadThermalLossCoeff(gState.heatLossCoeff);
+            DEBUG_PRINTF("[System] Thermal params loaded: V=%.1fL P=%.0fW Tamb=%.1f D=%.2fm h=%.1f\n",
+                         gState.volumeLiters, gState.heaterPowerWatts, gState.ambientTemp,
+                         gState.vesselDiameter, gState.heatLossCoeff);
+        }
+    }
+
     auto& pm = PluginManager::instance();
 
     // Register plugins in dependency order
@@ -71,8 +89,14 @@ void setup() {
     // Initialize all plugins
     pm.setup();
 
+    // P18 — give BrewLog a handle to SD for batched flushes.
+    brewLog->setSDCard(sd);
+
     // Initialize recovery manager
     RecoveryManager::instance().init(sd);
+    // P11 — increment bootAttempts BEFORE checking validity, so repeated
+    // crashes during restore eventually exceed the limit and we stop offering.
+    RecoveryManager::instance().noteBootAttempt();
 
     // Wire up command handler (routes BLE commands to plugins)
     commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler);
@@ -91,13 +115,39 @@ void setup() {
 
     // System ready
     EventBus::instance().publish(EventType::SystemReady);
-    
+
     DEBUG_PRINTLN();
     DEBUG_PRINTF("[System] Free heap: %d bytes\n", ESP.getFreeHeap());
     DEBUG_PRINTLN("[System] Ready. Waiting for BLE connection...");
+
+    // ─── P9: OTA rollback automático ────────────────────────────
+    // Se este boot é um firmware recém-instalado via OTA, o ESP-IDF marca
+    // a partição como ESP_OTA_IMG_PENDING_VERIFY. Damos 60s de operação
+    // estável antes de marcar como VALID. Se o firmware crashar antes
+    // disso, o bootloader faz rollback automático para a versão anterior
+    // no próximo boot.
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    esp_ota_img_states_t otaState;
+    if (running && esp_ota_get_state_partition(running, &otaState) == ESP_OK) {
+        if (otaState == ESP_OTA_IMG_PENDING_VERIFY) {
+            gState.otaVerifyDeadline = millis() + 60000;  // 60s
+            DEBUG_PRINTLN("[OTA] Firmware pending verify — 60s para confirmar estabilidade");
+        }
+    }
 }
 
 void loop() {
     PluginManager::instance().loop();
     gState.uptimeMs = millis();
+
+    // ─── P9: confirmar firmware estável após 60s sem crash ──────
+    if (gState.otaVerifyDeadline > 0 && millis() > gState.otaVerifyDeadline) {
+        esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
+        if (err == ESP_OK) {
+            DEBUG_PRINTLN("[OTA] Firmware marcado como VALID — rollback desabilitado");
+        } else {
+            DEBUG_PRINTF("[OTA] Falha ao marcar app valid (err=%d)\n", err);
+        }
+        gState.otaVerifyDeadline = 0;
+    }
 }

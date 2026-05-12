@@ -4,11 +4,23 @@
 #include <SD.h>
 #include <SPI.h>
 #include "../core/Plugin.h"
+#include "../core/Filename.h"
 #include "../core/constants.h"
 #include "../models/MachineState.h"
 
 class SDCardPlugin : public Plugin {
 public:
+    static constexpr size_t MAX_FILENAME_LEN = Filename::MAX_RECIPE_FILENAME_LEN;
+    // P16 — readString() loads whole file in RAM; ESP32-C3 heap ~200KB
+    static constexpr size_t MAX_RECIPE_SIZE  = 50 * 1024;
+
+    // P2 — delegates to Filename::isValidRecipeFilename so the validator is
+    // unit-tested on native and there's a single source of truth shared with
+    // CommandHandler (defense in depth).
+    static bool isValidRecipeFilename(const String& name) {
+        return Filename::isValidRecipeFilename(name);
+    }
+
     const char* getName() const override { return "SDCard"; }
 
     bool setup() override {
@@ -44,6 +56,7 @@ public:
     // List all .txt files in /recipes
     std::vector<String> listRecipes() {
         std::vector<String> recipes;
+        if (!_mounted) return recipes;
         File dir = SD.open(SD_RECIPES_DIR);
         if (!dir || !dir.isDirectory()) return recipes;
 
@@ -59,11 +72,23 @@ public:
         return recipes;
     }
 
-    // Read recipe file content
+    // Read recipe file content (capped at MAX_RECIPE_SIZE to prevent OOM)
     String readRecipe(const String& filename) {
+        if (!_mounted) return "";
+        if (!isValidRecipeFilename(filename)) {
+            DEBUG_PRINTF("[SDCard] readRecipe rejected: invalid filename '%s'\n", filename.c_str());
+            return "";
+        }
         String path = String(SD_RECIPES_DIR) + "/" + filename;
         File file = SD.open(path, FILE_READ);
         if (!file) return "";
+
+        if (file.size() > MAX_RECIPE_SIZE) {
+            DEBUG_PRINTF("[SDCard] readRecipe rejected: '%s' is %u bytes (max %u)\n",
+                         filename.c_str(), (unsigned)file.size(), (unsigned)MAX_RECIPE_SIZE);
+            file.close();
+            return "";
+        }
 
         String content = file.readString();
         file.close();
@@ -72,6 +97,9 @@ public:
 
     // Write recipe file
     bool writeRecipe(const String& filename, const String& content) {
+        if (!_mounted) return false;
+        if (!isValidRecipeFilename(filename)) return false;
+        if (content.length() > MAX_RECIPE_SIZE) return false;
         String path = String(SD_RECIPES_DIR) + "/" + filename;
         File file = SD.open(path, FILE_WRITE);
         if (!file) return false;
@@ -83,6 +111,8 @@ public:
 
     // Delete recipe file
     bool deleteRecipe(const String& filename) {
+        if (!_mounted) return false;
+        if (!isValidRecipeFilename(filename)) return false;
         String path = String(SD_RECIPES_DIR) + "/" + filename;
         return SD.remove(path);
     }

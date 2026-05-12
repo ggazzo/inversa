@@ -141,9 +141,14 @@ public:
         );
     }
 
-    // Publish an event to all subscribers
+    // Publish an event to all subscribers.
+    // P12 fix: copy _subscriptions before iterating so that subscribers may
+    // safely call subscribe()/unsubscribe() inside their own callback without
+    // invalidating the iterator. Cost: ~50 elements × ~16 bytes per publish
+    // (irrelevant on ESP32 at typical publish rates).
     void publish(const Event& event) {
-        for (auto& sub : _subscriptions) {
+        auto subs_copy = _subscriptions;
+        for (auto& sub : subs_copy) {
             if (sub.type == event.type) {
                 sub.callback(event);
             }

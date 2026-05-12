@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - v2
+      - v3
     paths:
       - "web/**"
       - ".github/workflows/web.yml"
@@ -12,6 +13,7 @@ on:
     branches:
       - develop
       - v2
+      - v3
     paths:
       - "web/**"
       - ".github/workflows/web.yml"

@@ -238,9 +238,11 @@ export function updateFromTelemetry(data) {
   if (data.rtcn !== undefined) rtcNtpSynced.value = data.rtcn;
 
   // Timer state
+  // P1 — firmware now sends tmrP/tmrT to avoid collision with the message
+  // type ("tp") and target-temp ("tt") keys when the timer is active.
   if (data.ta !== undefined) timerActive.value = data.ta;
-  if (data.tp !== undefined) timerPaused.value = data.tp;
-  if (data.tt !== undefined) timerTotal.value = data.tt;
+  if (data.tmrP !== undefined) timerPaused.value = data.tmrP;
+  if (data.tmrT !== undefined) timerTotal.value = data.tmrT;
   if (data.tr !== undefined) timerRemaining.value = data.tr;
   if (data.tm !== undefined) timerMode.value = data.tm;
   if (data.tah !== undefined) timerAlarmHour.value = data.tah;

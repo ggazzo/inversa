@@ -77,6 +77,16 @@ struct MachineState {
     int    recipeTotalSteps = 0;
     uint32_t timerRemainingMs = 0;
     String confirmMessage   = "";
+    // P5 — sub-states the RecipePlugin can be sitting in, captured by
+    // RecoveryManager so a power-cut resumes the correct WAIT_*.
+    bool   waitingForTemp    = false;
+    bool   waitingForTimer   = false;
+    bool   waitingForBoil    = false;
+    bool   waitingForRamp    = false;
+    bool   waitingForConfirm = false;
+    // P5 — paused duration accumulator (substracted from elapsed time in
+    // timer-based WAIT_TIME so a pause doesn't shorten the wait).
+    uint32_t recipePausedDurationMs = 0;
 
     // BLE
     bool  bleConnected      = false;
@@ -99,6 +109,11 @@ struct MachineState {
     String otaLatestVersion     = "";
     uint8_t otaProgress         = 0;
     String otaError             = "";
+    // P9 fix: rollback automático pós-OTA
+    // Quando != 0, indica que firmware atual está em ESP_OTA_IMG_PENDING_VERIFY.
+    // Ao expirar (millis() >= otaVerifyDeadline), main loop chama
+    // esp_ota_mark_app_valid_cancel_rollback() para confirmar boot estável.
+    uint32_t otaVerifyDeadline  = 0;
 
     // Ramp Mode
     bool   rampActive           = false;
@@ -113,6 +128,7 @@ struct MachineState {
 
     // Boil Timer
     bool     boilActive         = false;
+    bool     boilPaused         = false;   // P5 — for recovery
     uint32_t boilTotal          = 0;      // Total boil time in seconds
     uint32_t boilRemaining      = 0;      // Remaining time in seconds
     uint8_t  boilAdditions      = 0;      // Number of additions configured

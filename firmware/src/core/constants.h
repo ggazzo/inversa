@@ -93,8 +93,8 @@
 // ─── Auto-Tune Configuration ────────────────────────────────
 #define AUTOTUNE_STEP_OUTPUT      255.0f   // Full power during relay test
 #define AUTOTUNE_NOISE_BAND       0.5f     // °C noise band for relay switching
-#define AUTOTUNE_LOOKBACK_SEC     20       // Seconds to look back for peaks
 #define AUTOTUNE_MIN_CYCLES       4        // Minimum oscillation cycles
 #define AUTOTUNE_MAX_CYCLES       10       // Maximum cycles before timeout
 #define AUTOTUNE_SAMPLE_TIME_MS   500      // Sample interval during tuning
+// Effective lookback = LOOKBACK_SIZE (50) * AUTOTUNE_SAMPLE_TIME_MS (500ms) = 25s
 #define AUTOTUNE_TIMEOUT_MS       3600000  // 1 hour max tuning time

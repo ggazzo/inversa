@@ -13,7 +13,8 @@ def get_firmware_version():
     return version
 
 def get_build_timestamp():
-    return datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    # datetime.utcnow() is deprecated in Python 3.12+; use timezone-aware UTC.
+    return datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 version = get_firmware_version()
 timestamp = get_build_timestamp()

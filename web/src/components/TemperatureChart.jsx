@@ -1,4 +1,5 @@
 import { useRef, useEffect } from 'preact/hooks';
+import { useSignalEffect } from '@preact/signals';
 import { Chart, registerables } from 'chart.js';
 import { tempHistory, targetHistory, outputHistory, timeLabels } from '../stores/state';
 
@@ -128,8 +129,11 @@ export function TemperatureChart() {
     };
   }, []);
 
-  // Update chart when signals change
-  useEffect(() => {
+  // P19 — useSignalEffect auto-subscribes to every signal read inside, so the
+  // chart actually updates when telemetry comes in. The previous useEffect
+  // (no deps) only ran on re-renders, which weren't triggered by signal
+  // mutation alone — the chart silently froze.
+  useSignalEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
 
