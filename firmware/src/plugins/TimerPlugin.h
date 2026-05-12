@@ -237,6 +237,10 @@ private:
 
         DEBUG_PRINTLN("[Timer] Completed!");
         bus().publish(EventType::TimerCompleted);
+
+        // Telemetry omits ta/tr once timerActive is false, so the web client
+        // would never learn the timer ended. Forward an explicit BLE event.
+        bus().publish(EventType::BLESend, String("{\"tp\":\"evt:timer:complete\"}"));
     }
 };
 

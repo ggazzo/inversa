@@ -18,7 +18,16 @@ const repoRoot = resolve(here, '..', '..');
 const args = process.argv.slice(2);
 const port = parseInt(envOrFlag('--port', 'PORT', '8765'), 10);
 const simBin = process.env.SIM_BIN || join(repoRoot, 'firmware', '.pio', 'build', 'sim', 'program');
-const simArgs = args.filter(a => !a.startsWith('--port'));
+// Strip "--port N" (both the flag AND its value) from the list we pass on
+// to the sim. Other args are forwarded verbatim.
+const simArgs = (() => {
+    const out = [];
+    for (let i = 0; i < args.length; i++) {
+        if (args[i] === '--port') { i++; continue; }
+        out.push(args[i]);
+    }
+    return out;
+})();
 
 if (!existsSync(simBin)) {
     console.error(`[bridge] sim binary not found at ${simBin}`);
