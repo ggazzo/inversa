@@ -1,0 +1,19 @@
+STEP "Pre-aquecimento"
+SET_TEMP 67
+WAIT_TEMP 0.5
+STEP "Mostura"
+WAIT_TIMER 60
+MASH_OUT 76
+WAIT_TEMP 0.5
+STEP "Lavagem"
+WAIT_CONFIRM "Iniciar lavagem com 10L"
+STEP "Fervura"
+SET_TEMP 100
+WAIT_TEMP 0.5
+ADD_HOP 60 "Magnum 30g"
+ADD_HOP 15 "Cascade 40g"
+ADD_HOP 5 "Citra 30g"
+BOIL 60
+WAIT_BOIL
+STEP "Resfriamento"
+HEATER_OFF

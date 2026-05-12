@@ -3,6 +3,9 @@
 #include <Arduino.h>
 #include <NimBLEDevice.h>
 #include <ArduinoJson.h>
+#ifdef SIM_BUILD
+#include <cstdio>
+#endif
 #include "../core/Plugin.h"
 #include "../core/constants.h"
 #include "../models/MachineState.h"
@@ -66,6 +69,15 @@ public:
     // ── Send Data to App ────────────────────────────────────
 
     void send(const String& json) {
+#ifdef SIM_BUILD
+        // Simulator path: emit one JSON line per call to stdout. The Node
+        // bridge (tools/sim-bridge/server.js) forwards it to the connected
+        // WebSocket client. CI consumers can pipe directly.
+        std::fputs(json.c_str(), stdout);
+        std::fputc('\n', stdout);
+        std::fflush(stdout);
+        return;
+#else
         if (!_connected || !_txChar) return;
 
         // BLE MTU chunking for large messages
@@ -79,6 +91,7 @@ public:
             _txChar->notify();
             if (len > mtu) delay(20);  // small delay between chunks
         }
+#endif
     }
 
     void sendJson(JsonDocument& doc) {
@@ -114,7 +127,13 @@ private:
     NimBLEServer* _server = nullptr;
     NimBLECharacteristic* _txChar = nullptr;
     NimBLECharacteristic* _rxChar = nullptr;
+#ifdef SIM_BUILD
+    // Simulator runs as if a client is permanently connected so telemetry
+    // streams without a connection handshake.
+    bool _connected = true;
+#else
     bool _connected = false;
+#endif
     uint32_t _lastTelemetry = 0;
     String _rxBuffer = "";
 
@@ -260,8 +279,10 @@ private:
         // Timer info (generic countdown timer)
         // P1 fix: tmrP/tmrT keys avoid collision with FIELD_TYPE("tp") and
         // FIELD_TARGET_TEMP("tt") — old keys froze the UI when timer was active.
+        // Always emit ta so the UI can reset when the timer completes (without
+        // it the client would never see ta flip back to false).
+        doc["ta"] = gState.timerActive;
         if (gState.timerActive) {
-            doc["ta"]   = true;
             doc["tmrP"] = gState.timerPaused;
             doc["tmrT"] = gState.timerTotal;
             doc["tr"]   = gState.timerRemaining;

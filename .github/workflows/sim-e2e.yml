@@ -1,0 +1,60 @@
+name: Sim E2E
+
+on:
+  push:
+    branches: [develop, v2, v3]
+    paths:
+      - "firmware/**"
+      - "tools/sim-bridge/**"
+      - ".github/workflows/sim-e2e.yml"
+  pull_request:
+    branches: [develop, v2, v3]
+    paths:
+      - "firmware/**"
+      - "tools/sim-bridge/**"
+      - ".github/workflows/sim-e2e.yml"
+
+jobs:
+  e2e:
+    name: Simulated brew (quick.txt)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firmware
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio
+          key: ${{ runner.os }}-pio-sim-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: ${{ runner.os }}-pio-sim-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build sim
+        run: pio run -e sim
+
+      - name: Run quick.txt brew
+        run: |
+          set -o pipefail
+          ./.pio/build/sim/program \
+              --recipe samples/quick.txt --scale 0 --max-sim-time 3600 \
+              > /tmp/brew.jsonl 2> /tmp/brew.err
+          echo "--- stderr ---"
+          cat /tmp/brew.err
+          head -3 /tmp/brew.jsonl
+          echo "(...$(wc -l < /tmp/brew.jsonl) telemetry rows...)"
+          tail -1 /tmp/brew.jsonl
+
+      - name: Assert brew outcome
+        working-directory: ${{ github.workspace }}
+        run: node tools/sim-bridge/assert.js /tmp/brew.jsonl --expect-final-temp 55 --expect-step-count 4

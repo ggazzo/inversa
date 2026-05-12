@@ -1,8 +1,13 @@
 #pragma once
 
 #include <Arduino.h>
+#ifdef SIM_BUILD
+// Simulator: skip mbedTLS entirely. OTA isn't exercised — the verifier
+// stub below always returns false, refusing any install attempt.
+#else
 #include <mbedtls/pk.h>
 #include <mbedtls/md.h>
+#endif
 #include "ota_pubkey.h"
 #include "constants.h"
 
@@ -19,6 +24,16 @@
 
 class OtaVerify {
 public:
+#ifdef SIM_BUILD
+    // Simulator: no-op verifier. Always refuses installs; the sim doesn't
+    // exercise the OTA path and we don't want to ship a "verify_unsafe"
+    // implementation that could be confused with the real one.
+    OtaVerify() = default;
+    ~OtaVerify() = default;
+    bool begin() { return true; }
+    bool update(const uint8_t*, size_t) { return true; }
+    bool finishAndVerify(const uint8_t*, size_t) { return false; }
+#else
     OtaVerify() { mbedtls_md_init(&_md); }
     ~OtaVerify() { mbedtls_md_free(&_md); }
 
@@ -74,4 +89,5 @@ public:
 private:
     mbedtls_md_context_t _md;
     bool _ready = false;
+#endif
 };

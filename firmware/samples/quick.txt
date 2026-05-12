@@ -1,0 +1,7 @@
+STEP "Pre-aquecimento"
+SET_TEMP 60
+WAIT_TEMP 1.0
+STEP "Mostura curta"
+WAIT_TIMER 1
+STEP "Resfriamento"
+HEATER_OFF

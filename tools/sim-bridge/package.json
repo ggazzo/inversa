@@ -1,0 +1,14 @@
+{
+  "name": "inversa-sim-bridge",
+  "version": "0.1.0",
+  "description": "WebSocket bridge between the Inversa firmware simulator (native) and the PWA.",
+  "private": true,
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
