@@ -21,6 +21,7 @@
     "@tamagui/toast": "^1.121.0",
     "burnt": "^0.13.0",
     "expo": "~55.0.23",
+    "expo-build-properties": "~55.0.13",
     "expo-dev-client": "~55.0.32",
     "expo-status-bar": "~55.0.6",
     "react": "^19.2.0",

@@ -29,7 +29,15 @@
     },
     "plugins": [
       "expo-dev-client",
-      "react-native-ble-plx"
+      "react-native-ble-plx",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ]
     ],
     "experiments": {
       "tsconfigPaths": true
