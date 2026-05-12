@@ -25,7 +25,6 @@ module.exports = function (api) {
             ['babel-preset-expo', { jsxRuntime: 'automatic' }],
         ],
         plugins: [
-            ['module:@preact/signals-react-transform'],
             [
                 '@tamagui/babel-plugin',
                 {
@@ -36,6 +35,24 @@ module.exports = function (api) {
                 },
             ],
             'react-native-worklets/plugin',
+        ],
+        // signals-react-transform must only see our own code. If it runs
+        // on node_modules, it sees Reanimated's worklets that read
+        // `.value` on shared values and "helpfully" wraps them — the
+        // injected `_useSignals` import then can't be serialised to the
+        // UI thread runtime, so the worklet throws "_useSignals is not
+        // a function" at first invocation. Same trap for any other
+        // library that uses `.value` (Skia, victory-native chart-press
+        // hooks, etc.).
+        overrides: [
+            {
+                test: (filename) =>
+                    typeof filename === 'string'
+                    && !filename.includes('node_modules'),
+                plugins: [
+                    ['module:@preact/signals-react-transform'],
+                ],
+            },
         ],
     };
 };
