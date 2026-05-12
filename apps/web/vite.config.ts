@@ -30,9 +30,15 @@ export default defineConfig({
         }) as any,
     ],
     // `.web.ts` ahead of `.ts` so cross-platform packages can ship
-    // browser-specific shims (BleAdapter.web.ts, etc.) without
-    // polluting the native bundle. Metro mirrors this with its built-in
-    // `.native.ts` priority.
+    // browser-specific shims (BleAdapter.web.ts, platform.web.ts, etc.)
+    // without polluting the native bundle. Metro mirrors this with its
+    // built-in `.native.ts` priority.
+    //
+    // We intentionally do NOT alias `react-native` to `react-native-web`
+    // here: pulling in the full RN-Web tree just to read `Platform.OS`
+    // added ~420 modules / +86 KB gzip to the web bundle. Our shared
+    // packages route through a hand-rolled `platform.ts` shim
+    // (DOM-based on web, re-exports from `react-native` on RN).
     resolve: {
         extensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js',
                      '.tsx', '.ts', '.jsx', '.js', '.json'],

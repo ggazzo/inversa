@@ -1,4 +1,5 @@
 // WizardNotifications.tsx — browser permission + per-event toggles.
+import { Platform } from '../../platform';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Paragraph, Separator, Switch, Text, XStack, YStack } from 'tamagui';
 import {
@@ -8,7 +9,13 @@ import type { Signal } from '@preact/signals-react';
 import { ConnectionManager } from '@inversa/services';
 import { WizardSheet } from './WizardSheet';
 
-function permState(): NotificationPermission | 'unsupported' {
+type Perm = 'default' | 'granted' | 'denied' | 'unsupported' | 'native';
+
+function permState(): Perm {
+    // RN can't query the Web Notifications API. Native notifications
+    // (expo-notifications) come in a follow-up; for now we just label
+    // the path so the user knows where to look.
+    if (Platform.OS !== 'web') return 'native';
     if (typeof Notification === 'undefined') return 'unsupported';
     return Notification.permission;
 }
@@ -46,6 +53,12 @@ export function WizardNotifications({ open, onClose }: Props) {
                 {state === 'unsupported' && (
                     <Paragraph fontSize="$1" opacity={0.6}>
                         Este navegador não suporta a Notifications API.
+                    </Paragraph>
+                )}
+                {state === 'native' && (
+                    <Paragraph fontSize="$1" opacity={0.6}>
+                        Notificações nativas chegam em breve. Por enquanto,
+                        os toggles abaixo controlam apenas a lógica interna.
                     </Paragraph>
                 )}
             </YStack>

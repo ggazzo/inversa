@@ -4,6 +4,7 @@ import { Button, Input, Paragraph, Separator, Text, XStack, YStack } from 'tamag
 import { firmwareVersion, showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { WizardSheet } from './WizardSheet';
+import { confirm } from '../../platform';
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -63,8 +64,8 @@ export function WizardAbout({ open, onClose }: Props) {
                     onChangeText={setConfirmText} />
                 <Button size="$3" theme="red"
                     disabled={confirmText !== 'ERASE_ALL'}
-                    onPress={() => {
-                        if (window.confirm('Tem certeza? Esta ação é irreversível.'))
+                    onPress={async () => {
+                        if (await confirm('Tem certeza? Esta ação é irreversível.'))
                             doReset();
                     }}>
                     Apagar tudo

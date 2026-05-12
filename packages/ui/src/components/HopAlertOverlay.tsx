@@ -5,6 +5,7 @@
 // animation is gated by `prefers-reduced-motion` via main.css.
 
 import { useEffect, useRef } from 'react';
+import { Platform, Vibration } from '../platform';
 import { useSignals } from '@preact/signals-react/runtime';
 import { signal as createSignal } from '@preact/signals-react';
 import { Button, Text, YStack } from 'tamagui';
@@ -29,17 +30,28 @@ export function HopAlertOverlay() {
         if (count > lastSeenCount.value) {
             activeAlert.value = boilAlerts.value[count - 1];
             lastSeenCount.value = count;
-            try { (navigator as any).vibrate?.([200, 100, 200, 100, 600]); } catch { /* noop */ }
-            try {
-                const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-                if (!Ctx) return;
-                const ctx = new Ctx();
-                const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 880;
-                const g = ctx.createGain(); g.gain.value = 0.2;
-                o.connect(g).connect(ctx.destination);
-                o.start(); o.stop(ctx.currentTime + 0.4);
-                audioStarted.current = true;
-            } catch { /* noop */ }
+
+            // Vibration: RN's Vibration.vibrate takes a pattern array
+            // and accepts identical args on iOS/Android. On web,
+            // react-native-web's shim falls through to navigator.vibrate
+            // when available, so a single call covers both platforms.
+            try { Vibration.vibrate([200, 100, 200, 100, 600]); } catch { /* noop */ }
+
+            // Audio cue is web-only for now. On RN this needs `expo-av`
+            // (or react-native-sound); deferred to a follow-up. The
+            // vibration alone is enough to grab attention on a phone.
+            if (Platform.OS === 'web') {
+                try {
+                    const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+                    if (!Ctx) return;
+                    const ctx = new Ctx();
+                    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = 880;
+                    const g = ctx.createGain(); g.gain.value = 0.2;
+                    o.connect(g).connect(ctx.destination);
+                    o.start(); o.stop(ctx.currentTime + 0.4);
+                    audioStarted.current = true;
+                } catch { /* noop */ }
+            }
         }
     }, [count]);
 
@@ -47,12 +59,14 @@ export function HopAlertOverlay() {
     if (!alert) return null;
 
     return (
-        // `position: fixed` isn't part of the RN-style positioning Tamagui
-        // models. Drop to a raw style for the overlay container — same
-        // visual effect on web, ignored on RN (where this component
-        // wouldn't render anyway).
+        // Fullscreen takeover. `position: fixed` is web-only; on RN
+        // `absolute` pinned to all corners produces the same effect
+        // (the overlay is mounted near the root of the app tree, so
+        // the absolute box covers the brew view too).
         <YStack
-            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}
+            style={Platform.OS === 'web'
+                ? { position: 'fixed' as any, top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }
+                : { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 200 }}
             backgroundColor="$paused"
             ai="center" jc="center" gap="$5" padding="$5"
             role="alertdialog" aria-live="assertive"
