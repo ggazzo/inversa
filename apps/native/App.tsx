@@ -69,13 +69,19 @@ export default function App() {
                                         />
                                     </ScrollView>
 
-                                    <RecipeSheet        open={isOpen('recipes')}        onClose={close} />
-                                    <BrewLogSheet       open={isOpen('brewlog')}        onClose={close} />
-                                    <WizardEquipment    open={isOpen('equipment')}      onClose={close} />
-                                    <WizardConnectivity open={isOpen('connectivity')}   onClose={close} />
-                                    <WizardTuning       open={isOpen('tuning')}         onClose={close} />
-                                    <WizardNotifications open={isOpen('notifications')} onClose={close} />
-                                    <WizardAbout        open={isOpen('about')}          onClose={close} />
+                                    {/* Only mount the sheet that's actually open. Mounting
+                                        all 7 at once leaves their Portal containers in the
+                                        tree at zIndex 100k+; on RN those occasionally swallowed
+                                        touches even when `open={false}`. The web tree keeps the
+                                        all-mounted form because Tamagui's web Sheet portal is a
+                                        no-op when closed. */}
+                                    {openSheet === 'recipes'       && <RecipeSheet        open onClose={close} />}
+                                    {openSheet === 'brewlog'       && <BrewLogSheet       open onClose={close} />}
+                                    {openSheet === 'equipment'     && <WizardEquipment    open onClose={close} />}
+                                    {openSheet === 'connectivity'  && <WizardConnectivity open onClose={close} />}
+                                    {openSheet === 'tuning'        && <WizardTuning       open onClose={close} />}
+                                    {openSheet === 'notifications' && <WizardNotifications open onClose={close} />}
+                                    {openSheet === 'about'         && <WizardAbout        open onClose={close} />}
 
                                     <HopAlertOverlay />
                                     <ToastBridge />
