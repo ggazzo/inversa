@@ -22,11 +22,20 @@ class BLEServiceClass {
 
   // Check if Web Bluetooth is available
   isSupported() {
-    return !!navigator.bluetooth;
+    return !!navigator.bluetooth || this._simUrl() !== null;
   }
 
-  // Connect to the Inversa device
+  // Returns the simulator URL when `?sim=ws://...` is in the page URL.
+  _simUrl() {
+    if (typeof location === 'undefined') return null;
+    return new URLSearchParams(location.search).get('sim');
+  }
+
+  // Connect to the Inversa device (real BLE) or the simulator (WebSocket).
   async connect() {
+    const simUrl = this._simUrl();
+    if (simUrl) return this._connectSim(simUrl);
+
     if (!this.isSupported()) {
       throw new Error('Web Bluetooth is not supported in this browser');
     }
@@ -68,15 +77,60 @@ class BLEServiceClass {
 
   // Disconnect
   disconnect() {
-    if (this.device?.gatt?.connected) {
+    if (this._simSocket) {
+      try { this._simSocket.close(); } catch {}
+      this._simSocket = null;
+    } else if (this.device?.gatt?.connected) {
       this.device.gatt.disconnect();
     }
     this.connected = false;
     this._onDisconnect?.();
   }
 
+  // ── Simulator path (WebSocket bridge to firmware_sim) ───────────
+  _connectSim(url) {
+    return new Promise((resolve, reject) => {
+      const ws = new WebSocket(url);
+      const timer = setTimeout(() => reject(new Error('Sim connection timeout')), 5000);
+
+      ws.addEventListener('open', () => {
+        clearTimeout(timer);
+        this._simSocket = ws;
+        this.connected = true;
+        this._onConnect?.();
+        resolve(true);
+      });
+      ws.addEventListener('message', (e) => {
+        // Each WS message is one complete JSON line. No chunk accumulation.
+        try {
+          const data = JSON.parse(e.data);
+          if (data.rid && this._requestMap.has(data.rid)) {
+            this._requestMap.get(data.rid)(data);
+          }
+          this._onMessage?.(data);
+        } catch (err) {
+          console.warn('[SIM] bad JSON line:', e.data);
+        }
+      });
+      ws.addEventListener('close', () => {
+        clearTimeout(timer);
+        this._simSocket = null;
+        this.connected = false;
+        this._onDisconnect?.();
+      });
+      ws.addEventListener('error', (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
   // Send a JSON command to the device
   async send(data) {
+    if (this._simSocket) {
+      this._simSocket.send(JSON.stringify(data));
+      return;
+    }
     if (!this.connected || !this.rxChar) {
       throw new Error('Not connected');
     }
