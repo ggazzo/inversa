@@ -2,13 +2,13 @@ name: Sim E2E
 
 on:
   push:
-    branches: [develop, v2, v3]
+    branches: [develop, v2, v3, v4-tamagui]
     paths:
       - "firmware/**"
       - "tools/sim-bridge/**"
       - ".github/workflows/sim-e2e.yml"
   pull_request:
-    branches: [develop, v2, v3]
+    branches: [develop, v2, v3, v4-tamagui]
     paths:
       - "firmware/**"
       - "tools/sim-bridge/**"
