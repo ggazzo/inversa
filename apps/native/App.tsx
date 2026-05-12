@@ -1,22 +1,25 @@
-// App.tsx — RN shell. Diagnostic build to isolate the post-connect
-// interaction lockup. Everything previously suspected (bare <Toast />,
-// burnt adapter, all-mounted sheets) has been removed; this version
-// also temporarily drops <ToastViewport> and <HopAlertOverlay> from
-// the tree so the only thing layered above BrewView is the TopBar.
+// App.tsx — RN shell. Mirrors apps/web/src/App.tsx with RN-only
+// providers wrapped around it.
 //
-// Once tap + scroll come back, we can add the pieces back one by one.
+// The post-connect interaction lockup we hit on iOS was a perf issue:
+// the sim bridge defaults to `--scale 60` (1 wall sec = 60 sim sec)
+// and pushes telemetry at ~60Hz. The chart's polyline rebuild +
+// signal-driven re-renders saturated the JS thread, so native
+// gesture events queued faster than they could be drained — taps
+// and scroll went dead. Fixed in packages/stores by throttling
+// history pushes to 1 Hz (the chart's actual usefulness ceiling).
 
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
-import { ToastProvider } from '@tamagui/toast';
+import { ToastProvider, ToastViewport } from '@tamagui/toast';
 import { ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
 import { theme, mode } from '@inversa/stores';
 import {
-    TopBar, BrewView, ToastBridge,
+    TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet,
     WizardEquipment, WizardConnectivity, WizardTuning,
     WizardNotifications, WizardAbout,
@@ -63,16 +66,12 @@ export default function App() {
                                     {openSheet === 'notifications' && <WizardNotifications open onClose={close} />}
                                     {openSheet === 'about'         && <WizardAbout        open onClose={close} />}
 
+                                    <HopAlertOverlay />
                                     <ToastBridge />
                                 </YStack>
                             </SafeAreaView>
-                            {/* TEMPORARILY REMOVED for diagnostic:
-                                <ToastViewport top={8} right={8} />
-                                <HopAlertOverlay />
-                                These were the most likely candidates for an
-                                invisible overlay blocking taps. If they're
-                                gone and clicks still don't work, the issue
-                                is in the BrewView subtree or the chart. */}
+
+                            <ToastViewport top={8} right={8} />
                         </ToastProvider>
                     </Theme>
                 </TamaguiProvider>
