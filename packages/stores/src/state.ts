@@ -225,7 +225,23 @@ export const formattedSchedulerTarget = computed(() => {
 // `data` is a loose JSON object from the BLE/sim stream. We don't shape
 // it strictly because new fields are added on the firmware side and
 // each one is read defensively with `!== undefined`.
+//
+// Throttle: the sim bridge with default `--scale 60` pushes ~60 frames
+// per wall second. Every frame mutates a dozen signals, which forces
+// TopBar / TempInstrument / ContextPanel to re-render at 60Hz. On a
+// phone that's enough Tamagui reconciliation to starve the native
+// gesture queue (taps stop firing). 5Hz is well above what a human
+// eye perceives for temperature swings, so we drop intermediate
+// frames at the boundary. Recipe state transitions are uncommon
+// enough that the worst-case delay is invisible.
+const TELEMETRY_MIN_INTERVAL_MS = 200;  // 5Hz cap
+let _lastTelemetryProcessedMs = 0;
+
 export function updateFromTelemetry(data: Record<string, any>): void {
+  const nowMs = Date.now();
+  if (nowMs - _lastTelemetryProcessedMs < TELEMETRY_MIN_INTERVAL_MS) return;
+  _lastTelemetryProcessedMs = nowMs;
+
   if (data.ct !== undefined) currentTemp.value = data.ct;
   if (data.tt !== undefined) targetTemp.value = data.tt;
   if (data.out !== undefined) pidOutput.value = data.out;
