@@ -1,5 +1,6 @@
 // Disconnected.tsx — single CTA card; adapts text for sim mode.
 import { Button, Card, H2, Paragraph, Text, YStack } from 'tamagui';
+import { showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { BleClient } from '@inversa/services';
 
@@ -33,7 +34,9 @@ export function Disconnected() {
                 <Button
                     size="$5" theme="active"
                     disabled={!supported}
-                    onPress={() => ConnectionManager.connect().catch(() => {})}
+                    onPress={() => ConnectionManager.connect().catch((err: any) => {
+                        showToast(err?.message || 'Falha na conexão', 'error');
+                    })}
                 >
                     {simMode ? 'Iniciar sessão simulada' : 'Conectar'}
                 </Button>
