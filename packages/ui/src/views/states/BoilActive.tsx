@@ -4,6 +4,7 @@ import { recipeName, brewingStepName, boilRemaining, recipeState } from '@invers
 import { ConnectionManager } from '@inversa/services';
 import { HopTimeline } from '../../components/HopTimeline';
 import { fmtMmSs } from '../../components/util';
+import { confirm } from '../../platform';
 
 export function BoilActive() {
     const paused = recipeState.value === 'paused';
@@ -47,7 +48,7 @@ export function BoilActive() {
                         </Button>
                     )}
                     <Button flex={1} variant="outlined" theme="red"
-                        onPress={() => { if (confirm('Parar receita?')) ConnectionManager.stopRecipe(); }}>
+                        onPress={async () => { if (await confirm('Parar receita?')) ConnectionManager.stopRecipe(); }}>
                         Parar
                     </Button>
                 </XStack>

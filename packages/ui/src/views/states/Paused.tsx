@@ -2,6 +2,7 @@
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { recipeName, recipeStep, recipeTotalSteps, brewingStepName } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
+import { confirm } from '../../platform';
 
 export function Paused() {
     return (
@@ -29,7 +30,7 @@ export function Paused() {
                         Retomar
                     </Button>
                     <Button flex={1} variant="outlined" theme="red"
-                        onPress={() => { if (confirm('Parar receita?')) ConnectionManager.stopRecipe(); }}>
+                        onPress={async () => { if (await confirm('Parar receita?')) ConnectionManager.stopRecipe(); }}>
                         Parar
                     </Button>
                 </XStack>
