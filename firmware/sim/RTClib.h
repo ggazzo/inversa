@@ -8,7 +8,7 @@
 class DateTime {
 public:
     DateTime() = default;
-    DateTime(uint32_t unix)               : _u(unix) {}
+    DateTime(uint32_t epochSec)           : _u(epochSec) {}
     DateTime(int y, int mo, int d, int h, int mi, int s)
         : _u(epochFromYmdHms(y, mo, d, h, mi, s)) {}
     DateTime(const char* /*date*/, const char* /*time*/) : _u(0) {}
