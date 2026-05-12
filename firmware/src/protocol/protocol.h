@@ -40,6 +40,11 @@ namespace Protocol {
     constexpr const char* REQ_RECIPE_DELETE = "req:recipe:delete";
     constexpr const char* REQ_SETTINGS_GET  = "req:settings:get";
     constexpr const char* REQ_SETTINGS_SET  = "req:settings:set";
+    // P13 — persisted thermal params (volume, heater power, ambient, vessel)
+    constexpr const char* REQ_SETTINGS_THERMAL_GET = "req:settings:thermal:get";
+    constexpr const char* REQ_SETTINGS_THERMAL_SET = "req:settings:thermal:set";
+    // P7 — guarded factory reset (requires {confirm: "ERASE_ALL"})
+    constexpr const char* REQ_FACTORY_RESET = "req:factory:reset";
     constexpr const char* REQ_STATUS        = "req:status";
     constexpr const char* REQ_INFO          = "req:info";
     constexpr const char* REQ_AUTOTUNE_START = "req:autotune:start";
@@ -80,6 +85,9 @@ namespace Protocol {
     constexpr const char* REQ_RTC_GET         = "req:rtc:get";      // Get current RTC time
     constexpr const char* REQ_RTC_SET         = "req:rtc:set";      // {ts: unix_timestamp} or {iso: "YYYY-MM-DDTHH:MM:SS"}
     constexpr const char* REQ_RTC_SYNC        = "req:rtc:sync";     // Trigger NTP sync
+    // P14 — timezone offset in minutes from UTC (e.g., -180 = UTC-3)
+    constexpr const char* REQ_RTC_TZ_GET      = "req:rtc:tz:get";
+    constexpr const char* REQ_RTC_TZ_SET      = "req:rtc:tz:set";   // {min: int16}
 
     // Timer (app → device)
     constexpr const char* REQ_TIMER_START     = "req:timer:start";  // {sec: uint32} or {min: uint32}
@@ -133,6 +141,7 @@ namespace Protocol {
     constexpr const char* RES_RECIPE_LIST   = "res:recipe:list";
     constexpr const char* RES_RECIPE_LOAD   = "res:recipe:load";
     constexpr const char* RES_SETTINGS      = "res:settings";
+    constexpr const char* RES_SETTINGS_THERMAL = "res:settings:thermal";
     constexpr const char* RES_INFO          = "res:info";
 
     // ── JSON Field Names ────────────────────────────────────

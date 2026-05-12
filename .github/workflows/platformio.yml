@@ -7,6 +7,7 @@ on:
     branches:
       - develop
       - v2
+      - v3
     paths:
       - "firmware/**"
       - ".github/workflows/platformio.yml"
@@ -14,6 +15,7 @@ on:
     branches:
       - develop
       - v2
+      - v3
     paths:
       - "firmware/**"
       - ".github/workflows/platformio.yml"
@@ -123,6 +125,23 @@ jobs:
           cp release/s3/firmware.bin release/wemos_s3_mini.bin
           cp release/c3/firmware.bin release/wemos_c3_mini.bin
 
+      # P8 — ECDSA P-256 signature over the OTA assets. Firmware refuses
+      # an update without a matching `.sig` (see core/OtaVerify.h).
+      # OTA_SIGNING_KEY repo secret holds the PEM-encoded private key.
+      - name: Sign OTA binaries
+        env:
+          OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
+        run: |
+          if [ -z "$OTA_SIGNING_KEY" ]; then
+            echo "::error::OTA_SIGNING_KEY secret is not set — release would brick OTA"
+            exit 1
+          fi
+          printf '%s' "$OTA_SIGNING_KEY" > /tmp/ota_priv.pem
+          for bin in release/wemos_s3_mini.bin release/wemos_c3_mini.bin; do
+            openssl dgst -sha256 -sign /tmp/ota_priv.pem -out "${bin}.sig" "$bin"
+          done
+          shred -u /tmp/ota_priv.pem
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -130,5 +149,7 @@ jobs:
             release/inversa-s3-mini-${{ github.ref_name }}.bin
             release/inversa-c3-mini-${{ github.ref_name }}.bin
             release/wemos_s3_mini.bin
+            release/wemos_s3_mini.bin.sig
             release/wemos_c3_mini.bin
+            release/wemos_c3_mini.bin.sig
           generate_release_notes: true

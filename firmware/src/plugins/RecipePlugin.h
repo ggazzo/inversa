@@ -77,6 +77,7 @@ public:
         bus().subscribe(EventType::BoilCompleted, [this](const Event&) {
             if (_waitingForBoil) {
                 _waitingForBoil = false;
+                gState.waitingForBoil = false;  // P5
                 advanceStep();
             }
         });
@@ -85,6 +86,7 @@ public:
         bus().subscribe(EventType::TimerCompleted, [this](const Event&) {
             if (_waitingForTimer) {
                 _waitingForTimer = false;
+                gState.waitingForTimer = false;  // P5
                 advanceStep();
             }
         });
@@ -93,6 +95,7 @@ public:
         bus().subscribe(EventType::RampCompleted, [this](const Event&) {
             if (_waitingForRamp) {
                 _waitingForRamp = false;
+                gState.waitingForRamp = false;  // P5
                 advanceStep();
             }
         });
@@ -178,8 +181,11 @@ public:
         _waitingForBoil = false;
         _waitingForTimer = false;
         _waitingForRamp = false;
+        _pauseStartMs = 0;
         _hopAdditions.clear();
-        
+        clearWaitFlags();
+        gState.recipePausedDurationMs = 0;
+
         gState.recipeState = RecipeState::Running;
         gState.recipeStep = 0;
         gState.mode = OperatingMode::Recipe;
@@ -196,7 +202,10 @@ public:
         _waitingForBoil = false;
         _waitingForTimer = false;
         _waitingForRamp = false;
-        
+        _pauseStartMs = 0;
+        clearWaitFlags();
+        gState.recipePausedDurationMs = 0;
+
         bus().publish(EventType::RecipeStopped);
         bus().publish(EventType::SetpointChanged, 0.0f);
         bus().publish(EventType::HeaterStateChanged, false);
@@ -206,9 +215,12 @@ public:
 
     void pause() {
         if (gState.recipeState != RecipeState::Idle &&
-            gState.recipeState != RecipeState::Completed) {
+            gState.recipeState != RecipeState::Completed &&
+            gState.recipeState != RecipeState::Paused) {
             _pausedState = gState.recipeState;
             gState.recipeState = RecipeState::Paused;
+            // P3 — capture pause start so the internal WAIT_TIMER doesn't drift.
+            _pauseStartMs = millis();
             bus().publish(EventType::RecipePaused);
             DEBUG_PRINTLN("[Recipe] Paused");
         }
@@ -216,6 +228,14 @@ public:
 
     void resume() {
         if (gState.recipeState == RecipeState::Paused) {
+            // P3 — shift _timerStart forward by the paused interval so the
+            // WAIT_TIMER countdown sees the same effective elapsed time as
+            // before the pause. Also surface the accumulator in gState so
+            // RecoveryManager can snapshot it.
+            uint32_t pausedFor = millis() - _pauseStartMs;
+            _timerStart += pausedFor;
+            gState.recipePausedDurationMs += pausedFor;
+            _pauseStartMs = 0;
             gState.recipeState = _pausedState;
             bus().publish(EventType::RecipeResumed);
             DEBUG_PRINTLN("[Recipe] Resumed");
@@ -230,32 +250,76 @@ public:
     int getTotalSteps() const { return _commands.size(); }
     const std::vector<RecipeCommand>& getCommands() const { return _commands; }
 
-    // Restore from recovery data
+    // Restore from recovery data (Recovery v2).
+    //
+    // P5 — reconciles _hopAdditions by walking commands [0.._currentStep):
+    //   - AddHop      → push onto _hopAdditions
+    //   - Boil        → clear _hopAdditions (those hops already went into the
+    //                   previous BOIL invocation)
+    // After the walk, _hopAdditions has exactly the hops collected after the
+    // most recent BOIL — matching what a fresh execution from step 0 would
+    // have at this point.
+    //
+    // The recovery file does NOT store the hop list itself; the recipe file
+    // is the source of truth. This keeps RecoveryData small and avoids drift
+    // between the file and the loaded recipe.
     bool restoreFromRecovery(const RecoveryData& data, const String& recipeContent) {
         if (!loadRecipe(recipeContent, String(data.recipeName))) {
             return false;
         }
-        
-        _currentStep = data.currentStep;
-        gState.recipeStep = data.currentStep;
-        gState.targetTemp = data.targetTemp;
-        gState.recipeState = static_cast<RecipeState>(data.recipeState);
+
+        _currentStep            = data.currentStep;
+        gState.recipeStep       = data.currentStep;
+        gState.targetTemp       = data.targetTemp;
+        gState.recipeState      = static_cast<RecipeState>(data.recipeState);
         gState.timerRemainingMs = data.timerRemainingMs;
-        gState.mode = OperatingMode::Recipe;
-        
+        gState.mode             = OperatingMode::Recipe;
+        gState.brewingStep      = static_cast<BrewingStep>(data.brewingStep);
+        gState.mashOutEnabled   = data.mashOutEnabled;
+        gState.mashOutTemp      = data.mashOutTemp;
+        gState.recipePausedDurationMs = data.recipePausedDurationMs;
+
+        // P5 — restore wait-state flags into RAM and gState.
+        gState.waitingForTemp    = data.waitingForTemp;
+        gState.waitingForTimer   = data.waitingForTimer;
+        gState.waitingForBoil    = data.waitingForBoil;
+        gState.waitingForRamp    = data.waitingForRamp;
+        gState.waitingForConfirm = data.waitingForConfirm;
+        _waitingForBoil  = data.waitingForBoil;
+        _waitingForTimer = data.waitingForTimer;
+        _waitingForRamp  = data.waitingForRamp;
+
+        // P5 — reconcile _hopAdditions from _commands.
+        _hopAdditions.clear();
+        for (int i = 0; i < _currentStep && i < (int)_commands.size(); i++) {
+            const RecipeCommand& c = _commands[i];
+            if (c.type == RecipeCommandType::AddHop) {
+                _hopAdditions.push_back(c);
+            } else if (c.type == RecipeCommandType::Boil) {
+                _hopAdditions.clear();  // hops consumed by this BOIL
+            }
+        }
+        DEBUG_PRINTF("[Recipe] Reconciled %u pending hop additions\n",
+                     (unsigned)_hopAdditions.size());
+
+        // P11 — preserve the bootAttempts counter across periodic saves so
+        // repeated restore crashes eventually exceed the limit.
+        RecoveryManager::instance().setLiveBootAttempts(data.bootAttempts);
+
         if (gState.recipeState == RecipeState::WaitingForTimer && data.timerRemainingMs > 0) {
             _timerDuration = data.timerRemainingMs;
-            _timerStart = millis();
+            _timerStart    = millis();
         }
-        
-        DEBUG_PRINTF("[Recipe] Restored: step %d, state %d, target %.1f\n",
-                     _currentStep, data.recipeState, data.targetTemp);
-        
+
+        DEBUG_PRINTF("[Recipe] Restored: step %d, state %d, target %.1f, paused %ums\n",
+                     _currentStep, data.recipeState, data.targetTemp,
+                     (unsigned)data.recipePausedDurationMs);
+
         bus().publish(EventType::SetpointChanged, data.targetTemp);
         if (data.targetTemp > 0) {
             bus().publish(EventType::HeaterStateChanged, true);
         }
-        
+
         return true;
     }
 
@@ -266,10 +330,12 @@ private:
     float _currentTemp = 0;
     uint32_t _timerStart = 0;
     uint32_t _timerDuration = 0;
+    uint32_t _pauseStartMs = 0;       // P3 — set on pause, used in resume
     float _waitTempTolerance = 0.5f;
     RecipeState _pausedState = RecipeState::Idle;
-    
-    // Waiting flags for external events
+
+    // Waiting flags for external events. These mirror to gState.waitingFor*
+    // (set/cleared via setWaitFlag()) so RecoveryManager can serialize them.
     bool _waitingForBoil = false;
     bool _waitingForTimer = false;
     bool _waitingForRamp = false;
@@ -446,6 +512,7 @@ private:
 
             case RecipeCommandType::WaitTemp:
                 gState.recipeState = RecipeState::WaitingForTemperature;
+                gState.waitingForTemp = true;  // P5 — for recovery
                 _waitTempTolerance = cmd.value;
                 DEBUG_PRINTF("[Recipe] WAIT_TEMP (tol=%.1f)\n", cmd.value);
                 break;
@@ -454,9 +521,11 @@ private:
                 // Set mash-out temperature and wait for it
                 gState.targetTemp = cmd.value;
                 gState.mashOutTemp = cmd.value;
+                gState.mashOutEnabled = true;
                 bus().publish(EventType::SetpointChanged, cmd.value);
                 bus().publish(EventType::HeaterStateChanged, true);
                 gState.recipeState = RecipeState::WaitingForTemperature;
+                gState.waitingForTemp = true;  // P5
                 _waitTempTolerance = 0.5f;
                 DEBUG_PRINTF("[Recipe] MASH_OUT %.1f\n", cmd.value);
                 break;
@@ -468,14 +537,15 @@ private:
                 _timerDuration = (uint32_t)(cmd.value * 60000);
                 gState.recipeState = RecipeState::WaitingForTimer;
                 gState.timerRemainingMs = _timerDuration;
+                gState.waitingForTimer = true;  // P5
                 DEBUG_PRINTF("[Recipe] WAIT_TIMER %.0f min\n", cmd.value);
                 break;
 
             case RecipeCommandType::Timer:
                 // Use TimerPlugin (with notifications)
                 _waitingForTimer = true;
+                gState.waitingForTimer = true;  // P5
                 gState.recipeState = RecipeState::Preparing;
-                // Publish event to start timer - TimerPlugin will handle it
                 bus().publish(EventType::TimerStartRequest, (int)(cmd.value * 60));
                 DEBUG_PRINTF("[Recipe] TIMER %.0f min (via TimerPlugin)\n", cmd.value);
                 break;
@@ -484,8 +554,8 @@ private:
                 // Absolute alarm - requires RTC
                 if (gState.rtcAvailable) {
                     _waitingForTimer = true;
+                    gState.waitingForTimer = true;  // P5
                     gState.recipeState = RecipeState::Preparing;
-                    // Publish with HH:MM string for absolute timer
                     char buf[8];
                     snprintf(buf, sizeof(buf), "%02d:%02d", (int)cmd.value, (int)cmd.value2);
                     bus().publish(EventType::TimerStartRequest, String(buf));
@@ -500,9 +570,10 @@ private:
             case RecipeCommandType::Boil:
                 // Start boil timer with collected hop additions
                 _waitingForBoil = true;
+                gState.waitingForBoil = true;  // P5
                 gState.recipeState = RecipeState::Preparing;
                 startBoilWithAdditions((uint16_t)cmd.value);
-                DEBUG_PRINTF("[Recipe] BOIL %.0f min with %d additions\n", 
+                DEBUG_PRINTF("[Recipe] BOIL %.0f min with %d additions\n",
                             cmd.value, _hopAdditions.size());
                 break;
 
@@ -518,6 +589,7 @@ private:
                 // Wait for boil timer to complete
                 if (gState.boilActive) {
                     _waitingForBoil = true;
+                    gState.waitingForBoil = true;  // P5
                     gState.recipeState = RecipeState::Preparing;
                     DEBUG_PRINTLN("[Recipe] WAIT_BOIL");
                 } else {
@@ -567,6 +639,7 @@ private:
             // ── Confirmation ────────────────────────────────
             case RecipeCommandType::WaitConfirm:
                 gState.recipeState = RecipeState::WaitingForConfirm;
+                gState.waitingForConfirm = true;  // P5
                 gState.confirmMessage = cmd.message;
                 bus().publish(EventType::RecipeWaitConfirm, cmd.message);
                 DEBUG_PRINTF("[Recipe] WAIT_CONFIRM: %s\n", cmd.message.c_str());
@@ -636,12 +709,26 @@ private:
         _currentStep++;
         gState.recipeStep = _currentStep;
         gState.recipeState = RecipeState::Running;
+        // P5 — leaving any wait state means the corresponding flag is cleared
+        // so a recovery snapshot taken between steps doesn't resume a wait
+        // that already finished.
+        clearWaitFlags();
         bus().publish(EventType::RecipeStepChanged, _currentStep);
+    }
+
+    void clearWaitFlags() {
+        gState.waitingForTemp    = false;
+        gState.waitingForTimer   = false;
+        gState.waitingForBoil    = false;
+        gState.waitingForRamp    = false;
+        gState.waitingForConfirm = false;
     }
 
     void completeRecipe() {
         gState.recipeState = RecipeState::Completed;
-        gState.mode = OperatingMode::Idle;
+        gState.mode        = OperatingMode::Idle;
+        clearWaitFlags();
+        gState.recipePausedDurationMs = 0;
         bus().publish(EventType::RecipeCompleted);
         bus().publish(EventType::HeaterStateChanged, false);
         RecoveryManager::instance().clearRecovery();

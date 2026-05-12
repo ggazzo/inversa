@@ -143,10 +143,14 @@ public:
         _heatingStarted = false;
         _state.schedulerStatus = "";
 
-        // Turn off heater if we had started it
+        // Turn off heater if we had started it AND no other controller owns
+        // it. P17 — if a recipe was queued by the scheduler and is now
+        // executing, don't reset its mode behind its back.
         if (wasHeating) {
             bus().publish(EventType::HeaterStateChanged, false);
-            gState.mode = OperatingMode::Idle;
+            if (gState.mode == OperatingMode::Manual) {
+                gState.mode = OperatingMode::Idle;
+            }
         }
 
         DEBUG_PRINTLN("[Scheduler] Cancelled");
@@ -211,17 +215,21 @@ private:
     // Start the heating process
     void startHeating() {
         _heatingStarted = true;
-        
+
         // Set target temperature and start heating
         gState.targetTemp = _state.schedulerTargetTemp;
-        gState.mode = OperatingMode::Manual;
-        
+        // P17 — preserve mode if a higher-level controller already owns the
+        // heater (e.g., a recipe is queued). Only claim Manual when idle.
+        if (gState.mode == OperatingMode::Idle) {
+            gState.mode = OperatingMode::Manual;
+        }
+
         bus().publish(EventType::SetpointChanged, _state.schedulerTargetTemp);
         bus().publish(EventType::HeaterStateChanged, true);
         bus().publish(EventType::SchedulerStarting);
 
         _state.schedulerStatus = "Aquecendo...";
-        
+
         DEBUG_PRINTF("[Scheduler] Started heating to %.1f C\n", _state.schedulerTargetTemp);
     }
 
