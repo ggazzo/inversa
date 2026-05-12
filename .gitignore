@@ -9,9 +9,11 @@ compile_commands.json
 .DS_Store
 .qodo
 
-# Web App
-web/node_modules/
-web/dist/
+# Web App — covers `web/`, `web-next/`, and (post-cutover) `web-legacy/`
+web*/node_modules/
+web*/dist/
+web*/.tamagui/
+web*/tsconfig.tsbuildinfo
 firmware/data/
 
 # Tooling
