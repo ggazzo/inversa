@@ -18,7 +18,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
-import { ToastProvider, ToastViewport, Toast } from '@tamagui/toast';
+import { ToastProvider, ToastViewport } from '@tamagui/toast';
 import { TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
 import { theme, mode } from '@inversa/stores';
@@ -88,8 +88,12 @@ export default function App() {
                                 </YStack>
                             </SafeAreaView>
 
+                            {/* No bare `<Toast />` at the root: that component
+                                defaults `open` to true and would render a
+                                permanent ToastImpl frame on RN that swallows
+                                taps anywhere it lands. ToastViewport alone
+                                handles rendering the live toast queue. */}
                             <ToastViewport top={8} right={8} />
-                            <Toast />
                         </ToastProvider>
                     </Theme>
                 </TamaguiProvider>
