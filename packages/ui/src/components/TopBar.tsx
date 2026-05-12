@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { Platform } from '../platform';
 import { Button, Popover, Text, XStack, YStack, useTheme } from 'tamagui';
-import { isConnected, deviceName, mode, modeLabel } from '@inversa/stores';
+import { isConnected, deviceName, mode, modeLabel, showToast } from '@inversa/stores';
 import { isStale } from '@inversa/stores';
 import { theme as themeSignal, toggleTheme } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
@@ -99,7 +99,9 @@ export function TopBar({ onMenuSelect }: Props) {
                 disabled={!supported}
                 onPress={() => connected
                     ? ConnectionManager.disconnect()
-                    : ConnectionManager.connect().catch(() => {})}
+                    : ConnectionManager.connect().catch((err: any) => {
+                        showToast(err?.message || 'Falha na conexão', 'error');
+                    })}
                 aria-label={connected ? 'Desconectar' : 'Conectar'}
             >
                 <Text fontSize="$1" color={chipColor !== '$background' ? 'white' : '$color'}>

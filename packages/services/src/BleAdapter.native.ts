@@ -117,9 +117,22 @@ async function ensureAndroidPermissions(): Promise<boolean> {
     return perms.every((p) => granted[p] === PermissionsAndroid.RESULTS.GRANTED);
 }
 
+// Sim bridge URL. Set via `EXPO_PUBLIC_INVERSA_SIM_URL` when starting
+// the dev server (e.g. `EXPO_PUBLIC_INVERSA_SIM_URL=ws://192.168.1.10:8765
+// npx expo start`). When the variable is set, connect() opens a
+// WebSocket to that URL instead of scanning for BLE — the only way to
+// exercise the app on iOS Simulator (no Bluetooth radio) or test
+// against the brewing simulator from a physical device on the same
+// LAN. Leave unset for real BLE.
+function getSimUrl(): string | null {
+    const url = process.env.EXPO_PUBLIC_INVERSA_SIM_URL;
+    return typeof url === 'string' && url.length > 0 ? url : null;
+}
+
 class NativeBleAdapter implements BleAdapter {
     private manager: any | null = null;
     private device:  any | null = null;
+    private simSocket: WebSocket | null = null;
     private connected = false;
     private rxBuffer  = '';
     private monitorSub: any | null = null;
@@ -138,6 +151,8 @@ class NativeBleAdapter implements BleAdapter {
     }
 
     isSupported(): boolean {
+        // Sim mode is always supported (WebSocket is built into RN).
+        if (getSimUrl()) return true;
         // The native module ships with the dev-client (or any custom
         // build). Bare Expo Go can't host BLE, but our default flow is
         // the dev-client so we report true. If the require fails at
@@ -147,6 +162,9 @@ class NativeBleAdapter implements BleAdapter {
     }
 
     async connect(): Promise<void> {
+        const simUrl = getSimUrl();
+        if (simUrl) return this.connectSim(simUrl);
+
         const ok = await ensureAndroidPermissions();
         if (!ok) throw new Error('Bluetooth: permissões negadas');
 
@@ -205,7 +223,53 @@ class NativeBleAdapter implements BleAdapter {
         this._onConnect?.();
     }
 
+    /** Sim bridge path — line-framed JSON over a WebSocket, mirroring
+     *  the web adapter's behaviour. The dev sim sends one complete
+     *  JSON object per frame, so no chunk reassembly is needed. */
+    private connectSim(url: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const ws = new WebSocket(url);
+            const timer = setTimeout(() => {
+                try { ws.close(); } catch { /* noop */ }
+                reject(new Error(`Sim timeout (${url})`));
+            }, 5_000);
+
+            ws.onopen = () => {
+                clearTimeout(timer);
+                this.simSocket = ws;
+                this.connected = true;
+                this._onConnect?.();
+                resolve();
+            };
+            ws.onmessage = (e: any) => {
+                try {
+                    const data = JSON.parse(e.data);
+                    this._onMessage?.(data);
+                } catch {
+                    console.warn('[SIM] bad JSON line:', e.data);
+                }
+            };
+            ws.onclose = () => {
+                clearTimeout(timer);
+                this.simSocket = null;
+                this.connected = false;
+                this._onDisconnect?.();
+            };
+            ws.onerror = (_err: any) => {
+                clearTimeout(timer);
+                reject(new Error(`Sim unreachable (${url})`));
+            };
+        });
+    }
+
     disconnect(): void {
+        if (this.simSocket) {
+            try { this.simSocket.close(); } catch { /* noop */ }
+            this.simSocket = null;
+            this.connected = false;
+            // onclose handler fires _onDisconnect; nothing else to do.
+            return;
+        }
         if (this.monitorSub) { try { this.monitorSub.remove(); } catch { /* noop */ } this.monitorSub = null; }
         if (this.connectSub) { try { this.connectSub.remove(); } catch { /* noop */ } this.connectSub = null; }
         if (this.device) {
@@ -221,6 +285,10 @@ class NativeBleAdapter implements BleAdapter {
     }
 
     async send(message: object): Promise<void> {
+        if (this.simSocket) {
+            this.simSocket.send(JSON.stringify(message));
+            return;
+        }
         if (!this.connected || !this.device) {
             throw new Error('Not connected');
         }
@@ -246,6 +314,7 @@ class NativeBleAdapter implements BleAdapter {
     onDisconnect(cb: () => void): void { this._onDisconnect = cb; }
 
     getDeviceName(): string | null {
+        if (this.simSocket) return 'Sim';
         return this.device?.name ?? this.device?.localName ?? null;
     }
 
