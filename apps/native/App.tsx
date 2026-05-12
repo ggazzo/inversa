@@ -1,25 +1,14 @@
-// App.tsx — RN shell. Mirrors apps/web/src/App.tsx but uses:
-//
-//   * SafeAreaProvider + SafeAreaView from `react-native-safe-area-context`
-//     so the TopBar respects the iOS notch / Android status bar.
-//   * GestureHandlerRootView at the very top — required by
-//     react-native-gesture-handler (Tamagui Sheet, Popover, and
-//     victory-native's chart-press hooks all rely on it).
-//   * TemperatureChart from `src/components.native/`, injected into
-//     BrewView via the same `chart` prop the web app uses.
-//
-// The Toast viewport stays portal-driven by @tamagui/toast's RN
-// implementation (backed by `burnt`), so no extra positioning is
-// needed here.
+// App.tsx — RN shell. Mirrors apps/web/src/App.tsx but adds the RN-only
+// providers (GestureHandlerRootView, SafeAreaProvider) and the Tamagui
+// provider that the web side doesn't need at this level.
 
 import { useEffect, useState } from 'react';
-import { ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
 import { ToastProvider, ToastViewport } from '@tamagui/toast';
-import { TamaguiProvider, Theme, YStack } from 'tamagui';
+import { ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
 import { theme, mode } from '@inversa/stores';
 import {
@@ -39,26 +28,27 @@ export default function App() {
     useEffect(() => { ConnectionManager.init(); }, []);
 
     const close = () => setOpenSheet(null);
-    const isOpen = (id: MenuId) => openSheet === id;
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
             <SafeAreaProvider>
                 <TamaguiProvider config={config} defaultTheme={theme.value}>
                     <Theme name={theme.value}>
-                        <ToastProvider swipeDirection="horizontal" duration={3000}>
+                        {/* native={[]} disables Tamagui's burnt-backed native
+                            toast adapter; we use the in-tree ToastViewport
+                            instead so the toast Z-layer stays inside our
+                            React view hierarchy (matching the web build). */}
+                        <ToastProvider swipeDirection="horizontal" duration={3000} native={[]}>
                             <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
                                 <YStack flex={1} backgroundColor="$background">
                                     <TopBar onMenuSelect={setOpenSheet} />
 
-                                    {/* The web build relies on the browser's document scroll;
-                                        RN doesn't have that, so the cards inside BrewView clip
-                                        once the column overflows. Wrap in a ScrollView so the
-                                        TempInstrument + ContextPanel + RecipeTimeline can scroll
-                                        on a phone screen. `contentContainerStyle` flexGrow lets
-                                        the Disconnected card centre itself when content is short. */}
+                                    {/* Tamagui's ScrollView (RN ScrollView + tamagui styling)
+                                        is the canonical pattern for scrolling content inside a
+                                        Tamagui tree. RN's bare <ScrollView> caused weird touch
+                                        propagation when nested in Tamagui flex layouts. */}
                                     <ScrollView
-                                        style={{ flex: 1 }}
+                                        flex={1}
                                         contentContainerStyle={{ flexGrow: 1 }}
                                         keyboardShouldPersistTaps="handled"
                                     >
@@ -69,12 +59,10 @@ export default function App() {
                                         />
                                     </ScrollView>
 
-                                    {/* Only mount the sheet that's actually open. Mounting
-                                        all 7 at once leaves their Portal containers in the
-                                        tree at zIndex 100k+; on RN those occasionally swallowed
-                                        touches even when `open={false}`. The web tree keeps the
-                                        all-mounted form because Tamagui's web Sheet portal is a
-                                        no-op when closed. */}
+                                    {/* Only mount the sheet that's actually open. Mounting all
+                                        7 at once leaves their Portal containers in the tree at
+                                        zIndex 100k+; on RN those swallowed touches even with
+                                        `open={false}`. */}
                                     {openSheet === 'recipes'       && <RecipeSheet        open onClose={close} />}
                                     {openSheet === 'brewlog'       && <BrewLogSheet       open onClose={close} />}
                                     {openSheet === 'equipment'     && <WizardEquipment    open onClose={close} />}
@@ -88,11 +76,6 @@ export default function App() {
                                 </YStack>
                             </SafeAreaView>
 
-                            {/* No bare `<Toast />` at the root: that component
-                                defaults `open` to true and would render a
-                                permanent ToastImpl frame on RN that swallows
-                                taps anywhere it lands. ToastViewport alone
-                                handles rendering the live toast queue. */}
                             <ToastViewport top={8} right={8} />
                         </ToastProvider>
                     </Theme>
