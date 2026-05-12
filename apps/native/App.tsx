@@ -1,42 +1,83 @@
-// App.tsx — RN shell. Phase C goal: prove the toolchain.
+// App.tsx — RN shell. Mirrors apps/web/src/App.tsx but uses:
 //
-// Metro must resolve the `@inversa/*` workspace packages, the Tamagui
-// babel plugin must compile style props, and the signals-react
-// transform must wire React to signal reads. Everything else (TopBar,
-// BrewView, BLE, chart) lands in later phases — they each need a small
-// native audit (sticky positioning, `localStorage`, DOM events) before
-// we can drop them in here.
+//   * SafeAreaProvider + SafeAreaView from `react-native-safe-area-context`
+//     so the TopBar respects the iOS notch / Android status bar.
+//   * GestureHandlerRootView at the very top — required by
+//     react-native-gesture-handler (Tamagui Sheet, Popover, and
+//     victory-native's chart-press hooks all rely on it).
+//   * TemperatureChart from `src/components.native/`, injected into
+//     BrewView via the same `chart` prop the web app uses.
 //
-// What this file does today:
-//   - Mounts TamaguiProvider with the shared inversa config
-//   - Reads the `theme` signal from @inversa/stores
-//   - Renders a screen with a toggle button to prove signal reactivity
-//   - Imports `parseRecipe` from @inversa/utils as a smoke test that
-//     pure cross-platform code resolves through Metro
+// The Toast viewport stays portal-driven by @tamagui/toast's RN
+// implementation (backed by `burnt`), so no extra positioning is
+// needed here.
 
+import { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, H1, Text, TamaguiProvider, Theme, YStack } from 'tamagui';
-import { theme, toggleTheme } from '@inversa/stores';
+import { ToastProvider, ToastViewport, Toast } from '@tamagui/toast';
+import { TamaguiProvider, Theme, YStack } from 'tamagui';
+import { ConnectionManager } from '@inversa/services';
+import { theme, mode } from '@inversa/stores';
+import {
+    TopBar, BrewView, HopAlertOverlay, ToastBridge,
+    RecipeSheet, BrewLogSheet,
+    WizardEquipment, WizardConnectivity, WizardTuning,
+    WizardNotifications, WizardAbout,
+    type MenuId,
+} from '@inversa/ui';
+import { TemperatureChart } from './src/components.native/TemperatureChart';
 import config from './tamagui.config';
 
 export default function App() {
     useSignals();
+    const [openSheet, setOpenSheet] = useState<MenuId | null>(null);
+
+    useEffect(() => { ConnectionManager.init(); }, []);
+
+    const close = () => setOpenSheet(null);
+    const isOpen = (id: MenuId) => openSheet === id;
 
     return (
-        <TamaguiProvider config={config} defaultTheme={theme.value}>
-            <Theme name={theme.value}>
-                <SafeAreaView style={{ flex: 1, backgroundColor: theme.value === 'dark' ? '#1d232a' : '#fff' }}>
-                    <YStack flex={1} padding="$4" gap="$3" alignItems="center" justifyContent="center">
-                        <H1 color="$primary">Inversa</H1>
-                        <Text opacity={0.7}>React Native scaffold — Phase C</Text>
-                        <Text fontSize="$2" opacity={0.5}>theme: {theme.value}</Text>
-                        <Button onPress={toggleTheme} marginTop="$3">
-                            Alternar tema
-                        </Button>
-                    </YStack>
-                </SafeAreaView>
-            </Theme>
-        </TamaguiProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <SafeAreaProvider>
+                <TamaguiProvider config={config} defaultTheme={theme.value}>
+                    <Theme name={theme.value}>
+                        <ToastProvider swipeDirection="horizontal" duration={3000}>
+                            <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
+                                <YStack flex={1} backgroundColor="$background">
+                                    <TopBar onMenuSelect={setOpenSheet} />
+
+                                    <YStack flex={1}>
+                                        <BrewView
+                                            onMenuSelect={setOpenSheet}
+                                            onStartManual={() => { mode.value = 'manual'; }}
+                                            chart={<TemperatureChart />}
+                                        />
+                                    </YStack>
+
+                                    <RecipeSheet        open={isOpen('recipes')}        onClose={close} />
+                                    <BrewLogSheet       open={isOpen('brewlog')}        onClose={close} />
+                                    <WizardEquipment    open={isOpen('equipment')}      onClose={close} />
+                                    <WizardConnectivity open={isOpen('connectivity')}   onClose={close} />
+                                    <WizardTuning       open={isOpen('tuning')}         onClose={close} />
+                                    <WizardNotifications open={isOpen('notifications')} onClose={close} />
+                                    <WizardAbout        open={isOpen('about')}          onClose={close} />
+
+                                    <HopAlertOverlay />
+                                    <ToastBridge />
+                                </YStack>
+                            </SafeAreaView>
+
+                            <ToastViewport top={8} right={8} />
+                            <Toast />
+                        </ToastProvider>
+                    </Theme>
+                </TamaguiProvider>
+                <StatusBar style="auto" />
+            </SafeAreaProvider>
+        </GestureHandlerRootView>
     );
 }
