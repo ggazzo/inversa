@@ -11,7 +11,11 @@
         "web:dev": "npm run dev --workspace apps/web",
         "web:build": "npm run build --workspace apps/web",
         "web:typecheck": "npm run typecheck --workspace apps/web",
-        "web:build:firmware": "npm run build:firmware --workspace apps/web"
+        "web:build:firmware": "npm run build:firmware --workspace apps/web",
+        "native:start": "npm run start --workspace apps/native",
+        "native:ios": "npm run ios --workspace apps/native",
+        "native:android": "npm run android --workspace apps/native",
+        "native:typecheck": "npm run typecheck --workspace apps/native"
     },
     "engines": {
         "node": ">=20"
