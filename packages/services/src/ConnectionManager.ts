@@ -3,7 +3,10 @@
 // Tamagui migration we preserve behaviour and skip strict checks here.
 //
 // ConnectionManager.ts — Manages BLE connection lifecycle and message routing.
-import { BLEService } from './BLEService';
+import { BleClient } from './BleClient';
+// Note: prior versions imported `BLEService` from './BLEService' — the
+// rename to BleClient is the only public-API delta from Phase D.
+
 import { lastTelemetryMs } from '@inversa/stores';
 import {
   isConnected, deviceName, updateFromTelemetry, showToast,
@@ -50,275 +53,275 @@ class ConnectionManagerClass {
     if (this._initialized) return;
     this._initialized = true;
 
-    BLEService.onConnect(() => {
+    BleClient.onConnect(() => {
       isConnected.value = true;
-      deviceName.value = BLEService.device?.name || 'Inversa';
+      deviceName.value = BleClient.getDeviceName() || 'Inversa';
       showToast('Conectado!', 'success');
     });
 
-    BLEService.onDisconnect(() => {
+    BleClient.onDisconnect(() => {
       isConnected.value = false;
       deviceName.value = '';
       showToast('Desconectado', 'error');
     });
 
-    BLEService.onMessage((data) => {
+    BleClient.onMessage((data) => {
       this._handleMessage(data);
     });
   }
 
   async connect() {
     this.init();
-    await BLEService.connect();
+    await BleClient.connect();
   }
 
   disconnect() {
-    BLEService.disconnect();
+    BleClient.disconnect();
   }
 
   // Shorthand for requests
   async setTemp(value) {
-    return BLEService.request('req:set-temp', { v: value });
+    return BleClient.request('req:set-temp', { v: value });
   }
 
   async heaterOn() {
-    return BLEService.request('req:heater:on');
+    return BleClient.request('req:heater:on');
   }
 
   async heaterOff() {
-    return BLEService.request('req:heater:off');
+    return BleClient.request('req:heater:off');
   }
 
   async pumpOn() {
-    return BLEService.request('req:pump:on');
+    return BleClient.request('req:pump:on');
   }
 
   async pumpOff() {
-    return BLEService.request('req:pump:off');
+    return BleClient.request('req:pump:off');
   }
 
   async setPID(kp, ki, kd) {
-    return BLEService.request('req:set-pid', { kp, ki, kd });
+    return BleClient.request('req:set-pid', { kp, ki, kd });
   }
 
   // Save PID settings with NVS persistence
   async saveSettings(kp, ki, kd) {
-    return BLEService.request('req:settings:set', { kp, ki, kd });
+    return BleClient.request('req:settings:set', { kp, ki, kd });
   }
 
   async listRecipes() {
-    const res = await BLEService.request('req:recipe:list');
+    const res = await BleClient.request('req:recipe:list');
     return res.recipes || [];
   }
 
   async loadRecipe(filename) {
-    return BLEService.request('req:recipe:load', { file: filename });
+    return BleClient.request('req:recipe:load', { file: filename });
   }
 
   async startRecipe(filename) {
-    return BLEService.request('req:recipe:start', { file: filename });
+    return BleClient.request('req:recipe:start', { file: filename });
   }
 
   async stopRecipe() {
-    return BLEService.request('req:recipe:stop');
+    return BleClient.request('req:recipe:stop');
   }
 
   async pauseRecipe() {
-    return BLEService.request('req:recipe:pause');
+    return BleClient.request('req:recipe:pause');
   }
 
   async resumeRecipe() {
-    return BLEService.request('req:recipe:resume');
+    return BleClient.request('req:recipe:resume');
   }
 
   async confirmRecipe() {
-    return BLEService.request('req:recipe:confirm');
+    return BleClient.request('req:recipe:confirm');
   }
 
   async saveRecipe(filename, content) {
-    return BLEService.request('req:recipe:save', { file: filename, content });
+    return BleClient.request('req:recipe:save', { file: filename, content });
   }
 
   async deleteRecipe(filename) {
-    return BLEService.request('req:recipe:delete', { file: filename });
+    return BleClient.request('req:recipe:delete', { file: filename });
   }
 
   async getSettings() {
-    return BLEService.request('req:settings:get');
+    return BleClient.request('req:settings:get');
   }
 
   async getInfo() {
-    return BLEService.request('req:info');
+    return BleClient.request('req:info');
   }
 
   // Recovery
   async resumeRecovery() {
-    return BLEService.request('req:recovery:resume');
+    return BleClient.request('req:recovery:resume');
   }
 
   async discardRecovery() {
-    return BLEService.request('req:recovery:discard');
+    return BleClient.request('req:recovery:discard');
   }
 
   // WiFi
   async configureWiFi(ssid, password) {
-    return BLEService.request('req:wifi:config', { ssid, pwd: password });
+    return BleClient.request('req:wifi:config', { ssid, pwd: password });
   }
 
   async connectWiFi() {
-    return BLEService.request('req:wifi:connect');
+    return BleClient.request('req:wifi:connect');
   }
 
   async disconnectWiFi() {
-    return BLEService.request('req:wifi:disconnect');
+    return BleClient.request('req:wifi:disconnect');
   }
 
   async getWiFiStatus() {
-    return BLEService.request('req:wifi:status');
+    return BleClient.request('req:wifi:status');
   }
 
   // OTA
   async checkForUpdates() {
-    return BLEService.request('req:ota:check');
+    return BleClient.request('req:ota:check');
   }
 
   async installUpdate() {
-    return BLEService.request('req:ota:install');
+    return BleClient.request('req:ota:install');
   }
 
   // Thermal parameters (P13). Persisted in NVS; loaded on boot by
   // main.cpp before plugins start.
   async getThermalParams() {
-    return BLEService.request('req:settings:thermal:get');
+    return BleClient.request('req:settings:thermal:get');
   }
   async setThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff) {
-    return BLEService.request('req:settings:thermal:set',
+    return BleClient.request('req:settings:thermal:set',
       { volumeL, powerW, ambientC, diameterM, lossCoeff });
   }
 
   // Factory reset (P7). Requires `confirm: "ERASE_ALL"` literal; the
   // firmware refuses anything else.
   async factoryReset(confirm) {
-    return BLEService.request('req:factory:reset', { confirm });
+    return BleClient.request('req:factory:reset', { confirm });
   }
 
   // Timezone offset in minutes (P14).
-  async getTimezone() { return BLEService.request('req:rtc:tz:get'); }
-  async setTimezone(min) { return BLEService.request('req:rtc:tz:set', { min }); }
+  async getTimezone() { return BleClient.request('req:rtc:tz:get'); }
+  async setTimezone(min) { return BleClient.request('req:rtc:tz:set', { min }); }
 
   // Ramp Mode
   async setRampRate(rate) {
-    return BLEService.request('req:ramp:set', { rate });
+    return BleClient.request('req:ramp:set', { rate });
   }
 
   async stopRamp() {
-    return BLEService.request('req:ramp:stop');
+    return BleClient.request('req:ramp:stop');
   }
 
   // Brew Log
   async startBrewLog() {
-    return BLEService.request('req:log:start');
+    return BleClient.request('req:log:start');
   }
 
   async stopBrewLog() {
-    return BLEService.request('req:log:stop');
+    return BleClient.request('req:log:stop');
   }
 
   async exportBrewLog(format = 'csv') {
     brewLogData.value = [];
-    const result = await BLEService.request('req:log:export', { fmt: format, chunk: 0 });
+    const result = await BleClient.request('req:log:export', { fmt: format, chunk: 0 });
     return result;
   }
 
   async fetchLogChunk(format, chunkIndex) {
-    return BLEService.request('req:log:export', { fmt: format, chunk: chunkIndex });
+    return BleClient.request('req:log:export', { fmt: format, chunk: chunkIndex });
   }
 
   // Boil Timer
   async startBoil(minutes, additions = []) {
-    return BLEService.request('req:boil:start', { min: minutes, additions });
+    return BleClient.request('req:boil:start', { min: minutes, additions });
   }
 
   async stopBoil() {
-    return BLEService.request('req:boil:stop');
+    return BleClient.request('req:boil:stop');
   }
 
   async pauseBoil() {
-    return BLEService.request('req:boil:pause');
+    return BleClient.request('req:boil:pause');
   }
 
   async resumeBoil() {
-    return BLEService.request('req:boil:resume');
+    return BleClient.request('req:boil:resume');
   }
 
   async addBoilAddition(minutes, name) {
-    return BLEService.request('req:boil:add', { min: minutes, name });
+    return BleClient.request('req:boil:add', { min: minutes, name });
   }
 
   // Mash-Out
   async setMashOut(enabled, temp = 76.0) {
-    return BLEService.request('req:mashout:set', { enabled, temp });
+    return BleClient.request('req:mashout:set', { enabled, temp });
   }
 
   // RTC
   async getRtcTime() {
-    return BLEService.request('req:rtc:get');
+    return BleClient.request('req:rtc:get');
   }
 
   async setRtcTime(timestamp) {
-    return BLEService.request('req:rtc:set', { ts: timestamp });
+    return BleClient.request('req:rtc:set', { ts: timestamp });
   }
 
   async syncRtcNtp() {
-    return BLEService.request('req:rtc:sync');
+    return BleClient.request('req:rtc:sync');
   }
 
   // Timer (relative countdown)
   async startTimer(seconds) {
-    return BLEService.request('req:timer:start', { sec: seconds });
+    return BleClient.request('req:timer:start', { sec: seconds });
   }
 
   async startTimerMinutes(minutes) {
-    return BLEService.request('req:timer:start', { min: minutes });
+    return BleClient.request('req:timer:start', { min: minutes });
   }
 
   // Timer (absolute alarm at HH:MM)
   async setTimerAlarm(hour, minute) {
-    return BLEService.request('req:timer:alarm', { hour, min: minute });
+    return BleClient.request('req:timer:alarm', { hour, min: minute });
   }
 
   async stopTimer() {
-    return BLEService.request('req:timer:stop');
+    return BleClient.request('req:timer:stop');
   }
 
   async pauseTimer() {
-    return BLEService.request('req:timer:pause');
+    return BleClient.request('req:timer:pause');
   }
 
   async resumeTimer() {
-    return BLEService.request('req:timer:resume');
+    return BleClient.request('req:timer:resume');
   }
 
   async addTimerTime(seconds) {
-    return BLEService.request('req:timer:add', { sec: seconds });
+    return BleClient.request('req:timer:add', { sec: seconds });
   }
 
   // Scheduler ("be ready at HH:MM")
   async setScheduler(hour, minute, temp, volume) {
-    return BLEService.request('req:sched:set', { hour, min: minute, temp, vol: volume });
+    return BleClient.request('req:sched:set', { hour, min: minute, temp, vol: volume });
   }
 
   async stopScheduler() {
-    return BLEService.request('req:sched:stop');
+    return BleClient.request('req:sched:stop');
   }
 
   // Auto-Tune
   async startAutoTune(targetTemp = 65) {
-    return BLEService.request('req:autotune:start', { temp: targetTemp });
+    return BleClient.request('req:autotune:start', { temp: targetTemp });
   }
 
   async stopAutoTune() {
-    return BLEService.request('req:autotune:stop');
+    return BleClient.request('req:autotune:stop');
   }
 
   _handleMessage(data) {
