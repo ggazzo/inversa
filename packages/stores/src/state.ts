@@ -166,6 +166,11 @@ export const activeTab = signal('/');
 export const toastMessage = signal('');
 export const toastType    = signal<'info' | 'success' | 'error' | 'warning'>('info');
 
+// Device picker (RN real BLE). The Disconnected card flips this on
+// when `BleClient.needsPicker()` says yes; the DevicePickerSheet
+// reads it to decide whether to render itself + start scanning.
+export const devicePickerOpen = signal<boolean>(false);
+
 export type ToastKind = 'info' | 'success' | 'error' | 'warning';
 export function showToast(message: string, type: ToastKind = 'info', durationMs = 3000): void {
   toastMessage.value = message;

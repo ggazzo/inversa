@@ -20,7 +20,7 @@ import { ConnectionManager } from '@inversa/services';
 import { theme, mode } from '@inversa/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
-    RecipeSheet, BrewLogSheet,
+    RecipeSheet, BrewLogSheet, DevicePickerSheet,
     WizardEquipment, WizardConnectivity, WizardTuning,
     WizardNotifications, WizardAbout,
     type MenuId,
@@ -65,6 +65,8 @@ export default function App() {
                                     {openSheet === 'tuning'        && <WizardTuning       open onClose={close} />}
                                     {openSheet === 'notifications' && <WizardNotifications open onClose={close} />}
                                     {openSheet === 'about'         && <WizardAbout        open onClose={close} />}
+
+                                    <DevicePickerSheet />
 
                                     <HopAlertOverlay />
                                     <ToastBridge />
