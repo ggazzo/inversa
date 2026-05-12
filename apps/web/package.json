@@ -7,7 +7,7 @@
         "dev": "vite",
         "build": "tsc -b && vite build",
         "preview": "vite preview",
-        "build:firmware": "tsc -b && vite build --outDir ../firmware/data --emptyOutDir",
+        "build:firmware": "tsc -b && vite build --outDir ../../firmware/data --emptyOutDir",
         "icons": "node scripts/generate-icons.mjs",
         "prebuild": "node scripts/generate-icons.mjs",
         "prebuild:firmware": "node scripts/generate-icons.mjs",

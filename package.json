@@ -1,0 +1,19 @@
+{
+    "name": "inversa-monorepo",
+    "version": "0.0.0",
+    "private": true,
+    "description": "Inversa homebrewing controller — firmware, web PWA, and (soon) native app",
+    "workspaces": [
+        "apps/*",
+        "packages/*"
+    ],
+    "scripts": {
+        "web:dev": "npm run dev --workspace apps/web",
+        "web:build": "npm run build --workspace apps/web",
+        "web:typecheck": "npm run typecheck --workspace apps/web",
+        "web:build:firmware": "npm run build:firmware --workspace apps/web"
+    },
+    "engines": {
+        "node": ">=20"
+    }
+}
