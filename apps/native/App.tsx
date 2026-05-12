@@ -13,6 +13,7 @@
 // needed here.
 
 import { useEffect, useState } from 'react';
+import { ScrollView } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -50,13 +51,23 @@ export default function App() {
                                 <YStack flex={1} backgroundColor="$background">
                                     <TopBar onMenuSelect={setOpenSheet} />
 
-                                    <YStack flex={1}>
+                                    {/* The web build relies on the browser's document scroll;
+                                        RN doesn't have that, so the cards inside BrewView clip
+                                        once the column overflows. Wrap in a ScrollView so the
+                                        TempInstrument + ContextPanel + RecipeTimeline can scroll
+                                        on a phone screen. `contentContainerStyle` flexGrow lets
+                                        the Disconnected card centre itself when content is short. */}
+                                    <ScrollView
+                                        style={{ flex: 1 }}
+                                        contentContainerStyle={{ flexGrow: 1 }}
+                                        keyboardShouldPersistTaps="handled"
+                                    >
                                         <BrewView
                                             onMenuSelect={setOpenSheet}
                                             onStartManual={() => { mode.value = 'manual'; }}
                                             chart={<TemperatureChart />}
                                         />
-                                    </YStack>
+                                    </ScrollView>
 
                                     <RecipeSheet        open={isOpen('recipes')}        onClose={close} />
                                     <BrewLogSheet       open={isOpen('brewlog')}        onClose={close} />
