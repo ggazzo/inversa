@@ -12,7 +12,7 @@ import { Chart, registerables } from 'chart.js';
 import type { Chart as ChartType } from 'chart.js';
 import {
     tempHistory, targetHistory, outputHistory, timeLabels,
-} from '../stores/state';
+} from '@inversa/stores';
 
 Chart.register(...registerables);
 
