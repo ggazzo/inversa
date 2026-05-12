@@ -1,0 +1,11 @@
+{
+    "name": "@inversa/stores",
+    "version": "0.0.0",
+    "private": true,
+    "main": "./src/index.ts",
+    "types": "./src/index.ts",
+    "description": "Pure signal stores (state, telemetryFreshness, theme). 100% portable. Populated in Phase B.",
+    "peerDependencies": {
+        "@preact/signals-react": "*"
+    }
+}
