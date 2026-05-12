@@ -1,7 +1,17 @@
 #pragma once
 
-#include <Arduino.h>
+#ifndef NATIVE_BUILD
+  #include <Arduino.h>
+#endif
+
 #include <cmath>
+#include <algorithm>
+
+// ThermalCalc only needs M_PI, std::min, and a clamp. We use std:: variants
+// so the namespace compiles cleanly under native test as well as Arduino.
+#ifndef M_PI
+  #define M_PI 3.14159265358979323846
+#endif
 
 // ─── Thermal Calculation Utilities ──────────────────────────
 // Functions for calculating heating time, heat loss, and related
@@ -156,12 +166,12 @@ namespace ThermalCalc {
             // Energy to heat 1°C per second
             float powerPerDegree = massKg * SPECIFIC_HEAT_WATER;
             // Proportional power based on error (cap at 10°C error)
-            float error = min(deltaT, 10.0f);
+            float error = std::min(deltaT, 10.0f);
             heatingPower = (powerPerDegree * error) / 60.0f;  // Spread over 1 minute
         }
         
         float totalPower = heatLossPower + heatingPower;
-        return constrain(totalPower / maxPower, 0.0f, 1.0f);
+        return std::clamp(totalPower / maxPower, 0.0f, 1.0f);
     }
 
     // ─── Cooling Time Estimation ────────────────────────────
