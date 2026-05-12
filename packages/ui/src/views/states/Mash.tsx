@@ -2,6 +2,7 @@
 import { Button, Card, Progress, Text, XStack, YStack } from 'tamagui';
 import { recipeName, recipeStep, recipeTotalSteps, brewingStepName, showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
+import { confirm } from '../../platform';
 
 export function Mash() {
     const total = recipeTotalSteps.value;
@@ -52,8 +53,8 @@ export function Mash() {
                         Pausar
                     </Button>
                     <Button flex={1} size="$2" variant="outlined" theme="red"
-                        onPress={() => {
-                            if (confirm('Parar receita?'))
+                        onPress={async () => {
+                            if (await confirm('Parar receita?'))
                                 ConnectionManager.stopRecipe()
                                     .then(() => showToast('Receita parada'))
                                     .catch(() => {});

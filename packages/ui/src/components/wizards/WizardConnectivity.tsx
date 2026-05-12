@@ -8,6 +8,7 @@ import {
 } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { WizardSheet } from './WizardSheet';
+import { confirm } from '../../platform';
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -118,8 +119,8 @@ export function WizardConnectivity({ open, onClose }: Props) {
                     </Button>
                     <Button flex={1} size="$3" theme="orange"
                         disabled={otaStatus.value !== 'available'}
-                        onPress={() => {
-                            if (confirm('Instalar atualização? O dispositivo reinicia.'))
+                        onPress={async () => {
+                            if (await confirm('Instalar atualização? O dispositivo reinicia.'))
                                 ConnectionManager.installUpdate().catch(() => {});
                         }}>
                         Instalar
