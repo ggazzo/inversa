@@ -1,79 +1,18 @@
 #pragma once
 
 #include <Arduino.h>
+#include "RecoveryData.h"          // packed struct + checksum (testable on native)
 #include "../models/MachineState.h"
 #include "../plugins/SDCardPlugin.h"
 
-// ─── Recovery Data Structure v2 (P5/P10/P11) ────────────────
-// Stored to SD card periodically during recipe execution so a power loss
-// mid-brew can be resumed instead of restarting from the beginning.
+// ─── Recovery Manager (v2) — SD I/O + boot-loop guard ───────
+// The RecoveryData struct, magic, version constants, and XOR checksum live in
+// `core/RecoveryData.h` so they can be exercised by the native test runner
+// without dragging in SD/Arduino. This class adds SD reads/writes,
+// gState-snapshotting, and the bootAttempts increment.
 //
-// V2 changes (2026-05):
-//   - P10: currentStep/totalSteps widened to uint16_t (uint8 was inadequate
-//          for long recipes — Inversa DSL allows ~hundreds of steps).
-//   - P11: bootAttempts counter — if a restore crashes repeatedly, RecoveryManager
-//          stops offering it, breaking boot loops.
-//   - P5:  added brewingStep + mash-out + pause + minimal BoilTimer state. The
-//          _hopAdditions list is NOT stored here. RecipePlugin reconciles it on
-//          restore by walking _commands[0.._currentStep] for past HOP commands —
-//          since the recipe content is reloaded from SD, the hop list is derived
-//          state and would only bloat the recovery image.
-//   - Migration v1→v2: hasValidRecovery() rejects v1 (returns false instead of
-//          crashing on a sizeof mismatch). User loses unfinished recipes from the
-//          previous firmware — acceptable on a one-shot upgrade.
-
-#pragma pack(push, 1)
-struct RecoveryData {
-    uint32_t magic   = 0x494E5652;  // "INVR"
-    uint8_t  version = 2;           // P5/P10/P11
-
-    // ── Recipe state ────────────────────────────────────
-    char     recipeName[64]  = {0};   // SD filename, INCLUDING .txt extension (P4)
-    uint16_t currentStep     = 0;     // P10 — was uint8
-    uint16_t totalSteps      = 0;     // P10
-    uint8_t  recipeState     = 0;     // RecipeState enum
-    uint32_t recipePausedDurationMs = 0;  // P5 — accumulated paused time
-
-    // ── Temperature / setpoint ──────────────────────────
-    float    targetTemp      = 0;
-
-    // ── Brewing UI step (BrewingStep enum) ──────────────
-    uint8_t  brewingStep     = 0;     // P5 — for UI label after resume
-    bool     mashOutEnabled  = false;
-    float    mashOutTemp     = 76.0f;
-
-    // ── Generic Timer (in seconds remaining) ────────────
-    uint32_t timerRemainingMs = 0;
-
-    // ── BoilTimer minimal state (P5) ────────────────────
-    bool     boilActive       = false;
-    bool     boilPaused       = false;
-    uint32_t boilTotalSec     = 0;
-    uint32_t boilRemainingSec = 0;
-
-    // ── Waiting-for flags (P5) so RecipePlugin can resume the right wait ─
-    bool     waitingForTemp   = false;
-    bool     waitingForTimer  = false;
-    bool     waitingForBoil   = false;
-    bool     waitingForRamp   = false;
-    bool     waitingForConfirm = false;
-
-    // ── Boot-loop guard (P11) ───────────────────────────
-    uint8_t  bootAttempts    = 0;     // incremented at boot before user accepts
-
-    // ── Diagnostics ─────────────────────────────────────
-    uint32_t savedAtMs       = 0;     // millis() at save (informational)
-
-    uint8_t  checksum        = 0;     // XOR of all preceding bytes
-};
-#pragma pack(pop)
-
-// Hard ceiling — if the saved struct grew across versions, hasValidRecovery
-// must still safely reject older sizes. We rely on SD::read returning the
-// stored size and only accept exact matches.
-static constexpr uint32_t RECOVERY_MAGIC          = 0x494E5652;
-static constexpr uint8_t  RECOVERY_VERSION        = 2;
-static constexpr uint8_t  RECOVERY_MAX_BOOT_ATTEMPTS = 3;  // P11
+// V2 binary format change is one-way: hasValidRecovery() rejects v1 and
+// discards the file rather than crashing on a sizeof mismatch.
 
 // ─── Recovery Manager ───────────────────────────────────────
 class RecoveryManager {
@@ -236,14 +175,12 @@ private:
     uint32_t      _lastSaveMs = 0;
     uint8_t       _liveBootAttempts = 0;
 
-    uint8_t calculateChecksum(const RecoveryData& data) {
-        uint8_t sum = 0;
-        const uint8_t* ptr = (const uint8_t*)&data;
-        for (size_t i = 0; i < sizeof(data) - 1; i++) sum ^= ptr[i];
-        return sum;
+    // Local thin wrappers around RecoveryData.h helpers. Kept so the rest of
+    // this class reads naturally; both delegate to the testable functions.
+    static uint8_t calculateChecksum(const RecoveryData& data) {
+        return recoveryChecksum(data);
     }
-
-    bool validateChecksum(const RecoveryData& data) {
-        return data.checksum == calculateChecksum(data);
+    static bool validateChecksum(const RecoveryData& data) {
+        return recoveryChecksumValid(data);
     }
 };

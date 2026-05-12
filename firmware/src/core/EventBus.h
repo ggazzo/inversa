@@ -1,6 +1,11 @@
 #pragma once
 
-#include <Arduino.h>
+#ifdef NATIVE_BUILD
+  // Native unit tests provide an Arduino `String` stub via test_mocks.h.
+#else
+  #include <Arduino.h>
+#endif
+
 #include <functional>
 #include <vector>
 #include <algorithm>
@@ -140,6 +145,13 @@ public:
             _subscriptions.end()
         );
     }
+
+#ifdef NATIVE_BUILD
+    // Test-only helpers — the singleton is shared across the Unity binary
+    // so each test resets state explicitly.
+    void   reset()           { _subscriptions.clear(); _nextId = 1; }
+    size_t subscriberCount() { return _subscriptions.size(); }
+#endif
 
     // Publish an event to all subscribers.
     // P12 fix: copy _subscriptions before iterating so that subscribers may
