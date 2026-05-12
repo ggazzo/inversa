@@ -14,6 +14,9 @@ web/node_modules/
 web/dist/
 firmware/data/
 
+# Tooling
+tools/sim-bridge/node_modules/
+
 # IDE
 *.swp
 *.swo

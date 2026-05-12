@@ -144,9 +144,19 @@ export function TemperatureChart() {
     chart.update('none'); // skip animations
   });
 
+  // Empty-state hint when no telemetry has accumulated yet. The canvas
+  // stays mounted underneath so the chart keeps its dimensions and the
+  // first incoming point doesn't trigger a jarring layout shift.
+  const hasData = tempHistory.value.length > 0;
   return (
-    <div class="w-full h-48">
+    <div class="w-full h-48 relative">
       <canvas ref={canvasRef} />
+      {!hasData && (
+        <div class="absolute inset-0 grid place-items-center
+                    text-xs text-base-content/40 pointer-events-none">
+          Aguardando telemetria…
+        </div>
+      )}
     </div>
   );
 }

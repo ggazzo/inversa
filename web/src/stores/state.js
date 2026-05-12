@@ -114,6 +114,15 @@ export const recipeStep = signal(0);
 export const recipeTotalSteps = signal(0);
 export const timerLeft = signal(0);  // seconds
 export const recipeState = signal('idle');  // idle, running, paused, waiting_temp, waiting_timer, waiting_confirm, completed
+// Raw DSL of the currently-loaded recipe (set on `req:recipe:load`, on
+// start from the RecipeSheet, and lazily re-fetched after recovery resume).
+// The parser in utils/parseRecipe.js turns this into the structured list
+// the RecipeTimeline renders.
+export const loadedRecipeContent = signal('');
+
+// WAIT_CONFIRM — driven by telemetry (wc/cm) and evt:recipe:confirm.
+export const waitingForConfirm = signal(false);
+export const confirmMessage = signal('');
 
 // ─── Temperature History (for chart) ────────────────────────
 const MAX_HISTORY = 300;  // 5 minutes at 1Hz
@@ -263,6 +272,14 @@ export function updateFromTelemetry(data) {
   // Brewing step
   if (data.bs !== undefined) brewingStep.value = data.bs;
   if (data.bsc !== undefined) brewingStepCustom.value = data.bsc;
+
+  // WAIT_CONFIRM — wc is emitted on every telemetry tick so the modal
+  // clears automatically when the recipe advances.
+  if (data.wc !== undefined) {
+    waitingForConfirm.value = data.wc;
+    if (!data.wc) confirmMessage.value = '';
+  }
+  if (data.cm !== undefined) confirmMessage.value = data.cm;
 
   // Add to history
   addTelemetryPoint(

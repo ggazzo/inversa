@@ -1,7 +1,8 @@
 // ConnectionManager.js — Manages BLE connection lifecycle and message routing
 import { BLEService } from './BLEService';
-import { 
-  isConnected, deviceName, updateFromTelemetry, showToast, 
+import { lastTelemetryMs } from '../stores/telemetryFreshness';
+import {
+  isConnected, deviceName, updateFromTelemetry, showToast,
   hasRecovery, recoveryRecipeName,
   wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
   otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion,
@@ -13,7 +14,8 @@ import {
   mashOutEnabled, mashOutTemp,
   timerActive, timerRemaining,
   schedulerActive, schedulerStatus,
-  autoTuneActive, autoTuneProgress
+  autoTuneActive, autoTuneProgress,
+  waitingForConfirm, confirmMessage
 } from '../stores/state';
 
 class ConnectionManagerClass {
@@ -180,6 +182,26 @@ class ConnectionManagerClass {
     return BLEService.request('req:ota:install');
   }
 
+  // Thermal parameters (P13). Persisted in NVS; loaded on boot by
+  // main.cpp before plugins start.
+  async getThermalParams() {
+    return BLEService.request('req:settings:thermal:get');
+  }
+  async setThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff) {
+    return BLEService.request('req:settings:thermal:set',
+      { volumeL, powerW, ambientC, diameterM, lossCoeff });
+  }
+
+  // Factory reset (P7). Requires `confirm: "ERASE_ALL"` literal; the
+  // firmware refuses anything else.
+  async factoryReset(confirm) {
+    return BLEService.request('req:factory:reset', { confirm });
+  }
+
+  // Timezone offset in minutes (P14).
+  async getTimezone() { return BLEService.request('req:rtc:tz:get'); }
+  async setTimezone(min) { return BLEService.request('req:rtc:tz:set', { min }); }
+
   // Ramp Mode
   async setRampRate(rate) {
     return BLEService.request('req:ramp:set', { rate });
@@ -298,11 +320,13 @@ class ConnectionManagerClass {
   _handleMessage(data) {
     switch (data.tp) {
       case 'evt:status':
+        lastTelemetryMs.value = Date.now();
         updateFromTelemetry(data);
         break;
 
       case 'evt:recipe:confirm':
-        showToast(data.msg || 'Confirmacao necessaria', 'info', 10000);
+        waitingForConfirm.value = true;
+        confirmMessage.value = data.msg || '';
         break;
 
       case 'evt:recipe:state':

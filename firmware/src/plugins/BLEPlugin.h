@@ -53,6 +53,15 @@ public:
             send(e.stringValue);
         });
 
+        // Recipe paused on WAIT_CONFIRM — notify the app so it can prompt the user.
+        // Telemetry also carries wc/cm so the modal can re-open after a reconnect.
+        bus().subscribe(EventType::RecipeWaitConfirm, [this](const Event& e) {
+            JsonDocument doc;
+            doc[Protocol::FIELD_TYPE] = Protocol::EVT_RECIPE_CONFIRM;
+            doc["msg"] = e.stringValue;
+            sendJson(doc);
+        });
+
         DEBUG_PRINTLN("[BLE] Service started, advertising...");
         return true;
     }
@@ -233,12 +242,26 @@ private:
             default:                     doc[Protocol::FIELD_MODE] = Protocol::MODE_IDLE; break;
         }
 
-        // Recipe info (when running)
+        // Recipe info (when running). `rst` exposes the engine sub-state
+        // so the app can swap dedicated views (WaitTemp / WaitTimer /
+        // WaitConfirm / Paused) without inferring from other fields.
         if (gState.mode == OperatingMode::Recipe) {
             doc[Protocol::FIELD_RECIPE_STEP]  = gState.recipeStep;
             doc[Protocol::FIELD_RECIPE_TOTAL] = gState.recipeTotalSteps;
             doc[Protocol::FIELD_RECIPE_NAME]  = gState.recipeName;
             doc[Protocol::FIELD_TIMER_LEFT]   = gState.timerRemainingMs / 1000;
+            const char* rst = "running";
+            switch (gState.recipeState) {
+                case RecipeState::Idle:                  rst = "idle"; break;
+                case RecipeState::Running:               rst = "running"; break;
+                case RecipeState::Paused:                rst = "paused"; break;
+                case RecipeState::WaitingForTemperature: rst = "waiting_temp"; break;
+                case RecipeState::WaitingForTimer:       rst = "waiting_timer"; break;
+                case RecipeState::Preparing:             rst = "running"; break;
+                case RecipeState::WaitingForConfirm:     rst = "waiting_confirm"; break;
+                case RecipeState::Completed:             rst = "completed"; break;
+            }
+            doc["rst"] = rst;
         }
 
         // Ramp info
@@ -315,6 +338,13 @@ private:
             if (!gState.brewingStepCustom.isEmpty()) {
                 doc["bsc"] = gState.brewingStepCustom;
             }
+        }
+
+        // WAIT_CONFIRM state — always emitted so the UI clears the modal once
+        // the recipe advances past the wait.
+        doc["wc"] = gState.waitingForConfirm;
+        if (gState.waitingForConfirm && !gState.confirmMessage.isEmpty()) {
+            doc["cm"] = gState.confirmMessage;
         }
 
         sendJson(doc);
