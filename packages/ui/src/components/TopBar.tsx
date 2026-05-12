@@ -8,7 +8,7 @@ import { isConnected, deviceName, mode, modeLabel } from '@inversa/stores';
 import { isStale } from '@inversa/stores';
 import { theme as themeSignal, toggleTheme } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
-import { BLEService } from '@inversa/services';
+import { BleClient } from '@inversa/services';
 
 export type MenuId =
     | 'recipes' | 'brewlog' | 'equipment' | 'connectivity'
@@ -31,7 +31,7 @@ interface Props {
 export function TopBar({ onMenuSelect }: Props) {
     const connected = isConnected.value;
     const stale     = isStale.value;
-    const supported = BLEService.isSupported();
+    const supported = BleClient.isSupported();
     const t         = useTheme();
     // Controlled popover so we can dismiss it the moment a wizard
     // (or sheet) is requested — otherwise the dropdown would still be

@@ -29,6 +29,14 @@ export default defineConfig({
             optimize: true,
         }) as any,
     ],
+    // `.web.ts` ahead of `.ts` so cross-platform packages can ship
+    // browser-specific shims (BleAdapter.web.ts, etc.) without
+    // polluting the native bundle. Metro mirrors this with its built-in
+    // `.native.ts` priority.
+    resolve: {
+        extensions: ['.web.tsx', '.web.ts', '.web.jsx', '.web.js',
+                     '.tsx', '.ts', '.jsx', '.js', '.json'],
+    },
     build: {
         outDir: 'dist',
         // Target the ESP32 SPIFFS host (any modern static server). We
