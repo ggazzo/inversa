@@ -1,32 +1,272 @@
-// BleAdapter.native.ts — stub for Phase E.
+// BleAdapter.native.ts — react-native-ble-plx implementation.
 //
-// Metro picks this up over BleAdapter.ts because `.native.ts` wins in
-// Metro's default resolution order. Today it just yells; Phase E
-// fills it with:
+// Mirrors the web adapter's behaviour against the same Nordic UART
+// Service the firmware exposes:
 //
-//   * react-native-ble-plx for real BLE (NUS service, like web)
-//   * a WebSocket transport for the sim bridge (RN has WebSocket
-//     globally, no shim required), gated by the same `?sim=` URL
-//     fragment but read from the deep-link / launch URL instead of
-//     `location.search`.
+//   * Scan filtered by NUS service UUID (avoids paging through every
+//     advertisement on a crowded RF environment).
+//   * Connect → discover services/characteristics → subscribe to the
+//     TX characteristic (`6e400003`) for notifications.
+//   * Writes go to the RX characteristic (`6e400002`) without
+//     response, chunked to fit the negotiated MTU.
+//
+// Transport layer notes:
+//
+//   * ble-plx hands us base64 strings on both directions. We pivot
+//     through utf-8 with the tiny base64 helpers below so the JSON
+//     framing logic stays the same as on web.
+//
+//   * Android 12+ requires the user to grant BLUETOOTH_SCAN and
+//     BLUETOOTH_CONNECT at runtime even though the manifest declares
+//     them. We request both before scanning. iOS 13+ asks for the
+//     Always-Bluetooth string the moment we instantiate BleManager,
+//     so no extra plumbing on that side.
+//
+//   * The simulator path (`?sim=ws://...`) is web-only. On RN the
+//     dev workflow uses a real device against the firmware; a future
+//     enhancement could read a deep-link URL parameter and short-
+//     circuit to WebSocket, but for now sim simply isn't reachable
+//     from the native app.
 
+import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import type { BleAdapter } from './BleAdapter';
 
-class NativeBleAdapterStub implements BleAdapter {
-    isSupported(): boolean { return false; }
+const NUS_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notify: device → app
+const NUS_RX_CHAR_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // write:  app → device
+
+// ble-plx is a real native module; in the Expo dev-client it's
+// available, but during `expo export` in CI the JS bundle is built
+// without the native binary being linked. Importing it eagerly at
+// module load makes Metro happy (JS-only resolution) and the
+// runtime require throws only if the module isn't linked — which is
+// the same failure mode as any other native module.
+
+// We require lazily so the Metro bundle in CI doesn't fail if
+// react-native-ble-plx ever pulls in a host-binding it can't satisfy
+// during dry-export. The cost is one require() at first connect().
+type BleManagerCtor = new () => any;
+let _BleManager: BleManagerCtor | null = null;
+function getBleManagerCtor(): BleManagerCtor {
+    if (_BleManager) return _BleManager;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('react-native-ble-plx');
+    _BleManager = mod.BleManager as BleManagerCtor;
+    return _BleManager;
+}
+
+// Base64 helpers. RN ships `global.btoa`/`atob` polyfills in recent
+// versions, but they're not guaranteed everywhere — and our payload
+// is UTF-8 JSON, which the browser atob doesn't handle directly
+// (it's binary-safe only). We do the JSON → bytes → base64 trip via
+// a small inline routine that uses Buffer when available (Hermes
+// 0.79+) and falls back to a manual encoder.
+function encodeBase64(input: string): string {
+    if (typeof (globalThis as any).Buffer !== 'undefined') {
+        return (globalThis as any).Buffer.from(input, 'utf8').toString('base64');
+    }
+    return btoaUtf8(input);
+}
+function decodeBase64(input: string): string {
+    if (typeof (globalThis as any).Buffer !== 'undefined') {
+        return (globalThis as any).Buffer.from(input, 'base64').toString('utf8');
+    }
+    return atobUtf8(input);
+}
+
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+function btoaUtf8(str: string): string {
+    const bytes = unescape(encodeURIComponent(str));
+    let out = '';
+    for (let i = 0; i < bytes.length; i += 3) {
+        const b1 = bytes.charCodeAt(i);
+        const b2 = i + 1 < bytes.length ? bytes.charCodeAt(i + 1) : NaN;
+        const b3 = i + 2 < bytes.length ? bytes.charCodeAt(i + 2) : NaN;
+        out += B64[b1 >> 2];
+        out += B64[((b1 & 3) << 4) | ((Number.isNaN(b2) ? 0 : b2) >> 4)];
+        out += Number.isNaN(b2) ? '=' : B64[((b2 & 15) << 2) | ((Number.isNaN(b3) ? 0 : b3) >> 6)];
+        out += Number.isNaN(b3) ? '=' : B64[b3 & 63];
+    }
+    return out;
+}
+function atobUtf8(b64: string): string {
+    const lookup = new Map(B64.split('').map((c, i) => [c, i]));
+    let bytes = '';
+    for (let i = 0; i < b64.length; i += 4) {
+        const c1 = lookup.get(b64[i])!;
+        const c2 = lookup.get(b64[i + 1])!;
+        const c3 = b64[i + 2] === '=' ? 0 : (lookup.get(b64[i + 2]) ?? 0);
+        const c4 = b64[i + 3] === '=' ? 0 : (lookup.get(b64[i + 3]) ?? 0);
+        bytes += String.fromCharCode((c1 << 2) | (c2 >> 4));
+        if (b64[i + 2] !== '=') bytes += String.fromCharCode(((c2 & 15) << 4) | (c3 >> 2));
+        if (b64[i + 3] !== '=') bytes += String.fromCharCode(((c3 & 3) << 6) | c4);
+    }
+    return decodeURIComponent(escape(bytes));
+}
+
+// Runtime permission grant for Android. iOS doesn't need this.
+async function ensureAndroidPermissions(): Promise<boolean> {
+    if (Platform.OS !== 'android') return true;
+    const perms = [
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_SCAN,
+        PermissionsAndroid.PERMISSIONS.BLUETOOTH_CONNECT,
+        // Some older OEM stacks (pre-Android 12) still gate scans on location.
+        PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+    ].filter(Boolean) as string[];
+    const granted = await PermissionsAndroid.requestMultiple(perms);
+    return perms.every((p) => granted[p] === PermissionsAndroid.RESULTS.GRANTED);
+}
+
+class NativeBleAdapter implements BleAdapter {
+    private manager: any | null = null;
+    private device:  any | null = null;
+    private connected = false;
+    private rxBuffer  = '';
+    private monitorSub: any | null = null;
+    private connectSub: any | null = null;
+
+    private _onMessage:    ((data: any) => void) | null = null;
+    private _onConnect:    (() => void) | null = null;
+    private _onDisconnect: (() => void) | null = null;
+
+    private ensureManager(): any {
+        if (!this.manager) {
+            const Ctor = getBleManagerCtor();
+            this.manager = new Ctor();
+        }
+        return this.manager;
+    }
+
+    isSupported(): boolean {
+        // The native module ships with the dev-client (or any custom
+        // build). Bare Expo Go can't host BLE, but our default flow is
+        // the dev-client so we report true. If the require fails at
+        // first connect, the user sees a clear error.
+        return !!NativeModules.BleClientManager
+            || Platform.OS === 'ios' || Platform.OS === 'android';
+    }
+
     async connect(): Promise<void> {
-        throw new Error('BleAdapter.native is not implemented yet (Phase E)');
+        const ok = await ensureAndroidPermissions();
+        if (!ok) throw new Error('Bluetooth: permissões negadas');
+
+        const manager = this.ensureManager();
+
+        // Scan with a service-UUID filter so we don't get every
+        // advertisement on the air. Stop scanning the moment we find
+        // any Inversa device — the user can manage multiple devices
+        // later through a picker; for now, first hit wins.
+        const device = await new Promise<any>((resolve, reject) => {
+            const timer = setTimeout(() => {
+                manager.stopDeviceScan();
+                reject(new Error('Nenhum Inversa encontrado em 10s'));
+            }, 10_000);
+
+            manager.startDeviceScan([NUS_SERVICE_UUID], null, (error: any, d: any) => {
+                if (error) {
+                    clearTimeout(timer);
+                    manager.stopDeviceScan();
+                    reject(error);
+                    return;
+                }
+                if (d) {
+                    clearTimeout(timer);
+                    manager.stopDeviceScan();
+                    resolve(d);
+                }
+            });
+        });
+
+        const connected = await device.connect();
+        await connected.discoverAllServicesAndCharacteristics();
+
+        // Track disconnects so the UI updates. ble-plx fires this for
+        // every reason (BLE link drop, user-initiated, OS reset).
+        this.connectSub = connected.onDisconnected(() => {
+            this.connected = false;
+            this.device = null;
+            this._onDisconnect?.();
+        });
+
+        // Subscribe to the TX characteristic. Each notification is a
+        // chunk of the device's JSON response; we accumulate until
+        // JSON.parse succeeds, matching the web adapter.
+        this.monitorSub = connected.monitorCharacteristicForService(
+            NUS_SERVICE_UUID,
+            NUS_TX_CHAR_UUID,
+            (error: any, char: any) => {
+                if (error || !char?.value) return;
+                this.handleChunk(decodeBase64(char.value));
+            },
+        );
+
+        this.device = connected;
+        this.connected = true;
+        this._onConnect?.();
     }
-    disconnect(): void { /* noop */ }
-    async send(_message: object): Promise<void> {
-        throw new Error('BleAdapter.native is not implemented yet (Phase E)');
+
+    disconnect(): void {
+        if (this.monitorSub) { try { this.monitorSub.remove(); } catch { /* noop */ } this.monitorSub = null; }
+        if (this.connectSub) { try { this.connectSub.remove(); } catch { /* noop */ } this.connectSub = null; }
+        if (this.device) {
+            // `cancelConnection` returns a promise — fire and forget;
+            // the onDisconnected callback above will clear our state.
+            this.device.cancelConnection().catch(() => { /* noop */ });
+        } else {
+            // No active device yet: still signal disconnect so the UI
+            // can return to the "Conectar" CTA.
+            this._onDisconnect?.();
+        }
+        this.connected = false;
     }
-    onMessage(_cb: (data: any) => void): void { /* noop */ }
-    onConnect(_cb: () => void): void { /* noop */ }
-    onDisconnect(_cb: () => void): void { /* noop */ }
-    getDeviceName(): string | null { return null; }
+
+    async send(message: object): Promise<void> {
+        if (!this.connected || !this.device) {
+            throw new Error('Not connected');
+        }
+        const json = JSON.stringify(message);
+
+        // BLE MTU on Android negotiates around 185 bytes by default
+        // (517 max); iOS sits at 185 too. We stay at 180 to leave
+        // headroom — matches the firmware's per-chunk expectation and
+        // is well under the 500 we use on web (chrome negotiates up).
+        const chunkSize = 180;
+        for (let i = 0; i < json.length; i += chunkSize) {
+            const chunk = json.slice(i, i + chunkSize);
+            await this.device.writeCharacteristicWithoutResponseForService(
+                NUS_SERVICE_UUID,
+                NUS_RX_CHAR_UUID,
+                encodeBase64(chunk),
+            );
+        }
+    }
+
+    onMessage(cb: (data: any) => void): void { this._onMessage = cb; }
+    onConnect(cb: () => void): void { this._onConnect = cb; }
+    onDisconnect(cb: () => void): void { this._onDisconnect = cb; }
+
+    getDeviceName(): string | null {
+        return this.device?.name ?? this.device?.localName ?? null;
+    }
+
+    private handleChunk(text: string): void {
+        this.rxBuffer += text;
+        try {
+            const data = JSON.parse(this.rxBuffer);
+            this.rxBuffer = '';
+            this._onMessage?.(data);
+        } catch {
+            // Same guard as the web side — drop the buffer if it
+            // grows past anything plausible to avoid leaking memory
+            // on a stuck/garbled stream.
+            if (this.rxBuffer.length > 10_000) {
+                console.warn('[BLE-PLX] Buffer overflow, resetting');
+                this.rxBuffer = '';
+            }
+        }
+    }
 }
 
 export function createBleAdapter(): BleAdapter {
-    return new NativeBleAdapterStub();
+    return new NativeBleAdapter();
 }
