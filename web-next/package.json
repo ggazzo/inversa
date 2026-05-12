@@ -1,0 +1,35 @@
+{
+    "name": "inversa-web-next",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc -b && vite build",
+        "preview": "vite preview",
+        "build:firmware": "tsc -b && vite build --outDir ../firmware/data --emptyOutDir",
+        "icons": "node scripts/generate-icons.mjs",
+        "prebuild": "node scripts/generate-icons.mjs",
+        "prebuild:firmware": "node scripts/generate-icons.mjs",
+        "typecheck": "tsc -b --noEmit"
+    },
+    "dependencies": {
+        "@preact/signals-react": "^3.0.0",
+        "@tamagui/config": "^1.121.0",
+        "@tamagui/toast": "^1.121.0",
+        "chart.js": "^4.4.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0",
+        "tamagui": "^1.121.0"
+    },
+    "devDependencies": {
+        "@preact/signals-react-transform": "^0.5.0",
+        "@tamagui/vite-plugin": "^1.121.0",
+        "@types/react": "^19.0.0",
+        "@types/react-dom": "^19.0.0",
+        "@vitejs/plugin-react": "^4.3.4",
+        "sharp": "^0.33.0",
+        "typescript": "^5.6.3",
+        "vite": "^6.0.0"
+    }
+}
