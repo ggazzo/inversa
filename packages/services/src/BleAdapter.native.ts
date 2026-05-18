@@ -270,6 +270,12 @@ class NativeBleAdapter implements BleAdapter {
         if (simUrl) return this.connectSim(simUrl);
 
         const manager = this.ensureManager();
+        // ble-plx requires stopping any active scan before connecting,
+        // otherwise iOS rejects with a generic GATT error.
+        if (this.scanning) {
+            try { manager.stopDeviceScan(); } catch { /* noop */ }
+            this.scanning = false;
+        }
         // ble-plx's connectToDevice() does the GATT handshake; we still
         // need our own service/characteristic discovery + monitor setup
         // on top, which attachToDevice handles.
@@ -298,15 +304,34 @@ class NativeBleAdapter implements BleAdapter {
         // Subscribe to the TX characteristic. Each notification is a
         // chunk of the device's JSON response; we accumulate until
         // JSON.parse succeeds, matching the web adapter.
-        this.monitorSub = connected.monitorCharacteristicForService(
-            NUS_SERVICE_UUID,
-            NUS_TX_CHAR_UUID,
-            (error: any, char: any) => {
-                if (error) { console.warn('[BLE] monitor error', error?.message); return; }
-                if (!char?.value) return;
-                this.handleChunk(decodeBase64(char.value));
-            },
-        );
+        //
+        // ble-plx occasionally fires the callback with "Operation was
+        // cancelled" right after monitorCharacteristicForService
+        // resolves — iOS GATT race where the registration isn't fully
+        // settled. We retry the subscribe once on that specific error
+        // before the settle window. Cancellations after the settle
+        // (user disconnect, link drop) are normal and silent.
+        const subscribe = (): void => {
+            this.monitorSub = connected.monitorCharacteristicForService(
+                NUS_SERVICE_UUID,
+                NUS_TX_CHAR_UUID,
+                (error: any, char: any) => {
+                    if (error) {
+                        const msg = String(error?.message ?? '');
+                        if (msg.toLowerCase().includes('cancel')) {
+                            // Suppress: either the retry below or the
+                            // user-initiated disconnect cleared us.
+                            return;
+                        }
+                        console.warn('[BLE] monitor error', msg);
+                        return;
+                    }
+                    if (!char?.value) return;
+                    this.handleChunk(decodeBase64(char.value));
+                },
+            );
+        };
+        subscribe();
         console.log('[BLE] monitor subscribed');
 
         // iOS GATT registers the notify subscription asynchronously on
@@ -316,6 +341,19 @@ class NativeBleAdapter implements BleAdapter {
         // 300ms is enough to settle on every device we tested; tune
         // higher only if first-request timeouts come back.
         await new Promise((r) => setTimeout(r, 300));
+
+        // If the iOS stack cancelled the subscription during the
+        // settle window, the user wouldn't notice — frames just never
+        // arrive. Retry the subscribe once before signaling onConnect
+        // so the app starts in a healthy state.
+        if (!this.monitorSub?.isCancelled?.()) {
+            // ble-plx Subscription has no public "isCancelled" — we
+            // just re-subscribe unconditionally, cheap. The previous
+            // sub's callback ignores "cancel" so the new one wins.
+            try { this.monitorSub?.remove(); } catch { /* noop */ }
+            subscribe();
+            console.log('[BLE] monitor re-subscribed after settle');
+        }
 
         this.device = connected;
         this.connected = true;
