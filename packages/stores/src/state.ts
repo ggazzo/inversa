@@ -12,6 +12,15 @@ export const pidOutput = signal(0);
 export const heaterOn = signal(false);
 export const pumpOn = signal(false);
 export const mode = signal('idle');   // idle, manual, recipe, tuning
+
+// UI-only intent flag. User taps "Modo Manual" from Idle → we want
+// the Manual sub-state to render before the firmware has heard about
+// it (firmware only flips to OperatingMode::Manual on req:set-temp /
+// req:heater:on, which the user does *from* the Manual view itself).
+// Without this, the first evt:status that arrives after the tap
+// resets mode→idle and the Manual view unmounts mid-input. Cleared
+// when firmware reports a non-idle mode OR on disconnect.
+export const manualIntent = signal<boolean>(false);
 export const uptime = signal(0);
 export const tempSensorOk = signal(true);
 export const safetyShutoff = signal(false);
@@ -273,6 +282,11 @@ export function updateFromTelemetry(data: Record<string, any>): void {
   const nowMs = Date.now();
   if (nowMs - _lastTelemetryProcessedMs < TELEMETRY_MIN_INTERVAL_MS) return;
   _lastTelemetryProcessedMs = nowMs;
+
+  // Clear the local manual-intent flag once firmware confirms any
+  // mode that isn't idle — at that point the real `mode` signal is
+  // the source of truth and the intent flag is no longer needed.
+  if (data.m !== undefined && data.m !== 'idle') manualIntent.value = false;
 
   if (data.ct !== undefined) currentTemp.value = data.ct;
   if (data.tt !== undefined) targetTemp.value = data.tt;

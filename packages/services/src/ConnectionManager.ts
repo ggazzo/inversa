@@ -13,7 +13,7 @@ const LAST_DEVICE_KEY = 'inversa.lastDeviceId';
 
 import { lastTelemetryMs } from '@inversa/stores';
 import {
-  isConnected, deviceName, signalRssi, updateFromTelemetry, showToast, pushDebug,
+  isConnected, deviceName, signalRssi, manualIntent, updateFromTelemetry, showToast, pushDebug,
   hasRecovery, recoveryRecipeName,
   wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
   otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion,
@@ -73,6 +73,7 @@ class ConnectionManagerClass {
       isConnected.value = false;
       deviceName.value = '';
       signalRssi.value = null;
+      manualIntent.value = false;
       showToast('Desconectado', 'error');
     });
 

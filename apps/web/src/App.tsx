@@ -7,7 +7,7 @@ import { useSignals } from '@preact/signals-react/runtime';
 import { Toast, ToastProvider, ToastViewport } from '@tamagui/toast';
 import { Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
-import { theme, mode } from '@inversa/stores';
+import { theme, manualIntent } from '@inversa/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet, DebugSheet,
@@ -41,7 +41,7 @@ export function App() {
                         web, victory-native (or similar) on RN. */}
                     <BrewView
                         onMenuSelect={setOpenSheet}
-                        onStartManual={() => { mode.value = 'manual'; }}
+                        onStartManual={() => { manualIntent.value = true; }}
                         chart={<TemperatureChart />}
                     />
                 </YStack>

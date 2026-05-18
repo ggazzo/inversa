@@ -5,7 +5,8 @@
 import { useSignals } from '@preact/signals-react/runtime';
 import { XStack, YStack } from 'tamagui';
 import {
-    isConnected, hasRecovery, mode, recipeState, autoTuneActive, boilActive,
+    isConnected, hasRecovery, mode, manualIntent,
+    recipeState, autoTuneActive, boilActive,
 } from '@inversa/stores';
 import { TempInstrument } from '../components/TempInstrument';
 import { RecipeTimeline } from '../components/RecipeTimeline';
@@ -35,7 +36,14 @@ function deriveSubState(): Sub {
     if (!isConnected.value)              return 'disconnected';
     if (hasRecovery.value)               return 'recovery';
     if (autoTuneActive.value)            return 'autotune';
-    if (mode.value === 'manual')         return 'manual';
+    // UI-side intent: user tapped "Modo Manual" from Idle. Firmware
+    // only flips to Manual after req:set-temp / req:heater:on (which
+    // the user sends *from* the Manual view), so without this the
+    // first telemetry tick after the tap kicks them back to Idle.
+    // `manualIntent` is cleared by ConnectionManager on disconnect
+    // and by updateFromTelemetry once firmware reports any non-idle
+    // mode.
+    if (mode.value === 'manual' || manualIntent.value) return 'manual';
 
     if (mode.value === 'recipe' &&
         recipeState.value !== 'idle' && recipeState.value !== 'completed') {
