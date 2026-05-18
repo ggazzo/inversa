@@ -143,6 +143,11 @@ noble.on('discover', async (p) => {
         await txChar.subscribeAsync();
         console.log('[ble-probe] subscribed to TX (notify)');
 
+        // iOS GATT registers the notify subscription a moment after
+        // subscribeAsync resolves; first request inside that window
+        // can lose its response. 300ms settle covers it.
+        await new Promise((r) => setTimeout(r, 300));
+
         await runSuite();
         await p.disconnectAsync();
     } catch (e) {
