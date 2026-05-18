@@ -167,6 +167,8 @@ class WebBleAdapter implements BleAdapter {
     onMessage(cb: (data: any) => void): void { this._onMessage = cb; }
     onConnect(cb: () => void): void { this._onConnect = cb; }
     onDisconnect(cb: () => void): void { this._onDisconnect = cb; }
+    // Web Bluetooth doesn't expose RSSI; signal stays null on web.
+    onRssi(_cb: (rssi: number | null) => void): void { /* noop */ }
 
     getDeviceName(): string | null {
         return this.device?.name ?? null;

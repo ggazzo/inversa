@@ -26,6 +26,7 @@ class BleClientClass {
     private _onMessage: ((data: any) => void) | null = null;
     private _onConnect: (() => void) | null = null;
     private _onDisconnect: (() => void) | null = null;
+    private _onRssi: ((rssi: number | null) => void) | null = null;
 
     constructor() {
         this.adapter = createBleAdapter();
@@ -41,6 +42,7 @@ class BleClientClass {
 
         this.adapter.onConnect(() => this._onConnect?.());
         this.adapter.onDisconnect(() => this._onDisconnect?.());
+        this.adapter.onRssi((rssi) => this._onRssi?.(rssi));
     }
 
     isSupported(): boolean { return this.adapter.isSupported(); }
@@ -86,6 +88,7 @@ class BleClientClass {
     onMessage(cb: (data: any) => void): void { this._onMessage = cb; }
     onConnect(cb: () => void): void { this._onConnect = cb; }
     onDisconnect(cb: () => void): void { this._onDisconnect = cb; }
+    onRssi(cb: (rssi: number | null) => void): void { this._onRssi = cb; }
 
     getDeviceName(): string | null { return this.adapter.getDeviceName(); }
 }
