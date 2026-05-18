@@ -305,54 +305,51 @@ class NativeBleAdapter implements BleAdapter {
         // chunk of the device's JSON response; we accumulate until
         // JSON.parse succeeds, matching the web adapter.
         //
-        // ble-plx occasionally fires the callback with "Operation was
-        // cancelled" right after monitorCharacteristicForService
-        // resolves — iOS GATT race where the registration isn't fully
-        // settled. We retry the subscribe once on that specific error
-        // before the settle window. Cancellations after the settle
-        // (user disconnect, link drop) are normal and silent.
+        // Subscribe to TX char. Verbose logging on every callback
+        // invocation — we lost rx with no warning before, so see
+        // every event regardless of suppression.
+        let subId = 0;
         const subscribe = (): void => {
+            const myId = ++subId;
+            console.log(`[BLE] monitor subscribe #${myId}`);
             this.monitorSub = connected.monitorCharacteristicForService(
                 NUS_SERVICE_UUID,
                 NUS_TX_CHAR_UUID,
                 (error: any, char: any) => {
                     if (error) {
-                        const msg = String(error?.message ?? '');
-                        if (msg.toLowerCase().includes('cancel')) {
-                            // Suppress: either the retry below or the
-                            // user-initiated disconnect cleared us.
-                            return;
-                        }
-                        console.warn('[BLE] monitor error', msg);
+                        console.warn(`[BLE] monitor #${myId} error: ${error?.message ?? error}`);
                         return;
                     }
-                    if (!char?.value) return;
+                    if (!char?.value) {
+                        console.log(`[BLE] monitor #${myId} fired but no value`);
+                        return;
+                    }
                     this.handleChunk(decodeBase64(char.value));
                 },
             );
         };
         subscribe();
-        console.log('[BLE] monitor subscribed');
 
-        // iOS GATT registers the notify subscription asynchronously on
-        // the peripheral side; ble-plx resolves monitorCharacteristic*
-        // before the firmware has actually started routing notifies to
-        // us. The first request sent in that window drops its response.
-        // 300ms is enough to settle on every device we tested; tune
-        // higher only if first-request timeouts come back.
-        await new Promise((r) => setTimeout(r, 300));
+        // Android often needs a longer settle than iOS — the firmware
+        // writes the CCCD descriptor in response to our subscribe and
+        // that round-trip can take a beat. Bump to 1500ms. Removed
+        // the previous retry: doing remove() + re-subscribe on Android
+        // toggles the CCCD off then on, which can leave the descriptor
+        // in a disabled state if the writes race.
+        await new Promise((r) => setTimeout(r, 1500));
 
-        // If the iOS stack cancelled the subscription during the
-        // settle window, the user wouldn't notice — frames just never
-        // arrive. Retry the subscribe once before signaling onConnect
-        // so the app starts in a healthy state.
-        if (!this.monitorSub?.isCancelled?.()) {
-            // ble-plx Subscription has no public "isCancelled" — we
-            // just re-subscribe unconditionally, cheap. The previous
-            // sub's callback ignores "cancel" so the new one wins.
-            try { this.monitorSub?.remove(); } catch { /* noop */ }
-            subscribe();
-            console.log('[BLE] monitor re-subscribed after settle');
+        // Android: request a larger MTU so firmware can send bigger
+        // chunks. Default is 23 (20-byte payload), which works but
+        // amplifies the issue if any chunk is lost. Request 185
+        // (firmware ceiling). Skipped on iOS — ble-plx negotiates
+        // automatically there.
+        if (Platform.OS === 'android') {
+            try {
+                const after = await connected.requestMTU(185);
+                console.log(`[BLE] MTU negotiated: ${after.mtu ?? after}`);
+            } catch (e: any) {
+                console.warn(`[BLE] requestMTU failed: ${e?.message}`);
+            }
         }
 
         this.device = connected;
