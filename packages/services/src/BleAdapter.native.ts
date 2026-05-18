@@ -437,20 +437,53 @@ class NativeBleAdapter implements BleAdapter {
 
     private handleChunk(text: string): void {
         this.rxBuffer += text;
-        console.log('[BLE] rx chunk', text.length, 'b, buf', this.rxBuffer.length);
-        try {
-            const data = JSON.parse(this.rxBuffer);
-            this.rxBuffer = '';
-            console.log('[BLE] parsed', data?.tp);
-            this._onMessage?.(data);
-        } catch {
-            // Same guard as the web side — drop the buffer if it
-            // grows past anything plausible to avoid leaking memory
-            // on a stuck/garbled stream.
-            if (this.rxBuffer.length > 10_000) {
-                console.warn('[BLE-PLX] Buffer overflow, resetting');
-                this.rxBuffer = '';
+        // Firmware sends JSON frames back-to-back with no delimiter (no
+        // newline, no length prefix). Tracking brace depth + string
+        // state lets us slice complete top-level objects out of the
+        // stream as soon as they're whole. Naive JSON.parse on the
+        // whole buffer fails forever once frame N+1 starts arriving
+        // (`{...}{...}` isn't valid JSON) — which is exactly what we
+        // observed (buffer growing monotonically without parse success).
+        let depth      = 0;
+        let inString   = false;
+        let escape     = false;
+        let frameStart = -1;
+
+        for (let i = 0; i < this.rxBuffer.length; i++) {
+            const ch = this.rxBuffer[i];
+            if (escape) { escape = false; continue; }
+            if (inString) {
+                if (ch === '\\') escape = true;
+                else if (ch === '"') inString = false;
+                continue;
             }
+            if (ch === '"') { inString = true; continue; }
+            if (ch === '{') {
+                if (depth === 0) frameStart = i;
+                depth++;
+            } else if (ch === '}') {
+                depth--;
+                if (depth === 0 && frameStart >= 0) {
+                    const frame = this.rxBuffer.slice(frameStart, i + 1);
+                    try {
+                        const data = JSON.parse(frame);
+                        this._onMessage?.(data);
+                    } catch (e: any) {
+                        console.warn('[BLE] frame parse error', e?.message, frame.slice(0, 60));
+                    }
+                    // Drop everything up to and including the consumed
+                    // frame. Restart scanning from the new buffer head.
+                    this.rxBuffer = this.rxBuffer.slice(i + 1);
+                    i = -1;
+                    frameStart = -1;
+                }
+            }
+        }
+
+        // Sanity guard against runaway buffers from a corrupted stream.
+        if (this.rxBuffer.length > 10_000) {
+            console.warn('[BLE] buffer overflow, resetting');
+            this.rxBuffer = '';
         }
     }
 }
