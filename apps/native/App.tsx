@@ -12,8 +12,15 @@
 import { useEffect, useState } from 'react';
 import { Dimensions, Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
+
+// Lazy-require so a stale dev-client (built before
+// expo-screen-orientation was installed) doesn't redbox on boot.
+// Falls back to a no-op so the rotation policy below is harmless
+// until the user runs `expo run:android` to relink the pod.
+let ScreenOrientation: any = null;
+try { ScreenOrientation = require('expo-screen-orientation'); }
+catch { ScreenOrientation = null; }
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
@@ -43,6 +50,7 @@ export default function App() {
     // `orientation: default` in app.json lets the OS rotate; the
     // lockAsync below clamps phones back to portrait at boot.
     useEffect(() => {
+        if (!ScreenOrientation?.lockAsync) return;
         const { width, height } = Dimensions.get('window');
         const minEdge = Math.min(width, height);
         const isTablet = Platform.OS === 'ios'
