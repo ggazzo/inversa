@@ -14,7 +14,7 @@ import { BleClient } from '@inversa/services';
 
 export type MenuId =
     | 'recipes' | 'brewlog' | 'equipment' | 'connectivity'
-    | 'tuning'  | 'notifications' | 'about';
+    | 'tuning'  | 'notifications' | 'about' | 'debug';
 
 const MENU_ITEMS: { id: MenuId; label: string }[] = [
     { id: 'recipes',       label: 'Receitas salvas' },
@@ -24,6 +24,7 @@ const MENU_ITEMS: { id: MenuId; label: string }[] = [
     { id: 'tuning',        label: 'PID & AutoTune' },
     { id: 'notifications', label: 'Notificações' },
     { id: 'about',         label: 'Sobre' },
+    { id: 'debug',         label: 'Debug (BLE trace)' },
 ];
 
 interface Props {

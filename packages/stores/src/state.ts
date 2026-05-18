@@ -176,6 +176,28 @@ export const devicePickerOpen = signal<boolean>(false);
 // when disconnected, on web (browser doesn't expose RSSI), or sim.
 export const signalRssi = signal<number | null>(null);
 
+// Debug ring buffer — last N messages received from the device.
+// Populated by ConnectionManager._handleMessage. UI debug panel
+// reads this to display a live trace for troubleshooting.
+export interface DebugEntry {
+    ts: number;          // Date.now()
+    tp: string;          // message type
+    snippet: string;     // truncated JSON
+}
+const DEBUG_BUFFER_MAX = 50;
+export const debugMessages = signal<DebugEntry[]>([]);
+export function pushDebug(data: any): void {
+    const entry: DebugEntry = {
+        ts: Date.now(),
+        tp: data?.tp ?? '(no tp)',
+        snippet: JSON.stringify(data).slice(0, 200),
+    };
+    const next = debugMessages.value.concat(entry);
+    debugMessages.value = next.length > DEBUG_BUFFER_MAX
+        ? next.slice(-DEBUG_BUFFER_MAX)
+        : next;
+}
+
 export type ToastKind = 'info' | 'success' | 'error' | 'warning';
 export function showToast(message: string, type: ToastKind = 'info', durationMs = 3000): void {
   toastMessage.value = message;

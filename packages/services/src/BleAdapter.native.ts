@@ -448,7 +448,10 @@ class NativeBleAdapter implements BleAdapter {
         this.rxBuffer += text;
         const { frames, remaining, parseErrors } = extractFrames(this.rxBuffer);
         this.rxBuffer = remaining;
-        for (const data of frames) this._onMessage?.(data);
+        for (const data of frames) {
+            console.log('[BLE] rx', data?.tp);
+            this._onMessage?.(data);
+        }
         for (const { error, frame } of parseErrors) {
             console.warn('[BLE] frame parse error', error, frame.slice(0, 60));
         }
