@@ -19,7 +19,13 @@ public:
 
     bool setup() override {
         NimBLEDevice::init(BLE_DEVICE_NAME);
-        NimBLEDevice::setMTU(512);
+        NimBLEDevice::setMTU(
+#ifdef BLE_MTU_SIZE
+            BLE_MTU_SIZE
+#else
+            512
+#endif
+        );
 
         _server = NimBLEDevice::createServer();
         _server->setCallbacks(this);
@@ -104,9 +110,11 @@ public:
     }
 
     void sendJson(JsonDocument& doc) {
-        String json;
-        serializeJson(doc, json);
-        send(json);
+        // Reuse a single String buffer to avoid per-call heap churn on the
+        // BLE notify path. Cleared rather than freed so capacity is retained.
+        _telemetryBuf = "";
+        serializeJson(doc, _telemetryBuf);
+        send(_telemetryBuf);
     }
 
     bool isConnected() const { return _connected; }
@@ -145,6 +153,10 @@ private:
 #endif
     uint32_t _lastTelemetry = 0;
     String _rxBuffer = "";
+    // Reusable JsonDocument for telemetry — avoids ~12 heap allocs/sec at 1Hz
+    // telemetry. clear() is called at the start of every sendTelemetry().
+    JsonDocument _telemetryDoc;
+    String _telemetryBuf;
 
     // ── NimBLE Server Callbacks ─────────────────────────────
 
@@ -225,7 +237,8 @@ private:
     // ── Telemetry ───────────────────────────────────────────
 
     void sendTelemetry() {
-        JsonDocument doc;
+        JsonDocument& doc = _telemetryDoc;
+        doc.clear();
         doc[Protocol::FIELD_TYPE]         = Protocol::EVT_STATUS;
         doc[Protocol::FIELD_CURRENT_TEMP] = round2(gState.currentTemp);
         doc[Protocol::FIELD_TARGET_TEMP]  = round2(gState.targetTemp);

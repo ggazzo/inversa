@@ -42,16 +42,6 @@ public:
         }
     }
 
-    // Get plugin by type
-    template<typename T>
-    T* get() {
-        for (auto& p : _plugins) {
-            T* cast = dynamic_cast<T*>(p.get());
-            if (cast) return cast;
-        }
-        return nullptr;
-    }
-
     size_t count() const { return _plugins.size(); }
 
 private:
