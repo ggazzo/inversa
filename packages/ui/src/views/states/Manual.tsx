@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Card, Slider, Text, XStack, YStack } from 'tamagui';
-import { targetTemp, heaterOn, pumpOn, mode, showToast } from '@inversa/stores';
+import { targetTemp, heaterOn, pumpOn, mode, manualIntent, showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 
 export function Manual() {
@@ -21,7 +21,11 @@ export function Manual() {
     function emergencyOff() {
         ConnectionManager.heaterOff()
             .then(() => ConnectionManager.pumpOff().catch(() => {}))
-            .then(() => { mode.value = 'idle'; showToast('Desligado'); })
+            .then(() => {
+                mode.value = 'idle';
+                manualIntent.value = false;
+                showToast('Desligado');
+            })
             .catch((e: any) => showToast(e?.message || 'Falha', 'error'));
     }
 
@@ -30,7 +34,8 @@ export function Manual() {
             <YStack gap="$3">
                 <XStack jc="space-between" ai="center">
                     <Text fontWeight="700">Modo Manual</Text>
-                    <Button size="$1" chromeless onPress={() => { mode.value = 'idle'; }}>
+                    <Button size="$1" chromeless
+                        onPress={() => { mode.value = 'idle'; manualIntent.value = false; }}>
                         Sair
                     </Button>
                 </XStack>

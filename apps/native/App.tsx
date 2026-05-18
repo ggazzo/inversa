@@ -18,7 +18,7 @@ import { useSignals } from '@preact/signals-react/runtime';
 import { ToastProvider, ToastViewport } from '@tamagui/toast';
 import { PortalProvider, ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
-import { isConnected, theme, mode } from '@inversa/stores';
+import { isConnected, theme, manualIntent } from '@inversa/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet, DebugSheet,
@@ -73,7 +73,7 @@ export default function App() {
                                     >
                                         <BrewView
                                             onMenuSelect={setOpenSheet}
-                                            onStartManual={() => { mode.value = 'manual'; }}
+                                            onStartManual={() => { manualIntent.value = true; }}
                                             chart={<TemperatureChart />}
                                         />
                                     </ScrollView>
