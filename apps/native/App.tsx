@@ -10,7 +10,9 @@
 // history pushes to 1 Hz (the chart's actual usefulness ceiling).
 
 import { useEffect, useState } from 'react';
+import { Dimensions, Platform } from 'react-native';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -34,6 +36,24 @@ export default function App() {
     const [openSheet, setOpenSheet] = useState<MenuId | null>(null);
 
     useEffect(() => { ConnectionManager.init(); }, []);
+
+    // Rotation policy: phones lock to portrait; tablets get full
+    // freedom. Detection: Platform.isPad on iOS, screen min-edge
+    // ≥ 600dp on Android (the conventional sw600dp tablet bucket).
+    // `orientation: default` in app.json lets the OS rotate; the
+    // lockAsync below clamps phones back to portrait at boot.
+    useEffect(() => {
+        const { width, height } = Dimensions.get('window');
+        const minEdge = Math.min(width, height);
+        const isTablet = Platform.OS === 'ios'
+            ? (Platform as any).isPad === true
+            : minEdge >= 600;
+        if (isTablet) {
+            ScreenOrientation.unlockAsync().catch(() => {});
+        } else {
+            ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+        }
+    }, []);
 
     // Keep screen on while there's an active link. A brew session
     // runs for hours — a sleeping phone misses hop-addition alerts
