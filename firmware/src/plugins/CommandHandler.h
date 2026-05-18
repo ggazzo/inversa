@@ -285,7 +285,7 @@ public:
         else if (strcmp(type, Protocol::REQ_RECOVERY_DISCARD) == 0) {
             RecoveryManager::instance().clearRecovery();
             gState.hasRecoveryData = false;
-            gState.recoveryRecipeName = "";
+            gState.recoveryRecipeName[0] = 0;
             sendOk(rid);
         }
         // ── WiFi: Configure ─────────────────────────────────

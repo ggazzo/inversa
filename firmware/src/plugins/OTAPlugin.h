@@ -93,7 +93,7 @@ public:
         const char* tagName = doc["tag_name"] | "";
         if (strlen(tagName) == 0) { setError("No version tag in release"); return; }
 
-        _state.otaLatestVersion = tagName;
+        setStr(_state.otaLatestVersion, tagName);
         DEBUG_PRINTF("[OTA] Latest version: %s, Current: %s\n", tagName, BUILD_GIT_VERSION);
 
         if (!Semver::isNewer(tagName, BUILD_GIT_VERSION)) {
@@ -277,14 +277,14 @@ private:
     }
 
     void setStatus(const char* status) {
-        _state.otaStatus = status;
-        _state.otaError = "";
+        setStr(_state.otaStatus, status);
+        _state.otaError[0] = 0;
         sendStatus();
     }
 
     void setError(const String& error) {
-        _state.otaStatus = "error";
-        _state.otaError = error;
+        setStr(_state.otaStatus, "error");
+        setStr(_state.otaError, error);
         DEBUG_PRINTF("[OTA] Error: %s\n", error.c_str());
         sendStatus();
     }
@@ -292,11 +292,11 @@ private:
     void sendStatus() {
         JsonDocument doc;
         doc[Protocol::FIELD_TYPE] = Protocol::EVT_OTA_STATUS;
-        doc["st"]  = _state.otaStatus;
-        doc["ver"] = _state.otaLatestVersion;
+        doc["st"]  = (const char*)_state.otaStatus;
+        doc["ver"] = (const char*)_state.otaLatestVersion;
         doc["pct"] = _state.otaProgress;
         doc["cur"] = BUILD_GIT_VERSION;
-        if (_state.otaError.length() > 0) doc["err"] = _state.otaError;
+        if (!isEmptyStr(_state.otaError)) doc["err"] = (const char*)_state.otaError;
 
         String json;
         serializeJson(doc, json);
