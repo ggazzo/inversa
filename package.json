@@ -1,23 +1,26 @@
 {
-    "name": "inversa-monorepo",
-    "version": "0.0.0",
-    "private": true,
-    "description": "Inversa homebrewing controller — firmware, web PWA, and (soon) native app",
-    "workspaces": [
-        "apps/*",
-        "packages/*"
-    ],
-    "scripts": {
-        "web:dev": "npm run dev --workspace apps/web",
-        "web:build": "npm run build --workspace apps/web",
-        "web:typecheck": "npm run typecheck --workspace apps/web",
-        "web:build:firmware": "npm run build:firmware --workspace apps/web",
-        "native:start": "npm run start --workspace apps/native",
-        "native:ios": "npm run ios --workspace apps/native",
-        "native:android": "npm run android --workspace apps/native",
-        "native:typecheck": "npm run typecheck --workspace apps/native"
-    },
-    "engines": {
-        "node": ">=20"
-    }
+  "name": "inversa-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Inversa homebrewing controller — firmware, web PWA, and (soon) native app",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "web:dev": "npm run dev --workspace apps/web",
+    "web:build": "npm run build --workspace apps/web",
+    "web:typecheck": "npm run typecheck --workspace apps/web",
+    "web:build:firmware": "npm run build:firmware --workspace apps/web",
+    "native:start": "npm run start --workspace apps/native",
+    "native:ios": "npm run ios --workspace apps/native",
+    "native:android": "npm run android --workspace apps/native",
+    "native:typecheck": "npm run typecheck --workspace apps/native"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "@tamagui/portal": "1.144.4"
+  }
 }
