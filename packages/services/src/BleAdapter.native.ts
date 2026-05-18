@@ -309,6 +309,14 @@ class NativeBleAdapter implements BleAdapter {
         );
         console.log('[BLE] monitor subscribed');
 
+        // iOS GATT registers the notify subscription asynchronously on
+        // the peripheral side; ble-plx resolves monitorCharacteristic*
+        // before the firmware has actually started routing notifies to
+        // us. The first request sent in that window drops its response.
+        // 300ms is enough to settle on every device we tested; tune
+        // higher only if first-request timeouts come back.
+        await new Promise((r) => setTimeout(r, 300));
+
         this.device = connected;
         this.connected = true;
         this.startRssiPolling();
