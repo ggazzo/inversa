@@ -10,7 +10,7 @@ import { Notifications } from './notifications';
 
 import { lastTelemetryMs } from '@inversa/stores';
 import {
-  isConnected, deviceName, signalRssi, updateFromTelemetry, showToast,
+  isConnected, deviceName, signalRssi, updateFromTelemetry, showToast, pushDebug,
   hasRecovery, recoveryRecipeName,
   wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
   otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion,
@@ -344,6 +344,7 @@ class ConnectionManagerClass {
   }
 
   _handleMessage(data) {
+    pushDebug(data);
     switch (data.tp) {
       case 'evt:status':
         lastTelemetryMs.value = Date.now();
