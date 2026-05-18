@@ -86,6 +86,11 @@ export interface BleAdapter {
     /** Best-effort label for the connected device. `null` before
      *  connect or when the transport doesn't expose a name (sim). */
     getDeviceName(): string | null;
+
+    /** Subscribe to RSSI samples (dBm, negative; closer to 0 = stronger).
+     *  Native adapter polls every few seconds while connected. Web and
+     *  sim never fire. */
+    onRssi(cb: (rssi: number | null) => void): void;
 }
 
 /** Throws on every operation. Replaced at bundle time by
@@ -103,6 +108,7 @@ class UnsupportedAdapter implements BleAdapter {
     onMessage(_cb: (data: any) => void): void { /* noop */ }
     onConnect(_cb: () => void): void { /* noop */ }
     onDisconnect(_cb: () => void): void { /* noop */ }
+    onRssi(_cb: (rssi: number | null) => void): void { /* noop */ }
     getDeviceName(): string | null { return null; }
 }
 

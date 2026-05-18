@@ -171,6 +171,11 @@ export const toastType    = signal<'info' | 'success' | 'error' | 'warning'>('in
 // reads it to decide whether to render itself + start scanning.
 export const devicePickerOpen = signal<boolean>(false);
 
+// RSSI of the active link, in dBm (negative, closer to 0 = stronger).
+// Populated by the native BLE adapter via readRSSI() polling. Null
+// when disconnected, on web (browser doesn't expose RSSI), or sim.
+export const signalRssi = signal<number | null>(null);
+
 export type ToastKind = 'info' | 'success' | 'error' | 'warning';
 export function showToast(message: string, type: ToastKind = 'info', durationMs = 3000): void {
   toastMessage.value = message;

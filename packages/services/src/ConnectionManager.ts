@@ -10,7 +10,7 @@ import { Notifications } from './notifications';
 
 import { lastTelemetryMs } from '@inversa/stores';
 import {
-  isConnected, deviceName, updateFromTelemetry, showToast,
+  isConnected, deviceName, signalRssi, updateFromTelemetry, showToast,
   hasRecovery, recoveryRecipeName,
   wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
   otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion,
@@ -57,11 +57,16 @@ class ConnectionManagerClass {
     BleClient.onDisconnect(() => {
       isConnected.value = false;
       deviceName.value = '';
+      signalRssi.value = null;
       showToast('Desconectado', 'error');
     });
 
     BleClient.onMessage((data) => {
       this._handleMessage(data);
+    });
+
+    BleClient.onRssi((rssi) => {
+      signalRssi.value = rssi;
     });
   }
 
