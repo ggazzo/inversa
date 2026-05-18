@@ -1,5 +1,22 @@
 #pragma once
 #include <Arduino.h>
+#include <cstring>
+
+// Bounded copy helper used by the char[] string fields below. Returns a
+// reference to dst so it composes with operator chains. Truncates to N-1
+// chars and always NUL-terminates — caller does not need to handle the
+// '\0' itself. Empty source clears the buffer.
+template <size_t N>
+inline void setStr(char (&dst)[N], const char* src) {
+    if (!src) { dst[0] = 0; return; }
+    size_t i = 0;
+    for (; i < N - 1 && src[i] != 0; i++) dst[i] = src[i];
+    dst[i] = 0;
+}
+template <size_t N>
+inline void setStr(char (&dst)[N], const String& src) { setStr(dst, src.c_str()); }
+template <size_t N>
+inline bool isEmptyStr(const char (&buf)[N]) { return buf[0] == 0; }
 
 // ─── Operating Mode ─────────────────────────────────────────
 enum class OperatingMode : uint8_t {
@@ -72,11 +89,11 @@ struct MachineState {
 
     // Recipe
     RecipeState recipeState = RecipeState::Idle;
-    String recipeName       = "";
+    char   recipeName[32]   = {0};
     int    recipeStep       = 0;
     int    recipeTotalSteps = 0;
     uint32_t timerRemainingMs = 0;
-    String confirmMessage   = "";
+    char   confirmMessage[64] = {0};
     // P5 — sub-states the RecipePlugin can be sitting in, captured by
     // RecoveryManager so a power-cut resumes the correct WAIT_*.
     bool   waitingForTemp    = false;
@@ -96,19 +113,19 @@ struct MachineState {
 
     // Recovery
     bool   hasRecoveryData      = false;
-    String recoveryRecipeName   = "";
+    char   recoveryRecipeName[32] = {0};
 
     // WiFi
     bool   wifiConnected        = false;
-    String wifiSSID             = "";
-    String wifiIP               = "";
-    String wifiConfiguredSSID   = "";  // Stored SSID (for display)
+    char   wifiSSID[33]         = {0};
+    char   wifiIP[16]           = {0};
+    char   wifiConfiguredSSID[33] = {0};  // Stored SSID (for display)
 
     // OTA
-    String otaStatus            = "idle";  // idle, checking, available, downloading, installing, error, up-to-date
-    String otaLatestVersion     = "";
+    char   otaStatus[16]        = "idle";  // idle, checking, available, downloading, installing, error, up-to-date
+    char   otaLatestVersion[32] = {0};
     uint8_t otaProgress         = 0;
-    String otaError             = "";
+    char   otaError[64]         = {0};
     // P9 fix: rollback automático pós-OTA
     // Quando != 0, indica que firmware atual está em ESP_OTA_IMG_PENDING_VERIFY.
     // Ao expirar (millis() >= otaVerifyDeadline), main loop chama
@@ -158,16 +175,16 @@ struct MachineState {
     float    schedulerTargetTemp   = 0;   // Target temperature
     float    schedulerVolume       = 0;   // Water volume in liters
     uint32_t schedulerStartTime    = 0;   // Calculated start unix timestamp
-    String   schedulerStatus       = "";  // Status message
+    char     schedulerStatus[32]   = {0}; // Status message
 
     // Auto-Tune
     bool     autoTuneActive     = false;
     uint8_t  autoTuneProgress   = 0;      // Progress percentage (0-100)
-    String   autoTuneStatus     = "";     // Status message
+    char     autoTuneStatus[32] = {0};    // Status message
 
     // Brewing Step (for UI visualization)
     BrewingStep brewingStep     = BrewingStep::None;
-    String   brewingStepCustom  = "";     // Custom step name (from STEP command)
+    char     brewingStepCustom[32] = {0}; // Custom step name (from STEP command)
 
     // Thermal parameters (for heat loss calculation)
     float    volumeLiters       = 20.0f;  // Water/wort volume
