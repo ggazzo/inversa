@@ -456,19 +456,29 @@ class NativeBleAdapter implements BleAdapter {
             throw new Error('Not connected');
         }
         const json = JSON.stringify(message);
+        const tp   = (message as any)?.tp ?? '(no tp)';
+        console.log(`[BLE] tx ${tp} bytes=${json.length}`);
 
         // BLE MTU on Android negotiates around 185 bytes by default
         // (517 max); iOS sits at 185 too. We stay at 180 to leave
         // headroom — matches the firmware's per-chunk expectation and
         // is well under the 500 we use on web (chrome negotiates up).
         const chunkSize = 180;
+        let chunkIdx = 0;
         for (let i = 0; i < json.length; i += chunkSize) {
             const chunk = json.slice(i, i + chunkSize);
-            await this.device.writeCharacteristicWithoutResponseForService(
-                NUS_SERVICE_UUID,
-                NUS_RX_CHAR_UUID,
-                encodeBase64(chunk),
-            );
+            try {
+                await this.device.writeCharacteristicWithoutResponseForService(
+                    NUS_SERVICE_UUID,
+                    NUS_RX_CHAR_UUID,
+                    encodeBase64(chunk),
+                );
+                console.log(`[BLE] tx chunk ${chunkIdx} (${chunk.length}b) ok`);
+            } catch (e: any) {
+                console.warn(`[BLE] tx chunk ${chunkIdx} FAILED: ${e?.message ?? e}`);
+                throw e;
+            }
+            chunkIdx++;
         }
     }
 

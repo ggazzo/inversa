@@ -4,6 +4,7 @@
 // arriving and trigger probes from inside the app instead of from
 // a Mac terminal.
 
+import { useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { debugMessages, showToast, signalRssi, isConnected, deviceName } from '@inversa/stores';
@@ -11,6 +12,7 @@ import { ConnectionManager } from '@inversa/services';
 import { WizardSheet } from '../wizards/WizardSheet';
 
 interface Props { open: boolean; onClose: () => void }
+interface ActionResult { label: string; status: 'pending' | 'ok' | 'err'; ms?: number; detail?: string }
 
 const ACTIONS: { label: string; run: () => Promise<any> }[] = [
     { label: 'req:info',           run: () => ConnectionManager.getInfo() },
@@ -32,19 +34,27 @@ function fmtTime(ts: number): string {
 
 export function DebugSheet({ open, onClose }: Props) {
     useSignals();
+    const [lastResult, setLastResult] = useState<ActionResult | null>(null);
     const msgs = debugMessages.value;
     // Newest first.
     const ordered = [...msgs].reverse();
 
     async function fire(label: string, run: () => Promise<any>) {
+        console.log(`[debug] fire ${label}`);
+        setLastResult({ label, status: 'pending' });
+        const t0 = Date.now();
         try {
-            const t0 = Date.now();
             const res = await run();
             const ms = Date.now() - t0;
-            showToast(`${label} ✓ ${ms}ms`, 'success', 2000);
             console.log(`[debug] ${label} ✓ ${ms}ms`, res);
+            setLastResult({ label, status: 'ok', ms, detail: JSON.stringify(res).slice(0, 200) });
+            showToast(`${label} ✓ ${ms}ms`, 'success', 2000);
         } catch (e: any) {
-            showToast(`${label}: ${e?.message ?? 'falha'}`, 'error', 4000);
+            const ms = Date.now() - t0;
+            const msg = e?.message ?? String(e);
+            console.warn(`[debug] ${label} ✗ ${ms}ms: ${msg}`);
+            setLastResult({ label, status: 'err', ms, detail: msg });
+            showToast(`${label}: ${msg}`, 'error', 4000);
         }
     }
 
@@ -76,7 +86,46 @@ export function DebugSheet({ open, onClose }: Props) {
                             </Button>
                         ))}
                     </XStack>
+                    {lastResult && (
+                        <YStack padding="$2" br="$2" backgroundColor="$backgroundFocus" gap={2}>
+                            <XStack gap="$2" ai="center">
+                                <Text fontSize="$1" fontFamily="$mono" fontWeight="700">
+                                    {lastResult.status === 'pending' ? '…' : lastResult.status === 'ok' ? '✓' : '✗'}
+                                </Text>
+                                <Text fontSize="$1" fontFamily="$mono">
+                                    {lastResult.label}
+                                </Text>
+                                {lastResult.ms != null && (
+                                    <Text fontSize="$1" opacity={0.6} fontFamily="$mono">
+                                        {lastResult.ms}ms
+                                    </Text>
+                                )}
+                            </XStack>
+                            {lastResult.detail && (
+                                <Text fontSize="$1" opacity={0.6} fontFamily="$mono" numberOfLines={3}>
+                                    {lastResult.detail}
+                                </Text>
+                            )}
+                        </YStack>
+                    )}
                 </YStack>
+
+                {/* Per-tp counts since last clear */}
+                {msgs.length > 0 && (
+                    <YStack gap={2}>
+                        <Text fontSize="$1" opacity={0.6} fontWeight="600">Contagem por tipo</Text>
+                        <XStack gap="$2" flexWrap="wrap">
+                            {Object.entries(msgs.reduce((acc: Record<string, number>, m) => {
+                                acc[m.tp] = (acc[m.tp] || 0) + 1;
+                                return acc;
+                            }, {})).map(([tp, n]) => (
+                                <Text key={tp} fontSize="$1" fontFamily="$mono" opacity={0.7}>
+                                    {tp}={n}
+                                </Text>
+                            ))}
+                        </XStack>
+                    </YStack>
+                )}
 
                 {/* Message trace */}
                 <YStack gap="$1.5">
