@@ -10,6 +10,7 @@
 // history pushes to 1 Hz (the chart's actual usefulness ceiling).
 
 import { useEffect, useState } from 'react';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +18,7 @@ import { useSignals } from '@preact/signals-react/runtime';
 import { ToastProvider, ToastViewport } from '@tamagui/toast';
 import { ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
-import { theme, mode } from '@inversa/stores';
+import { isConnected, theme, mode } from '@inversa/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet,
@@ -33,6 +34,18 @@ export default function App() {
     const [openSheet, setOpenSheet] = useState<MenuId | null>(null);
 
     useEffect(() => { ConnectionManager.init(); }, []);
+
+    // Keep screen on while there's an active link. A brew session
+    // runs for hours — a sleeping phone misses hop-addition alerts
+    // and timer transitions. Once disconnected we release the lock
+    // so the phone can sleep normally and save battery.
+    const connected = isConnected.value;
+    useEffect(() => {
+        if (!connected) return;
+        const tag = 'inversa-brew';
+        activateKeepAwakeAsync(tag);
+        return () => { deactivateKeepAwake(tag); };
+    }, [connected]);
 
     const close = () => setOpenSheet(null);
 

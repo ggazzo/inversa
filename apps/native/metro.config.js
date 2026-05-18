@@ -25,7 +25,14 @@ config.resolver.nodeModulesPaths = [
     path.resolve(projectRoot, 'node_modules'),
     path.resolve(workspaceRoot, 'node_modules'),
 ];
-config.resolver.disableHierarchicalLookup = true;
+// Keep hierarchical lookup ON: when npm fails to hoist a transitive
+// (e.g. @tamagui/portal sometimes stays nested under
+// node_modules/tamagui/node_modules/@tamagui/portal when peer-dep
+// conflicts force npm to dedupe oddly), Metro needs to walk the
+// nested node_modules to find it. nodeModulesPaths above already
+// bounds the search to the monorepo root, so a global shadow can't
+// sneak in.
+config.resolver.disableHierarchicalLookup = false;
 
 // Make sure Tamagui's `tamagui.config.ts` and friends resolve. Tamagui
 // ships its own CJS/ESM bifurcation so we leave Metro's defaults alone
