@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { Platform } from '../platform';
 import { Button, Popover, Text, XStack, YStack, useTheme } from 'tamagui';
-import { isConnected, deviceName, mode, modeLabel, showToast } from '@inversa/stores';
+import { isConnected, deviceName, mode, modeLabel, showToast, signalRssi } from '@inversa/stores';
 import { isStale } from '@inversa/stores';
 import { theme as themeSignal, toggleTheme } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
@@ -104,9 +104,14 @@ export function TopBar({ onMenuSelect }: Props) {
                     })}
                 aria-label={connected ? 'Desconectar' : 'Conectar'}
             >
-                <Text fontSize="$1" color={chipColor !== '$background' ? 'white' : '$color'}>
-                    {chipText}
-                </Text>
+                <XStack ai="center" gap="$1.5">
+                    {connected && signalRssi.value != null && (
+                        <SignalBars rssi={signalRssi.value} on="white" off="rgba(255,255,255,0.35)" />
+                    )}
+                    <Text fontSize="$1" color={chipColor !== '$background' ? 'white' : '$color'}>
+                        {chipText}
+                    </Text>
+                </XStack>
             </Button>
 
             {/* Mode pill */}
@@ -164,6 +169,34 @@ export function TopBar({ onMenuSelect }: Props) {
                     </YStack>
                 </Popover.Content>
             </Popover>
+        </XStack>
+    );
+}
+
+// 4-bar signal indicator. RSSI is in dBm (negative, closer to 0 is
+// stronger). Thresholds match the conventional Wi-Fi/BLE bucketing:
+//   >= -55 dBm: 4 bars (excellent)
+//   >= -67 dBm: 3 bars (good)
+//   >= -75 dBm: 2 bars (fair)
+//   >= -85 dBm: 1 bar  (weak)
+//    < -85 dBm: 0 bars (unusable)
+function rssiToBars(rssi: number): number {
+    if (rssi >= -55) return 4;
+    if (rssi >= -67) return 3;
+    if (rssi >= -75) return 2;
+    if (rssi >= -85) return 1;
+    return 0;
+}
+
+function SignalBars({ rssi, on, off }: { rssi: number; on: string; off: string }) {
+    const bars    = rssiToBars(rssi);
+    const heights = [4, 7, 10, 13];
+    return (
+        <XStack ai="flex-end" gap={1.5} height={14}>
+            {heights.map((h, i) => (
+                <YStack key={i} width={2.5} height={h} br={1}
+                        backgroundColor={i < bars ? on : off} />
+            ))}
         </XStack>
     );
 }

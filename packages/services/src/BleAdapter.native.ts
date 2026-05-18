@@ -142,6 +142,8 @@ class NativeBleAdapter implements BleAdapter {
     private _onMessage:    ((data: any) => void) | null = null;
     private _onConnect:    (() => void) | null = null;
     private _onDisconnect: (() => void) | null = null;
+    private _onRssi:       ((rssi: number | null) => void) | null = null;
+    private rssiTimer:     ReturnType<typeof setInterval> | null = null;
 
     private ensureManager(): any {
         if (!this.manager) {
@@ -280,10 +282,13 @@ class NativeBleAdapter implements BleAdapter {
      *  device.connect()). */
     private async attachToDevice(connected: any): Promise<void> {
         await connected.discoverAllServicesAndCharacteristics();
+        console.log('[BLE] services discovered, id=', connected.id);
 
         // Track disconnects so the UI updates. ble-plx fires this for
         // every reason (BLE link drop, user-initiated, OS reset).
-        this.connectSub = connected.onDisconnected(() => {
+        this.connectSub = connected.onDisconnected((err: any) => {
+            console.log('[BLE] onDisconnected', err?.message ?? '');
+            this.stopRssiPolling();
             this.connected = false;
             this.device = null;
             this._onDisconnect?.();
@@ -296,14 +301,41 @@ class NativeBleAdapter implements BleAdapter {
             NUS_SERVICE_UUID,
             NUS_TX_CHAR_UUID,
             (error: any, char: any) => {
-                if (error || !char?.value) return;
+                if (error) { console.warn('[BLE] monitor error', error?.message); return; }
+                if (!char?.value) return;
                 this.handleChunk(decodeBase64(char.value));
             },
         );
+        console.log('[BLE] monitor subscribed');
 
         this.device = connected;
         this.connected = true;
+        this.startRssiPolling();
         this._onConnect?.();
+    }
+
+    private startRssiPolling(): void {
+        this.stopRssiPolling();
+        // Immediate read so the chip shows bars without the 3s delay.
+        this.pollRssi();
+        this.rssiTimer = setInterval(() => this.pollRssi(), 3_000);
+    }
+
+    private stopRssiPolling(): void {
+        if (this.rssiTimer) { clearInterval(this.rssiTimer); this.rssiTimer = null; }
+        this._onRssi?.(null);
+    }
+
+    private async pollRssi(): Promise<void> {
+        if (!this.device || !this.connected) return;
+        try {
+            const d = await this.device.readRSSI();
+            const rssi = typeof d?.rssi === 'number' ? d.rssi : null;
+            this._onRssi?.(rssi);
+        } catch {
+            // Read failure is non-fatal; transient on iOS during link
+            // power-save. Skip until next tick.
+        }
     }
 
     /** Sim bridge path — line-framed JSON over a WebSocket, mirroring
@@ -346,6 +378,7 @@ class NativeBleAdapter implements BleAdapter {
     }
 
     disconnect(): void {
+        this.stopRssiPolling();
         if (this.simSocket) {
             try { this.simSocket.close(); } catch { /* noop */ }
             this.simSocket = null;
@@ -395,6 +428,7 @@ class NativeBleAdapter implements BleAdapter {
     onMessage(cb: (data: any) => void): void { this._onMessage = cb; }
     onConnect(cb: () => void): void { this._onConnect = cb; }
     onDisconnect(cb: () => void): void { this._onDisconnect = cb; }
+    onRssi(cb: (rssi: number | null) => void): void { this._onRssi = cb; }
 
     getDeviceName(): string | null {
         if (this.simSocket) return 'Sim';
@@ -403,9 +437,11 @@ class NativeBleAdapter implements BleAdapter {
 
     private handleChunk(text: string): void {
         this.rxBuffer += text;
+        console.log('[BLE] rx chunk', text.length, 'b, buf', this.rxBuffer.length);
         try {
             const data = JSON.parse(this.rxBuffer);
             this.rxBuffer = '';
+            console.log('[BLE] parsed', data?.tp);
             this._onMessage?.(data);
         } catch {
             // Same guard as the web side — drop the buffer if it
