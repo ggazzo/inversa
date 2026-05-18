@@ -169,6 +169,17 @@ export function TopBar({ onMenuSelect }: Props) {
                                 <Text>{m.label}</Text>
                             </Button>
                         ))}
+                        {connected && (
+                            <Button size="$3" theme="red"
+                                justifyContent="flex-start"
+                                backgroundColor="transparent"
+                                onPress={() => {
+                                    setMenuOpen(false);
+                                    ConnectionManager.disconnect();
+                                }}>
+                                <Text>Desconectar</Text>
+                            </Button>
+                        )}
                     </YStack>
                 </Popover.Content>
             </Popover>

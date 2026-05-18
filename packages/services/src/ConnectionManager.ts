@@ -5,6 +5,9 @@
 // ConnectionManager.ts — Manages BLE connection lifecycle and message routing.
 import { BleClient } from './BleClient';
 import { Notifications } from './notifications';
+import { kvStore } from './kvStore';
+
+const LAST_DEVICE_KEY = 'inversa.lastDeviceId';
 // Note: prior versions imported `BLEService` from './BLEService` — the
 // rename to BleClient is the only public-API delta from Phase D.
 
@@ -54,6 +57,18 @@ class ConnectionManagerClass {
       showToast('Conectado!', 'success');
     });
 
+    // Best-effort auto-reconnect: if the user paired with a device
+    // previously, try the same id on boot. Silent failure — no toast
+    // for "no device found", that would be noise on every cold start.
+    // Only runs on platforms that need a picker (real BLE on RN);
+    // web's browser picker handles its own UX, sim's WS is just the
+    // single fixed URL.
+    if (BleClient.needsPicker()) {
+        kvStore.get(LAST_DEVICE_KEY).then((id) => {
+            if (id) BleClient.connectToDevice(id).catch(() => {});
+        });
+    }
+
     BleClient.onDisconnect(() => {
       isConnected.value = false;
       deviceName.value = '';
@@ -92,10 +107,21 @@ class ConnectionManagerClass {
     return BleClient.startScan(onDevice, onError);
   }
 
-  /** Connect to a specific device picked from a scan result. */
+  /** Connect to a specific device picked from a scan result. Persists
+   *  the id so future boots can auto-reconnect without showing the
+   *  picker. */
   async connectToDevice(id) {
     this.init();
     await BleClient.connectToDevice(id);
+    // Persist only after the connect succeeds; failed ids stay out
+    // of storage so the next boot doesn't keep retrying a bad one.
+    kvStore.set(LAST_DEVICE_KEY, id).catch(() => {});
+  }
+
+  /** Forget the cached auto-reconnect device. UI calls this when the
+   *  user explicitly chooses "Esquecer dispositivo". */
+  async forgetDevice() {
+    await kvStore.remove(LAST_DEVICE_KEY);
   }
 
   // Shorthand for requests
