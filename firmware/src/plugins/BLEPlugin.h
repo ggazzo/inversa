@@ -180,10 +180,10 @@ private:
     void sendRecoveryNotification() {
         JsonDocument doc;
         doc[Protocol::FIELD_TYPE] = Protocol::EVT_RECIPE_RECOVERY;
-        doc["recipe"] = gState.recoveryRecipeName;
+        doc["recipe"] = (const char*)gState.recoveryRecipeName;
         sendJson(doc);
-        DEBUG_PRINTF("[BLE] Sent recovery notification: %s\n", 
-                     gState.recoveryRecipeName.c_str());
+        DEBUG_PRINTF("[BLE] Sent recovery notification: %s\n",
+                     gState.recoveryRecipeName);
     }
 
     void onDisconnect(NimBLEServer* server, NimBLEConnInfo& connInfo, int reason) override {
@@ -261,7 +261,7 @@ private:
         if (gState.mode == OperatingMode::Recipe) {
             doc[Protocol::FIELD_RECIPE_STEP]  = gState.recipeStep;
             doc[Protocol::FIELD_RECIPE_TOTAL] = gState.recipeTotalSteps;
-            doc[Protocol::FIELD_RECIPE_NAME]  = gState.recipeName;
+            doc[Protocol::FIELD_RECIPE_NAME]  = (const char*)gState.recipeName;
             doc[Protocol::FIELD_TIMER_LEFT]   = gState.timerRemainingMs / 1000;
             const char* rst = "running";
             switch (gState.recipeState) {
@@ -336,7 +336,7 @@ private:
             doc["stm"] = gState.schedulerTargetMinute;
             doc["stt"] = gState.schedulerTargetTemp;
             doc["sv"] = gState.schedulerVolume;
-            doc["ss"] = gState.schedulerStatus;
+            doc["ss"] = (const char*)gState.schedulerStatus;
         }
 
         // Auto-Tune info
@@ -346,18 +346,18 @@ private:
         }
 
         // Brewing step (for UI)
-        if (gState.brewingStep != BrewingStep::None || !gState.brewingStepCustom.isEmpty()) {
+        if (gState.brewingStep != BrewingStep::None || !isEmptyStr(gState.brewingStepCustom)) {
             doc["bs"] = (int)gState.brewingStep;
-            if (!gState.brewingStepCustom.isEmpty()) {
-                doc["bsc"] = gState.brewingStepCustom;
+            if (!isEmptyStr(gState.brewingStepCustom)) {
+                doc["bsc"] = (const char*)gState.brewingStepCustom;
             }
         }
 
         // WAIT_CONFIRM state — always emitted so the UI clears the modal once
         // the recipe advances past the wait.
         doc["wc"] = gState.waitingForConfirm;
-        if (gState.waitingForConfirm && !gState.confirmMessage.isEmpty()) {
-            doc["cm"] = gState.confirmMessage;
+        if (gState.waitingForConfirm && !isEmptyStr(gState.confirmMessage)) {
+            doc["cm"] = (const char*)gState.confirmMessage;
         }
 
         sendJson(doc);
