@@ -1,9 +1,11 @@
 // HopTimeline.tsx — horizontal strip of triggered hops along the boil.
 import { Text, XStack, YStack } from 'tamagui';
+import { useSignals } from '@preact/signals-react/runtime';
 import { boilAlerts, boilTotal, boilRemaining, boilAdditions } from '@inversa/stores';
 import { fmtMmSs } from './util';
 
 export function HopTimeline() {
+    useSignals();
     const total = boilTotal.value;
     const left  = boilRemaining.value;
     const elapsed = total > 0 ? total - left : 0;

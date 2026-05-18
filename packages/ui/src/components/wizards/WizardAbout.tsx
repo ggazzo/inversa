@@ -1,5 +1,6 @@
 // WizardAbout.tsx — device info + gated factory reset.
 import { useEffect, useState } from 'react';
+import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Input, Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
 import { firmwareVersion, showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
@@ -9,6 +10,7 @@ import { confirm } from '../../platform';
 interface Props { open: boolean; onClose: () => void }
 
 export function WizardAbout({ open, onClose }: Props) {
+    useSignals();
     const [info, setInfo] = useState<any | null>(null);
     const [confirmText, setConfirmText] = useState('');
 

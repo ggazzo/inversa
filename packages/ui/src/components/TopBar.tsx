@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { Platform } from '../platform';
+import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Popover, Text, XStack, YStack, useTheme } from 'tamagui';
 import { isConnected, deviceName, mode, modeLabel, showToast, signalRssi } from '@inversa/stores';
 import { isStale } from '@inversa/stores';
@@ -30,6 +31,7 @@ interface Props {
 }
 
 export function TopBar({ onMenuSelect }: Props) {
+    useSignals();
     const connected = isConnected.value;
     const stale     = isStale.value;
     const supported = BleClient.isSupported();

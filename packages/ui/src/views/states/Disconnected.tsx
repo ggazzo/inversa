@@ -1,10 +1,12 @@
 // Disconnected.tsx — single CTA card; adapts text for sim mode.
+import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Card, H2, Paragraph, Text, YStack } from 'tamagui';
 import { showToast, devicePickerOpen } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { BleClient } from '@inversa/services';
 
 export function Disconnected() {
+    useSignals();
     const supported = BleClient.isSupported();
     const simMode   = typeof location !== 'undefined'
         && !!new URLSearchParams(location.search).get('sim');

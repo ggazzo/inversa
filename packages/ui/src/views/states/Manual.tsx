@@ -1,10 +1,12 @@
 // Manual.tsx — direct setpoint + actuator toggles.
 import { useState } from 'react';
+import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Card, Slider, Text, XStack, YStack } from 'tamagui';
 import { targetTemp, heaterOn, pumpOn, mode, showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 
 export function Manual() {
+    useSignals();
     // Local mirror so the slider feels responsive without round-tripping
     // every move. Confirmed by the user with "Aplicar".
     const [draft, setDraft] = useState<number>(targetTemp.value || 65);
