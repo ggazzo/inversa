@@ -1,5 +1,6 @@
 // WaitTimer.tsx — austere giant countdown.
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
+import { useSignals } from '@preact/signals-react/runtime';
 import {
     timerLeft, recipeName, brewingStepName, recipeStep, recipeTotalSteps,
 } from '@inversa/stores';
@@ -8,6 +9,7 @@ import { fmtMmSs } from '../../components/util';
 import { confirm } from '../../platform';
 
 export function WaitTimer() {
+    useSignals();
     return (
         <Card elevate size="$4" padded>
             <YStack ai="center" gap="$3">

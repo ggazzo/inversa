@@ -1,10 +1,12 @@
 // Mash.tsx — generic "recipe is running, calm middle" view.
 import { Button, Card, Progress, Text, XStack, YStack } from 'tamagui';
+import { useSignals } from '@preact/signals-react/runtime';
 import { recipeName, recipeStep, recipeTotalSteps, brewingStepName, showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { confirm } from '../../platform';
 
 export function Mash() {
+    useSignals();
     const total = recipeTotalSteps.value;
     const step  = recipeStep.value;
     const pct   = total > 0 ? Math.min(100, (step / total) * 100) : 0;
