@@ -1,9 +1,11 @@
 // RecoveryPrompt.tsx — yellow warning card with Retomar/Descartar.
 import { Button, Card, Paragraph, Text, XStack, YStack } from 'tamagui';
+import { useSignals } from '@preact/signals-react/runtime';
 import { recoveryRecipeName, showToast } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 
 export function RecoveryPrompt() {
+    useSignals();
     return (
         <Card
             elevate size="$4" padded

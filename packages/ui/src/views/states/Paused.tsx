@@ -1,10 +1,12 @@
 // Paused.tsx — yellow card while the recipe sits paused.
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
+import { useSignals } from '@preact/signals-react/runtime';
 import { recipeName, recipeStep, recipeTotalSteps, brewingStepName } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { confirm } from '../../platform';
 
 export function Paused() {
+    useSignals();
     return (
         <Card elevate size="$4" padded backgroundColor="$paused" opacity={0.95}>
             <YStack ai="center" gap="$3">

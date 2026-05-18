@@ -1,5 +1,6 @@
 // RecipeSheet.tsx — list, preview, start, delete.
 import { useEffect, useState } from 'react';
+import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { showToast, loadedRecipeContent } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
@@ -9,6 +10,7 @@ import { confirm } from '../../platform';
 interface Props { open: boolean; onClose: () => void }
 
 export function RecipeSheet({ open, onClose }: Props) {
+    useSignals();
     const [recipes, setRecipes] = useState<string[] | null>(null);
     const [err, setErr]         = useState<string | null>(null);
     const [preview, setPreview] = useState<{ file: string; content: string } | null>(null);

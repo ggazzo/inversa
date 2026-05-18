@@ -7,6 +7,7 @@
 // `apps/native` each pass their own implementation.
 
 import type { ReactNode } from 'react';
+import { useSignals } from '@preact/signals-react/runtime';
 import { Card, H1, Text, XStack, YStack } from 'tamagui';
 import {
     currentTemp, targetTemp, pidOutput, heaterOn, pumpOn, mode,
@@ -34,6 +35,7 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
 }
 
 export function TempInstrument({ chart }: { chart?: ReactNode } = {}) {
+    useSignals();
     const status = tempStatus(currentTemp.value, targetTemp.value, mode.value);
     const stale  = isStale.value;
     const pidPct = Math.round((pidOutput.value / 255) * 100);

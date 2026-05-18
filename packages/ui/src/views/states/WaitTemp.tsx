@@ -1,5 +1,6 @@
 // WaitTemp.tsx — "aguardando temperatura" with delta + ETA.
 import { Card, Progress, Text, XStack, YStack } from 'tamagui';
+import { useSignals } from '@preact/signals-react/runtime';
 import { currentTemp, targetTemp, recipeName, brewingStepName } from '@inversa/stores';
 
 function approxEtaMin(curr: number, target: number): number | null {
@@ -10,6 +11,7 @@ function approxEtaMin(curr: number, target: number): number | null {
 }
 
 export function WaitTemp() {
+    useSignals();
     const curr   = currentTemp.value;
     const target = targetTemp.value;
     const delta  = target - curr;
