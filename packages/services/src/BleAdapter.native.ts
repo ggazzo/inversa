@@ -30,6 +30,7 @@
 
 import { NativeModules, PermissionsAndroid, Platform } from 'react-native';
 import type { BleAdapter, BleScanDevice } from './BleAdapter';
+import { extractFrames } from './frameExtractor';
 
 const NUS_SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NUS_TX_CHAR_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // notify: device → app
@@ -437,49 +438,12 @@ class NativeBleAdapter implements BleAdapter {
 
     private handleChunk(text: string): void {
         this.rxBuffer += text;
-        // Firmware sends JSON frames back-to-back with no delimiter (no
-        // newline, no length prefix). Tracking brace depth + string
-        // state lets us slice complete top-level objects out of the
-        // stream as soon as they're whole. Naive JSON.parse on the
-        // whole buffer fails forever once frame N+1 starts arriving
-        // (`{...}{...}` isn't valid JSON) — which is exactly what we
-        // observed (buffer growing monotonically without parse success).
-        let depth      = 0;
-        let inString   = false;
-        let escape     = false;
-        let frameStart = -1;
-
-        for (let i = 0; i < this.rxBuffer.length; i++) {
-            const ch = this.rxBuffer[i];
-            if (escape) { escape = false; continue; }
-            if (inString) {
-                if (ch === '\\') escape = true;
-                else if (ch === '"') inString = false;
-                continue;
-            }
-            if (ch === '"') { inString = true; continue; }
-            if (ch === '{') {
-                if (depth === 0) frameStart = i;
-                depth++;
-            } else if (ch === '}') {
-                depth--;
-                if (depth === 0 && frameStart >= 0) {
-                    const frame = this.rxBuffer.slice(frameStart, i + 1);
-                    try {
-                        const data = JSON.parse(frame);
-                        this._onMessage?.(data);
-                    } catch (e: any) {
-                        console.warn('[BLE] frame parse error', e?.message, frame.slice(0, 60));
-                    }
-                    // Drop everything up to and including the consumed
-                    // frame. Restart scanning from the new buffer head.
-                    this.rxBuffer = this.rxBuffer.slice(i + 1);
-                    i = -1;
-                    frameStart = -1;
-                }
-            }
+        const { frames, remaining, parseErrors } = extractFrames(this.rxBuffer);
+        this.rxBuffer = remaining;
+        for (const data of frames) this._onMessage?.(data);
+        for (const { error, frame } of parseErrors) {
+            console.warn('[BLE] frame parse error', error, frame.slice(0, 60));
         }
-
         // Sanity guard against runaway buffers from a corrupted stream.
         if (this.rxBuffer.length > 10_000) {
             console.warn('[BLE] buffer overflow, resetting');
