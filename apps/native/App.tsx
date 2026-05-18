@@ -16,7 +16,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
 import { ToastProvider, ToastViewport } from '@tamagui/toast';
-import { ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
+import { PortalProvider, ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
 import { isConnected, theme, mode } from '@inversa/stores';
 import {
@@ -54,6 +54,13 @@ export default function App() {
             <SafeAreaProvider>
                 <TamaguiProvider config={config} defaultTheme={theme.value}>
                     <Theme name={theme.value}>
+                      {/* PortalProvider is required by Tamagui's Sheet /
+                          AlertDialog (they dispatch to PortalDispatchContext).
+                          The web tree gets one via TamaguiProvider
+                          automatically; RN doesn't, so mount it explicitly.
+                          shouldAddRootHost gives every Portal a default
+                          root container. */}
+                      <PortalProvider shouldAddRootHost>
                         <ToastProvider swipeDirection="horizontal" duration={3000} native={[]}>
                             <SafeAreaView style={{ flex: 1 }} edges={['top', 'left', 'right']}>
                                 <YStack flex={1} backgroundColor="$background">
@@ -88,6 +95,7 @@ export default function App() {
 
                             <ToastViewport top={8} right={8} />
                         </ToastProvider>
+                      </PortalProvider>
                     </Theme>
                 </TamaguiProvider>
                 <StatusBar style="auto" />
