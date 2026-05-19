@@ -73,6 +73,23 @@ public:
     }
 
     void loop() override {
+        // Drain any BLE command queued by onWrite. Doing this here
+        // instead of inside onWrite means the synchronous handlers
+        // (SD reads, JSON serialization, notify bursts) run on the
+        // main loop task, not on the NimBLE host task. The host
+        // task being blocked for >300 ms is what was tripping the
+        // BLE supervision timer and disconnecting on req:recipe:load.
+        if (_hasPendingCommand) {
+            String cmd;
+            // Atomic swap-and-clear so a write that races with this
+            // dispatch is just queued for next loop() instead of lost.
+            std::swap(cmd, _pendingCommand);
+            _hasPendingCommand = false;
+            if (cmd.length() > 0) {
+                bus().publish(EventType::BLECommandReceived, cmd);
+            }
+        }
+
         // Send telemetry periodically
         uint32_t now = millis();
         if (_connected && (now - _lastTelemetry >= TELEMETRY_INTERVAL_MS)) {
@@ -93,29 +110,158 @@ public:
         std::fflush(stdout);
         return;
 #else
-        if (!_connected || !_txChar) return;
-
-        // BLE MTU chunking for large messages
-        const uint8_t* data = (const uint8_t*)json.c_str();
-        size_t len = json.length();
-        size_t mtu = NimBLEDevice::getMTU() - 3;  // 3 bytes overhead
-
-        for (size_t i = 0; i < len; i += mtu) {
-            size_t chunk = min(mtu, len - i);
-            _txChar->setValue(data + i, chunk);
-            _txChar->notify();
-            if (len > mtu) delay(20);  // small delay between chunks
-        }
+        sendBytes(reinterpret_cast<const uint8_t*>(json.c_str()), json.length());
 #endif
     }
 
+#ifndef SIM_BUILD
+    // Returns the MTU that the *peer* has agreed to on the current
+    // link. NimBLEDevice::getMTU() returns the locally configured
+    // preferred MTU (185 on this build) regardless of what was
+    // actually negotiated, so chunking by it caused chunks larger
+    // than the peer would accept whenever the central hadn't yet
+    // completed the MTU exchange (BLE default = 23). The controller
+    // silently drops the link in that case — symptom matches the
+    // "BLE desconectou ao abrir uma receita" report.
+    uint16_t getNegotiatedMtu() const {
+        if (_server && _connHandle != BLE_HS_CONN_HANDLE_NONE) {
+            uint16_t mtu = _server->getPeerMTU(_connHandle);
+            if (mtu > 0) return mtu;
+        }
+        // BLE default ATT MTU is 23. Stay conservative pre-exchange.
+        return 23;
+    }
+
+    // Core BLE chunked-notify path. Earlier versions dropped chunks
+    // silently when NimBLE's TX mbuf pool ran out on a large burst
+    // (loadRecipe / brewlog export ~4 KB payloads at MTU=185). The
+    // dropped chunk left the central waiting indefinitely, and the
+    // supervision timer eventually killed the link — surfaced in the
+    // app as "BLE desconectou ao abrir uma receita".
+    //
+    // Fixes here, all in one place so every notify path shares them:
+    //
+    //   * check `notify()`'s bool return,
+    //   * on failure, back off (5 / 10 / 20 ms) and retry up to 3x,
+    //   * re-check `_connected`/`_txChar` between chunks so a
+    //     mid-stream disconnect aborts cleanly,
+    //   * keep the 2 ms per-chunk yield on the success path so the
+    //     NimBLE host task isn't pinned long enough to trip the
+    //     supervision timer.
+    bool sendBytes(const uint8_t* data, size_t len) {
+        if (!_connected || !_txChar || len == 0) return false;
+
+        const size_t mtu = getNegotiatedMtu() - 3;  // 3 bytes ATT overhead
+
+        for (size_t i = 0; i < len; i += mtu) {
+            if (!_connected || !_txChar) return false;
+            const size_t chunk = (len - i < mtu) ? (len - i) : mtu;
+            bool sent = false;
+            for (uint8_t attempt = 0; attempt < 3 && _connected; ++attempt) {
+                _txChar->setValue(data + i, chunk);
+                if (_txChar->notify()) { sent = true; break; }
+                // Notify queue full or transient ENOMEM — back off
+                // and retry. Backoffs stay short enough not to trip
+                // the supervision timer but long enough for the host
+                // task to drain its TX mbuf pool.
+                delay(5 << attempt);  // 5 / 10 / 20 ms
+            }
+            if (!sent) {
+                DEBUG_PRINTLN("[BLE] notify dropped chunk after 3 retries");
+                return false;
+            }
+            if (len > mtu) delay(2);  // brief yield between chunks
+        }
+        return true;
+    }
+#endif
+
     void sendJson(JsonDocument& doc) {
-        // Reuse a single String buffer to avoid per-call heap churn on the
-        // BLE notify path. Cleared rather than freed so capacity is retained.
+#ifdef SIM_BUILD
+        // Reuse a single String buffer to avoid per-call heap churn
+        // on the sim stdout bridge. Cleared rather than freed so
+        // capacity is retained.
         _telemetryBuf = "";
         serializeJson(doc, _telemetryBuf);
         send(_telemetryBuf);
+#else
+        if (!_connected || !_txChar) return;
+        // Stream the JSON directly into BLE notify chunks via a
+        // Print-derived adapter (defined below). Avoids the previous
+        // `String json` intermediate, which held the full payload —
+        // ~4 KB for a recipe load — and was the third copy of the
+        // content along with the SD readString() result and the
+        // JsonDocument internal storage. Triple-copy on a heap that
+        // also has NimBLE + WiFi controllers + lwIP was tight enough
+        // to occasionally fail malloc inside ArduinoJson's
+        // serializer, which on ESP-IDF surfaces as a crash → reset →
+        // "BLE desconectou" in the app.
+        // getNegotiatedMtu() falls back to 23 (BLE default ATT MTU)
+        // until the central completes the MTU exchange, so we never
+        // send a chunk larger than the peer actually agreed to.
+        ChunkedBleStream stream(_txChar, &_connected,
+                                getNegotiatedMtu() - 3);
+        serializeJson(doc, stream);
+        stream.flushTail();
+#endif
     }
+
+#ifndef SIM_BUILD
+    // ArduinoJson serializeJson() drives anything that implements the
+    // Arduino Print interface: write(uint8_t) + write(buf, n). This
+    // adapter buffers up to one MTU worth of payload and notifies in
+    // place, with the same retry-on-ENOMEM behaviour the legacy
+    // sendBytes() path now has.
+    class ChunkedBleStream : public Print {
+    public:
+        ChunkedBleStream(NimBLECharacteristic* tx, volatile bool* connected,
+                         size_t mtu)
+            : _tx(tx), _connected(connected),
+              _mtu(mtu > sizeof(_buf) ? sizeof(_buf) : mtu) {}
+
+        size_t write(uint8_t c) override { return write(&c, 1); }
+
+        size_t write(const uint8_t* data, size_t n) override {
+            if (_fail) return 0;
+            size_t out = 0;
+            while (n > 0 && *_connected) {
+                size_t room = _mtu - _pos;
+                size_t take = (n < room) ? n : room;
+                memcpy(_buf + _pos, data, take);
+                _pos  += take;
+                data  += take;
+                n     -= take;
+                out   += take;
+                if (_pos == _mtu) flush();
+            }
+            return out;
+        }
+
+        bool flushTail() { if (_pos > 0) flush(); return !_fail; }
+
+    private:
+        NimBLECharacteristic* _tx;
+        volatile bool*        _connected;
+        size_t                _mtu;
+        // Sized to the typical MTU ceiling (185) plus headroom — both
+        // S3 and C3 envs pin CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=185.
+        uint8_t               _buf[192];
+        size_t                _pos  = 0;
+        bool                  _fail = false;
+
+        void flush() {
+            if (!*_connected) { _fail = true; _pos = 0; return; }
+            for (uint8_t attempt = 0; attempt < 3 && *_connected; ++attempt) {
+                _tx->setValue(_buf, _pos);
+                if (_tx->notify()) { _pos = 0; delay(2); return; }
+                delay(5 << attempt);  // 5 / 10 / 20 ms
+            }
+            _fail = true;
+            _pos = 0;
+            DEBUG_PRINTLN("[BLE] notify chunk dropped after 3 retries");
+        }
+    };
+#endif
 
     bool isConnected() const { return _connected; }
 
@@ -144,6 +290,9 @@ private:
     NimBLEServer* _server = nullptr;
     NimBLECharacteristic* _txChar = nullptr;
     NimBLECharacteristic* _rxChar = nullptr;
+    // Tracked from onConnect/onDisconnect so we can query the
+    // per-connection negotiated MTU before each notify burst.
+    uint16_t _connHandle = BLE_HS_CONN_HANDLE_NONE;
 #ifdef SIM_BUILD
     // Simulator runs as if a client is permanently connected so telemetry
     // streams without a connection handshake.
@@ -158,18 +307,34 @@ private:
     JsonDocument _telemetryDoc;
     String _telemetryBuf;
 
+    // Deferred command dispatch — populated from the NimBLE host
+    // task (onWrite), drained from the main task (loop). `volatile`
+    // is enough for the bool: it's a single-word RMW that the ESP32
+    // toolchain emits as one store, and we don't rely on inter-task
+    // ordering beyond "main task notices the flip on its next tick."
+    String          _pendingCommand;
+    volatile bool   _hasPendingCommand = false;
+
     // ── NimBLE Server Callbacks ─────────────────────────────
 
     void onConnect(NimBLEServer* server, NimBLEConnInfo& connInfo) override {
         _connected = true;
+        // Capture the connection handle so sendJson/sendBytes can ask
+        // NimBLE for the *negotiated* MTU on this specific link, not
+        // the configured preferred MTU returned by NimBLEDevice::getMTU.
+        // Until the central completes the MTU exchange the link is on
+        // the BLE default of 23; sending 182-byte chunks against a
+        // peer that hasn't agreed to >23 makes the controller drop
+        // the link with no log on either side.
+        _connHandle = connInfo.getConnHandle();
         gState.bleConnected = true;
         bus().publish(EventType::BLEClientConnected);
-        DEBUG_PRINTF("[BLE] Client connected: %s\n", 
-                      connInfo.getAddress().toString().c_str());
-        
+        DEBUG_PRINTF("[BLE] Client connected: %s (conn=%u)\n",
+                      connInfo.getAddress().toString().c_str(), _connHandle);
+
         // Allow multiple connections
         NimBLEDevice::getAdvertising()->start();
-        
+
         // Notify app if recovery data is available
         if (gState.hasRecoveryData) {
             delay(500);  // Give app time to set up
@@ -188,6 +353,7 @@ private:
 
     void onDisconnect(NimBLEServer* server, NimBLEConnInfo& connInfo, int reason) override {
         _connected = (server->getConnectedCount() > 0);
+        if (!_connected) _connHandle = BLE_HS_CONN_HANDLE_NONE;
         gState.bleConnected = _connected;
         if (!_connected) {
             bus().publish(EventType::BLEClientDisconnected);
@@ -221,17 +387,29 @@ private:
     }
 
     // ── Command Handler ─────────────────────────────────────
-
+    //
+    // Called from onWrite on the NimBLE host task. We DO NOT run the
+    // real handler here — synchronous SD reads + JSON serialize +
+    // notify bursts can keep the host task pinned past the BLE
+    // supervision timeout. Instead we capture the raw JSON and let
+    // loop() (main task) publish it on the EventBus where the actual
+    // handlers can take their time without killing the link.
     void handleCommand(JsonDocument& doc) {
         const char* type = doc[Protocol::FIELD_TYPE] | "";
-        String rid = doc[Protocol::FIELD_REQUEST_ID] | "";
-
         DEBUG_PRINTF("[BLE] Command: %s\n", type);
 
-        // Publish raw command for other plugins
+        if (_hasPendingCommand) {
+            // Previous command still queued — drop the new one rather
+            // than overwrite. Clients should serialize requests, but
+            // we'd rather log a drop than silently lose state.
+            DEBUG_PRINTLN("[BLE] command dropped: previous still queued");
+            return;
+        }
+
         String raw;
         serializeJson(doc, raw);
-        bus().publish(EventType::BLECommandReceived, raw);
+        _pendingCommand     = std::move(raw);
+        _hasPendingCommand  = true;
     }
 
     // ── Telemetry ───────────────────────────────────────────

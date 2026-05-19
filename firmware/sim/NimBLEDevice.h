@@ -11,8 +11,17 @@ class NimBLECharacteristic;
 class NimBLEAdvertising;
 class NimBLEService;
 
+// Mirror the NimBLE host header constant; the firmware uses it as a
+// "no active connection" sentinel for the per-conn MTU lookup.
+#ifndef BLE_HS_CONN_HANDLE_NONE
+#define BLE_HS_CONN_HANDLE_NONE 0xffff
+#endif
+
 struct NimBLEAddress { String toString() const { return String("00:00:00:00:00:00"); } };
-struct NimBLEConnInfo { NimBLEAddress getAddress() const { return {}; } };
+struct NimBLEConnInfo {
+    NimBLEAddress getAddress() const { return {}; }
+    uint16_t      getConnHandle() const { return 1; }
+};
 
 class NimBLECharacteristicCallbacks {
 public:
@@ -59,11 +68,15 @@ public:
 
 class NimBLEServer {
 public:
-    void setCallbacks(NimBLEServerCallbacks*) {}
+    void     setCallbacks(NimBLEServerCallbacks*) {}
     NimBLEService* createService(const char* /*uuid*/) { return &_svc; }
-    int  getConnectedCount() { return _connected ? 1 : 0; }
-    void simConnect()    { _connected = true; }
-    void simDisconnect() { _connected = false; }
+    int      getConnectedCount() { return _connected ? 1 : 0; }
+    void     simConnect()    { _connected = true; }
+    void     simDisconnect() { _connected = false; }
+    // Mirror of the real API — sim assumes the negotiated MTU is the
+    // configured ceiling, since the sim transport (stdout JSONL) has
+    // no link-layer fragmentation.
+    uint16_t getPeerMTU(uint16_t /*connHandle*/) const { return 512; }
 private:
     NimBLEService _svc;
     bool _connected = false;
