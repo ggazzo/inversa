@@ -109,7 +109,7 @@ public:
         uint32_t marginSec = SCHEDULER_MARGIN_MINUTES * 60;
         if (heatingTime + marginSec >= targetTs - _rtc.now()) {
             DEBUG_PRINTLN("[Scheduler] Not enough time to reach target");
-            _state.schedulerStatus = "Tempo insuficiente";
+            setStr(_state.schedulerStatus, "Tempo insuficiente");
             return false;
         }
 
@@ -119,9 +119,8 @@ public:
 
         // Update status
         uint32_t waitSec = _state.schedulerStartTime - _rtc.now();
-        char buf[64];
-        snprintf(buf, sizeof(buf), "Aguardando %lu min para iniciar", waitSec / 60);
-        _state.schedulerStatus = buf;
+        snprintf(_state.schedulerStatus, sizeof(_state.schedulerStatus),
+                 "Aguardando %lu min para iniciar", waitSec / 60);
 
         DEBUG_PRINTF("[Scheduler] Set for %02d:%02d, temp=%.1f, vol=%.1f L\n", 
                     hour, minute, targetTemp, volumeLiters);
@@ -141,7 +140,7 @@ public:
         bool wasHeating = _heatingStarted;
         _state.schedulerActive = false;
         _heatingStarted = false;
-        _state.schedulerStatus = "";
+        _state.schedulerStatus[0] = 0;
 
         // Turn off heater if we had started it AND no other controller owns
         // it. P17 — if a recipe was queued by the scheduler and is now
@@ -228,7 +227,7 @@ private:
         bus().publish(EventType::HeaterStateChanged, true);
         bus().publish(EventType::SchedulerStarting);
 
-        _state.schedulerStatus = "Aquecendo...";
+        setStr(_state.schedulerStatus, "Aquecendo...");
 
         DEBUG_PRINTF("[Scheduler] Started heating to %.1f C\n", _state.schedulerTargetTemp);
     }
@@ -238,7 +237,7 @@ private:
         // Consider reached if within 0.5C of target
         if (currentTemp >= _state.schedulerTargetTemp - 0.5f) {
             _state.schedulerActive = false;
-            _state.schedulerStatus = "Pronto!";
+            setStr(_state.schedulerStatus, "Pronto!");
             
             DEBUG_PRINTF("[Scheduler] Target reached at %.1f C\n", currentTemp);
             bus().publish(EventType::SchedulerReady);
@@ -250,12 +249,12 @@ private:
         uint32_t waitSec = _state.schedulerStartTime - now;
         uint32_t waitMin = waitSec / 60;
         
-        char buf[64];
         if (waitMin >= 60) {
-            snprintf(buf, sizeof(buf), "Inicia em %lu h %lu min", waitMin / 60, waitMin % 60);
+            snprintf(_state.schedulerStatus, sizeof(_state.schedulerStatus),
+                     "Inicia em %lu h %lu min", waitMin / 60, waitMin % 60);
         } else {
-            snprintf(buf, sizeof(buf), "Inicia em %lu min", waitMin);
+            snprintf(_state.schedulerStatus, sizeof(_state.schedulerStatus),
+                     "Inicia em %lu min", waitMin);
         }
-        _state.schedulerStatus = buf;
     }
 };

@@ -91,7 +91,7 @@ public:
 
         _state.autoTuneActive = true;
         _state.autoTuneProgress = 0;
-        _state.autoTuneStatus = "Iniciando...";
+        setStr(_state.autoTuneStatus, "Iniciando...");
         _state.mode = OperatingMode::Tuning;
 
         // Start with heater ON if below setpoint
@@ -108,7 +108,7 @@ public:
         _running = false;
         _state.autoTuneActive = false;
         _state.autoTuneProgress = 0;
-        _state.autoTuneStatus = "Cancelado";
+        setStr(_state.autoTuneStatus, "Cancelado");
         _state.mode = OperatingMode::Idle;
 
         // Turn off heater
@@ -232,9 +232,8 @@ private:
             // Update progress
             _state.autoTuneProgress = min(90, (_cycleCount * 100) / AUTOTUNE_MIN_CYCLES);
             
-            char buf[32];
-            snprintf(buf, sizeof(buf), "Ciclo %d/%d", _cycleCount, AUTOTUNE_MIN_CYCLES);
-            _state.autoTuneStatus = String(buf);
+            snprintf(_state.autoTuneStatus, sizeof(_state.autoTuneStatus),
+                     "Ciclo %d/%d", _cycleCount, AUTOTUNE_MIN_CYCLES);
         }
     }
 
@@ -274,7 +273,7 @@ private:
         // Update state
         _state.autoTuneActive = false;
         _state.autoTuneProgress = 100;
-        _state.autoTuneStatus = "Concluido!";
+        setStr(_state.autoTuneStatus, "Concluido!");
         _state.mode = OperatingMode::Idle;
 
         // Turn off heater
@@ -294,7 +293,7 @@ private:
         _running = false;
         _state.autoTuneActive = false;
         _state.autoTuneProgress = 0;
-        _state.autoTuneStatus = String("Erro: ") + reason;
+        snprintf(_state.autoTuneStatus, sizeof(_state.autoTuneStatus), "Erro: %s", reason);
         _state.mode = OperatingMode::Idle;
 
         // Turn off heater
@@ -310,7 +309,7 @@ private:
         doc[Protocol::FIELD_TYPE] = Protocol::EVT_AUTOTUNE_STATUS;
         doc["active"] = _state.autoTuneActive;
         doc["progress"] = _state.autoTuneProgress;
-        doc["status"] = _state.autoTuneStatus;
+        doc["status"] = (const char*)_state.autoTuneStatus;
         doc["cycles"] = _cycleCount;
         doc["setpoint"] = _setpoint;
 
