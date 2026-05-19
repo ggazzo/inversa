@@ -93,41 +93,54 @@ public:
         std::fflush(stdout);
         return;
 #else
-        if (!_connected || !_txChar) return;
-
-        // BLE MTU chunking for large messages.
-        //
-        // The previous `delay(20)` between chunks was too long: on a
-        // recipe payload of ~4 KB at MTU=185 (~22 chunks) the chunk
-        // loop kept the NimBLE host task pinned for ~440 ms straight,
-        // which is enough to trip the BLE supervision timer on the
-        // central. The app reported "Bluetooth desconectou ao abrir
-        // a receita" — link dropped mid-stream.
-        //
-        // Two changes:
-        //
-        // 1. Drop the inter-chunk delay from 20 ms → 2 ms. That's still
-        //    a yield to FreeRTOS so the NimBLE host task can service
-        //    link-layer events, but it caps the host-task occupancy
-        //    for a 4 KB transfer at ~44 ms instead of ~440 ms.
-        //
-        // 2. Abort the loop if the client disappears mid-send (e.g.
-        //    `_connected` was cleared by onDisconnect). Otherwise the
-        //    remaining `notify()` calls land on a dead handle and the
-        //    next send() races with the disconnect cleanup.
-        const uint8_t* data = (const uint8_t*)json.c_str();
-        size_t len = json.length();
-        size_t mtu = NimBLEDevice::getMTU() - 3;  // 3 bytes overhead
-
-        for (size_t i = 0; i < len; i += mtu) {
-            if (!_connected || !_txChar) return;
-            size_t chunk = min(mtu, len - i);
-            _txChar->setValue(data + i, chunk);
-            _txChar->notify();
-            if (len > mtu) delay(2);  // brief yield between chunks
-        }
+        sendBytes(reinterpret_cast<const uint8_t*>(json.c_str()), json.length());
 #endif
     }
+
+#ifndef SIM_BUILD
+    // Core BLE chunked-notify path. Earlier versions dropped chunks
+    // silently when NimBLE's TX mbuf pool ran out on a large burst
+    // (loadRecipe / brewlog export ~4 KB payloads at MTU=185). The
+    // dropped chunk left the central waiting indefinitely, and the
+    // supervision timer eventually killed the link — surfaced in the
+    // app as "BLE desconectou ao abrir uma receita".
+    //
+    // Fixes here, all in one place so every notify path shares them:
+    //
+    //   * check `notify()`'s bool return,
+    //   * on failure, back off (5 / 10 / 20 ms) and retry up to 3x,
+    //   * re-check `_connected`/`_txChar` between chunks so a
+    //     mid-stream disconnect aborts cleanly,
+    //   * keep the 2 ms per-chunk yield on the success path so the
+    //     NimBLE host task isn't pinned long enough to trip the
+    //     supervision timer.
+    bool sendBytes(const uint8_t* data, size_t len) {
+        if (!_connected || !_txChar || len == 0) return false;
+
+        const size_t mtu = NimBLEDevice::getMTU() - 3;  // 3 bytes ATT overhead
+
+        for (size_t i = 0; i < len; i += mtu) {
+            if (!_connected || !_txChar) return false;
+            const size_t chunk = (len - i < mtu) ? (len - i) : mtu;
+            bool sent = false;
+            for (uint8_t attempt = 0; attempt < 3 && _connected; ++attempt) {
+                _txChar->setValue(data + i, chunk);
+                if (_txChar->notify()) { sent = true; break; }
+                // Notify queue full or transient ENOMEM — back off
+                // and retry. Backoffs stay short enough not to trip
+                // the supervision timer but long enough for the host
+                // task to drain its TX mbuf pool.
+                delay(5 << attempt);  // 5 / 10 / 20 ms
+            }
+            if (!sent) {
+                DEBUG_PRINTLN("[BLE] notify dropped chunk after 3 retries");
+                return false;
+            }
+            if (len > mtu) delay(2);  // brief yield between chunks
+        }
+        return true;
+    }
+#endif
 
     void sendJson(JsonDocument& doc) {
         // Reuse a single String buffer to avoid per-call heap churn on the
