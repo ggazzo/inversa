@@ -9,10 +9,16 @@ interface Props {
 
 export function Idle({ onMenuSelect, onStartManual }: Props) {
     return (
+        // Two main CTAs share a row with `flexBasis={0}` so neither
+        // button's intrinsic content (solid vs. outlined variant has a
+        // slightly different padding model) shifts the 50/50 split.
+        // The shortcut row underneath does NOT pretend to be a 3-column
+        // grid — that fights the 2-column row above and the edges never
+        // line up. It's a centered chip row.
         <YStack gap="$3">
             <XStack gap="$3" flexWrap="wrap">
                 <Button
-                    flex={1} minWidth={140}
+                    flex={1} flexBasis={0} minWidth={140}
                     size="$6" theme="active"
                     onPress={() => onMenuSelect('recipes')}
                     flexDirection="column" gap="$1" paddingVertical="$5"
@@ -22,7 +28,7 @@ export function Idle({ onMenuSelect, onStartManual }: Props) {
                     <Text fontSize="$1" opacity={0.7}>Escolher do SD card</Text>
                 </Button>
                 <Button
-                    flex={1} minWidth={140}
+                    flex={1} flexBasis={0} minWidth={140}
                     size="$6" variant="outlined"
                     onPress={onStartManual}
                     flexDirection="column" gap="$1" paddingVertical="$5"
@@ -32,14 +38,14 @@ export function Idle({ onMenuSelect, onStartManual }: Props) {
                     <Text fontSize="$1" opacity={0.7}>Setpoint direto</Text>
                 </Button>
             </XStack>
-            <XStack gap="$2">
-                <Button flex={1} size="$2" chromeless onPress={() => onMenuSelect('tuning')}>
+            <XStack gap="$2" jc="center" flexWrap="wrap">
+                <Button size="$2" chromeless onPress={() => onMenuSelect('tuning')}>
                     AutoTune
                 </Button>
-                <Button flex={1} size="$2" chromeless onPress={() => onMenuSelect('brewlog')}>
+                <Button size="$2" chromeless onPress={() => onMenuSelect('brewlog')}>
                     Brew log
                 </Button>
-                <Button flex={1} size="$2" chromeless onPress={() => onMenuSelect('equipment')}>
+                <Button size="$2" chromeless onPress={() => onMenuSelect('equipment')}>
                     Equipamento
                 </Button>
             </XStack>
