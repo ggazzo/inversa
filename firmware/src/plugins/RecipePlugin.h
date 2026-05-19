@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 #include <vector>
+#include <cstring>
+#include <cstdlib>
 #include "../core/Plugin.h"
 #include "../core/constants.h"
 #include "../core/RecoveryManager.h"
@@ -147,30 +149,41 @@ public:
         _currentStep = 0;
         _hopAdditions.clear();
 
-        // Parse line by line
-        int start = 0;
-        while (start < (int)content.length()) {
-            int end = content.indexOf('\n', start);
-            if (end < 0) end = content.length();
-
-            String line = content.substring(start, end);
-            line.trim();
-            start = end + 1;
-
-            if (line.length() == 0) continue;
-
-            RecipeCommand cmd = parseLine(line);
-            if (cmd.type != RecipeCommandType::Comment && 
-                cmd.type != RecipeCommandType::Unknown) {
-                _commands.push_back(cmd);
+        // Walk content line-by-line without String::substring/trim — those
+        // were allocating a fresh heap String per line, peaking heap usage
+        // at recipe load. Now we just window into the existing buffer and
+        // hand parseLine a NUL-terminated slice from a fixed scratch buffer.
+        const char* base = content.c_str();
+        size_t len = content.length();
+        char line[128];
+        size_t i = 0;
+        while (i < len) {
+            size_t j = i;
+            while (j < len && base[j] != '\n') j++;
+            // Strip leading/trailing whitespace from [i, j).
+            size_t a = i;
+            while (a < j && (base[a] == ' ' || base[a] == '\t' || base[a] == '\r')) a++;
+            size_t b = j;
+            while (b > a && (base[b-1] == ' ' || base[b-1] == '\t' || base[b-1] == '\r')) b--;
+            size_t n = b - a;
+            if (n > 0) {
+                if (n >= sizeof(line)) n = sizeof(line) - 1;
+                memcpy(line, base + a, n);
+                line[n] = 0;
+                RecipeCommand cmd = parseLine(line);
+                if (cmd.type != RecipeCommandType::Comment &&
+                    cmd.type != RecipeCommandType::Unknown) {
+                    _commands.push_back(cmd);
+                }
             }
+            i = j + 1;
         }
 
         setStr(gState.recipeName, name);
         gState.recipeTotalSteps = _commands.size();
         gState.recipeStep = 0;
 
-        DEBUG_PRINTF("[Recipe] Loaded '%s' with %d steps\n", 
+        DEBUG_PRINTF("[Recipe] Loaded '%s' with %d steps\n",
                       name.c_str(), _commands.size());
         return !_commands.empty();
     }
@@ -341,153 +354,186 @@ private:
     bool _waitingForRamp = false;
 
     // ── Command Parsing ─────────────────────────────────────
+    //
+    // parseLine works on a NUL-terminated `const char*` and avoids any
+    // intermediate `String` (no substring, no toUpperCase). The previous
+    // implementation allocated 2–3 heap Strings per line; on a 50-step
+    // recipe that meant ~150 transient allocations in a single load,
+    // peaking heap usage right when SD I/O was also active.
 
-    RecipeCommand parseLine(const String& line) {
+    // Compare keyword `kw` (uppercase ASCII) to the beginning of `s`,
+    // case-insensitively. Returns true if matched. Order of callers must
+    // still put longer prefixes first (RAMP_OFF before RAMP, etc.).
+    static bool startsWithI(const char* s, const char* kw) {
+        while (*kw) {
+            char a = *s++;
+            char b = *kw++;
+            if (a >= 'a' && a <= 'z') a = a - 32;
+            if (a != b) return false;
+        }
+        return true;
+    }
+
+    static bool equalsI(const char* a, const char* b) {
+        while (*a && *b) {
+            char ca = *a++, cb = *b++;
+            if (ca >= 'a' && ca <= 'z') ca -= 32;
+            if (cb >= 'a' && cb <= 'z') cb -= 32;
+            if (ca != cb) return false;
+        }
+        return *a == 0 && *b == 0;
+    }
+
+    // strtof_skip — advance past leading ws, parse a float, return value.
+    static float parseFloatAt(const char* s) {
+        while (*s == ' ' || *s == '\t') s++;
+        return (float)strtod(s, nullptr);
+    }
+
+    // Extract the first quoted "..." segment from `s`. If no quote is
+    // present, returns the (trimmed) rest of the line. Trailing whitespace
+    // is stripped. Caller owns the resulting String.
+    static String extractQuoted(const char* s) {
+        while (*s == ' ' || *s == '\t') s++;
+        const char* q1 = strchr(s, '"');
+        if (q1) {
+            const char* q2 = strchr(q1 + 1, '"');
+            if (!q2) return String(q1 + 1);
+            return String(q1 + 1).substring(0, (int)(q2 - q1 - 1));
+        }
+        // No quotes — return the (right-trimmed) rest.
+        size_t n = strlen(s);
+        while (n > 0 && (s[n-1] == ' ' || s[n-1] == '\t')) n--;
+        String out;
+        out.concat(s, n);
+        return out;
+    }
+
+    RecipeCommand parseLine(const char* line) {
         RecipeCommand cmd;
+        while (*line == ' ' || *line == '\t') line++;
 
-        if (line.startsWith("#")) {
+        if (*line == '#' || *line == 0) {
             cmd.type = RecipeCommandType::Comment;
             return cmd;
         }
 
-        String upper = line;
-        upper.toUpperCase();
-
-        // Temperature commands
-        if (upper.startsWith("SET_TEMP")) {
+        if (startsWithI(line, "SET_TEMP")) {
             cmd.type = RecipeCommandType::SetTemp;
-            cmd.value = extractFloat(line, 8);
+            cmd.value = parseFloatAt(line + 8);
         }
-        else if (upper.startsWith("WAIT_TEMP")) {
+        else if (startsWithI(line, "WAIT_TEMP")) {
             cmd.type = RecipeCommandType::WaitTemp;
-            float tol = extractFloat(line, 9);
+            float tol = parseFloatAt(line + 9);
             cmd.value = (tol > 0) ? tol : _waitTempTolerance;
         }
-        else if (upper.startsWith("MASH_OUT")) {
+        else if (startsWithI(line, "MASH_OUT")) {
             cmd.type = RecipeCommandType::MashOut;
-            float temp = extractFloat(line, 8);
+            float temp = parseFloatAt(line + 8);
             cmd.value = (temp > 0) ? temp : 76.0f;  // Default 76°C
         }
-        // Timer commands
-        else if (upper.startsWith("WAIT_TIMER")) {
+        else if (startsWithI(line, "WAIT_TIMER")) {
             cmd.type = RecipeCommandType::WaitTimer;
-            cmd.value = extractFloat(line, 10);  // minutes
+            cmd.value = parseFloatAt(line + 10);
         }
-        else if (upper.startsWith("TIMER")) {
+        else if (startsWithI(line, "TIMER")) {
             cmd.type = RecipeCommandType::Timer;
-            cmd.value = extractFloat(line, 5);  // minutes
+            cmd.value = parseFloatAt(line + 5);
         }
-        else if (upper.startsWith("ALARM")) {
+        else if (startsWithI(line, "ALARM")) {
             cmd.type = RecipeCommandType::Alarm;
-            // Parse HH:MM format
-            String timeStr = line.substring(5);
-            timeStr.trim();
-            int colonPos = timeStr.indexOf(':');
-            if (colonPos > 0) {
-                cmd.value = timeStr.substring(0, colonPos).toInt();   // hour
-                cmd.value2 = timeStr.substring(colonPos + 1).toInt(); // minute
+            const char* p = line + 5;
+            while (*p == ' ' || *p == '\t') p++;
+            char* end = nullptr;
+            long hour = strtol(p, &end, 10);
+            if (end && *end == ':') {
+                long minute = strtol(end + 1, nullptr, 10);
+                cmd.value  = (float)hour;
+                cmd.value2 = (float)minute;
             }
         }
-        // Boil commands
-        else if (upper.startsWith("BOIL")) {
+        else if (startsWithI(line, "BOIL")) {
             cmd.type = RecipeCommandType::Boil;
-            cmd.value = extractFloat(line, 4);  // minutes
+            cmd.value = parseFloatAt(line + 4);
         }
-        else if (upper.startsWith("ADD_HOP")) {
+        else if (startsWithI(line, "ADD_HOP")) {
             cmd.type = RecipeCommandType::AddHop;
-            // Parse: ADD_HOP <minutes> "name"
-            String rest = line.substring(7);
-            rest.trim();
-            int spacePos = rest.indexOf(' ');
-            if (spacePos > 0) {
-                cmd.value = rest.substring(0, spacePos).toFloat();  // minutes
-                cmd.message = extractQuotedString(rest, spacePos);
+            const char* rest = line + 7;
+            while (*rest == ' ' || *rest == '\t') rest++;
+            char* end = nullptr;
+            cmd.value = strtof(rest, &end);
+            if (end && end != rest) {
+                cmd.message = extractQuoted(end);
+                if (cmd.message.isEmpty()) cmd.message = "Hop";
             } else {
-                cmd.value = rest.toFloat();
                 cmd.message = "Hop";
             }
         }
-        else if (upper.startsWith("WAIT_BOIL")) {
+        else if (startsWithI(line, "WAIT_BOIL")) {
             cmd.type = RecipeCommandType::WaitBoil;
         }
-        // Ramp commands
-        else if (upper.startsWith("RAMP_OFF")) {
+        else if (startsWithI(line, "RAMP_OFF")) {
             cmd.type = RecipeCommandType::RampOff;
         }
-        else if (upper.startsWith("RAMP")) {
+        else if (startsWithI(line, "RAMP")) {
             cmd.type = RecipeCommandType::Ramp;
-            cmd.value = extractFloat(line, 4);  // °C/min
+            cmd.value = parseFloatAt(line + 4);
         }
-        // Actuator commands
-        else if (upper.startsWith("PUMP_ON")) {
+        else if (startsWithI(line, "PUMP_ON")) {
             cmd.type = RecipeCommandType::PumpOn;
         }
-        else if (upper.startsWith("PUMP_OFF")) {
+        else if (startsWithI(line, "PUMP_OFF")) {
             cmd.type = RecipeCommandType::PumpOff;
         }
-        else if (upper.startsWith("HEATER_ON")) {
+        else if (startsWithI(line, "HEATER_ON")) {
             cmd.type = RecipeCommandType::HeaterOn;
         }
-        else if (upper.startsWith("HEATER_OFF")) {
+        else if (startsWithI(line, "HEATER_OFF")) {
             cmd.type = RecipeCommandType::HeaterOff;
         }
-        // Confirmation
-        else if (upper.startsWith("WAIT_CONFIRM")) {
+        else if (startsWithI(line, "WAIT_CONFIRM")) {
             cmd.type = RecipeCommandType::WaitConfirm;
-            cmd.message = extractQuotedString(line, 12);
+            cmd.message = extractQuoted(line + 12);
             if (cmd.message.isEmpty()) {
                 cmd.message = "Confirmar para continuar";
             }
         }
-        // UI Step
-        else if (upper.startsWith("STEP")) {
+        else if (startsWithI(line, "STEP")) {
             cmd.type = RecipeCommandType::Step;
-            cmd.message = extractQuotedString(line, 4);
-            // Try to match known step names
-            String stepUpper = cmd.message;
-            stepUpper.toUpperCase();
-            if (stepUpper == "PRE_HEATING" || stepUpper == "PREHEATING" || stepUpper == "PRE-AQUECIMENTO") {
+            cmd.message = extractQuoted(line + 4);
+            const char* m = cmd.message.c_str();
+            if (equalsI(m, "PRE_HEATING") || equalsI(m, "PREHEATING") || equalsI(m, "PRE-AQUECIMENTO")) {
                 cmd.value = (float)BrewingStep::PreHeating;
-            } else if (stepUpper == "MASHING" || stepUpper == "MOSTURA") {
+            } else if (equalsI(m, "MASHING") || equalsI(m, "MOSTURA")) {
                 cmd.value = (float)BrewingStep::Mashing;
-            } else if (stepUpper == "MASH_OUT" || stepUpper == "MASHOUT" || stepUpper == "MASH-OUT") {
+            } else if (equalsI(m, "MASH_OUT") || equalsI(m, "MASHOUT") || equalsI(m, "MASH-OUT")) {
                 cmd.value = (float)BrewingStep::MashOut;
-            } else if (stepUpper == "SPARGE" || stepUpper == "LAVAGEM") {
+            } else if (equalsI(m, "SPARGE") || equalsI(m, "LAVAGEM")) {
                 cmd.value = (float)BrewingStep::Sparge;
-            } else if (stepUpper == "BOILING" || stepUpper == "BOIL" || stepUpper == "FERVURA") {
+            } else if (equalsI(m, "BOILING") || equalsI(m, "BOIL") || equalsI(m, "FERVURA")) {
                 cmd.value = (float)BrewingStep::Boiling;
-            } else if (stepUpper == "HOPPING" || stepUpper == "LUPULAGEM") {
+            } else if (equalsI(m, "HOPPING") || equalsI(m, "LUPULAGEM")) {
                 cmd.value = (float)BrewingStep::Hopping;
-            } else if (stepUpper == "COOLING" || stepUpper == "RESFRIAMENTO") {
+            } else if (equalsI(m, "COOLING") || equalsI(m, "RESFRIAMENTO")) {
                 cmd.value = (float)BrewingStep::Cooling;
-            } else if (stepUpper == "DONE" || stepUpper == "CONCLUIDO") {
+            } else if (equalsI(m, "DONE") || equalsI(m, "CONCLUIDO")) {
                 cmd.value = (float)BrewingStep::Done;
             } else {
-                cmd.value = 0;  // Custom step - use message
+                cmd.value = 0;  // Custom step — UI uses message
             }
         }
         else {
             cmd.type = RecipeCommandType::Unknown;
-            DEBUG_PRINTF("[Recipe] Unknown command: %s\n", line.c_str());
+            DEBUG_PRINTF("[Recipe] Unknown command: %s\n", line);
         }
 
         return cmd;
     }
 
-    float extractFloat(const String& line, int offset) {
-        String rest = line.substring(offset);
-        rest.trim();
-        return rest.toFloat();
-    }
-
-    String extractQuotedString(const String& line, int offset) {
-        String rest = line.substring(offset);
-        rest.trim();
-        int q1 = rest.indexOf('"');
-        if (q1 < 0) return rest;
-        int q2 = rest.indexOf('"', q1 + 1);
-        if (q2 < 0) return rest.substring(q1 + 1);
-        return rest.substring(q1 + 1, q2);
+    // Back-compat shim — the native test suite still calls parseLine with a
+    // String. Kept inline so it folds into the char* path.
+    RecipeCommand parseLine(const String& line) {
+        return parseLine(line.c_str());
     }
 
     // ── Step Execution ──────────────────────────────────────
