@@ -21,21 +21,15 @@ export function Idle({ onMenuSelect, onStartManual }: Props) {
                     flex={1} flexBasis={0} minWidth={140}
                     size="$6" theme="active"
                     onPress={() => onMenuSelect('recipes')}
-                    flexDirection="column" gap="$1" paddingVertical="$5"
                 >
-                    <Text fontSize={24}>🍺</Text>
                     <Text fontSize="$4" fontWeight="700">Iniciar Receita</Text>
-                    <Text fontSize="$1" opacity={0.7}>Escolher do SD card</Text>
                 </Button>
                 <Button
                     flex={1} flexBasis={0} minWidth={140}
                     size="$6" variant="outlined"
                     onPress={onStartManual}
-                    flexDirection="column" gap="$1" paddingVertical="$5"
                 >
-                    <Text fontSize={24}>🎛️</Text>
                     <Text fontSize="$4" fontWeight="700">Modo Manual</Text>
-                    <Text fontSize="$1" opacity={0.7}>Setpoint direto</Text>
                 </Button>
             </XStack>
             <XStack gap="$2" jc="center" flexWrap="wrap">

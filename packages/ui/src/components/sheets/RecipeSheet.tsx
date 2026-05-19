@@ -18,8 +18,11 @@ export function RecipeSheet({ open, onClose }: Props) {
     function refresh() {
         if (!open) return;
         setRecipes(null); setErr(null);
+        // `listRecipes()` already unwraps `res.recipes` and hands back
+        // the array — calling `.recipes` on it again gave `undefined`,
+        // which is why the list always rendered empty.
         ConnectionManager.listRecipes()
-            .then((r: any) => setRecipes(r.recipes || []))
+            .then((r: any) => setRecipes(Array.isArray(r) ? r : []))
             .catch((e: any) => { setErr(e?.message || 'Falha'); setRecipes([]); });
     }
     useEffect(refresh, [open]);
@@ -76,23 +79,51 @@ export function RecipeSheet({ open, onClose }: Props) {
     return (
         <WizardSheet title="Receitas salvas" open={open} onClose={onClose}
             footer={<Button size="$3" onPress={onClose}>Fechar</Button>}>
-            {recipes === null && <Text fontSize="$2" opacity={0.5}>Listando do SD…</Text>}
-            {recipes && recipes.length === 0 && (
-                <Paragraph fontSize="$2" opacity={0.6}>
-                    {err ? <>Erro: {err}</> : 'Nenhuma receita no SD.'}
-                </Paragraph>
+            {/* Status messages live in a polite live-region so screen
+                readers announce loading → loaded / empty / error
+                transitions without stealing focus. */}
+            <YStack role="status" aria-live="polite">
+                {recipes === null && (
+                    <Text fontSize="$2" opacity={0.5}>Listando do SD…</Text>
+                )}
+                {recipes && recipes.length === 0 && (
+                    <Paragraph fontSize="$2" opacity={0.6}>
+                        {err ? <>Erro: {err}</> : 'Nenhuma receita no SD.'}
+                    </Paragraph>
+                )}
+            </YStack>
+            {recipes && recipes.length > 0 && (
+                <YStack role="list"
+                        aria-label={`${recipes.length} receitas no SD`}>
+                    {recipes.map((file) => (
+                        <XStack key={file} role="listitem"
+                                ai="center" gap="$2" padding="$2"
+                                hoverStyle={{ backgroundColor: '$backgroundFocus' }}
+                                focusStyle={{ backgroundColor: '$backgroundFocus' }}
+                                br="$2">
+                            <Text fontFamily="$mono" fontSize="$2" flex={1}
+                                  numberOfLines={1}>
+                                {file}
+                            </Text>
+                            <Button size="$1" chromeless
+                                    aria-label={`Ver ${file}`}
+                                    onPress={() => openPreview(file)}>
+                                Ver
+                            </Button>
+                            <Button size="$1" theme="active"
+                                    aria-label={`Iniciar ${file}`}
+                                    onPress={() => start(file)}>
+                                Iniciar
+                            </Button>
+                            <Button size="$1" chromeless theme="red"
+                                    aria-label={`Apagar ${file}`}
+                                    onPress={() => del(file)}>
+                                <Text aria-hidden>🗑</Text>
+                            </Button>
+                        </XStack>
+                    ))}
+                </YStack>
             )}
-            {recipes?.map((file) => (
-                <XStack key={file} ai="center" gap="$2" padding="$2"
-                        hoverStyle={{ backgroundColor: '$backgroundFocus' }} br="$2">
-                    <Text fontFamily="$mono" fontSize="$2" flex={1} numberOfLines={1}>
-                        {file}
-                    </Text>
-                    <Button size="$1" chromeless onPress={() => openPreview(file)}>Ver</Button>
-                    <Button size="$1" theme="active" onPress={() => start(file)}>Iniciar</Button>
-                    <Button size="$1" chromeless theme="red" onPress={() => del(file)}>🗑</Button>
-                </XStack>
-            ))}
         </WizardSheet>
     );
 }
