@@ -184,6 +184,14 @@ namespace Protocol {
     constexpr const char* WD_FIELD_LAST_UNIX   = "lu";
     constexpr const char* WD_FIELD_HARD_STOP   = "hs";
     constexpr const char* WD_FIELD_AUTO_RESET  = "ar";
+    // Full config — exposed so the UI can render every editable field
+    // (T032 ext). Keys mirror the JSON accepted by req:watchdog:config.
+    constexpr const char* WD_FIELD_SENSOR_FAULT_MS  = "sfm";
+    constexpr const char* WD_FIELD_LOOP_STUCK_MS    = "lsm";
+    constexpr const char* WD_FIELD_GRAD_FACTOR      = "gf";
+    constexpr const char* WD_FIELD_GRAD_WINDOW      = "gw";
+    constexpr const char* WD_FIELD_SAFE_AUTORESET_C = "sa";
+    constexpr const char* WD_FIELD_COOL_MIN_MS      = "cm";
 
     // Mode values
     constexpr const char* MODE_IDLE          = "idle";

@@ -110,6 +110,15 @@ export const watchdogLastCause     = signal<string>('');   // 'OVERTEMP' | 'SENS
 export const watchdogLastTripUnix  = signal(0);
 export const watchdogHardStopC     = signal(105.0);
 export const watchdogAutoReset     = signal(true);
+// Full config mirror — populated from the `wd` object once the firmware
+// reports each field. Defaults match constants.h so the UI renders
+// sensible values before the first telemetry frame.
+export const watchdogSensorFaultMs   = signal(10000);
+export const watchdogLoopStuckMs     = signal(5000);
+export const watchdogGradFactor      = signal(5);
+export const watchdogGradWindow      = signal(20);
+export const watchdogSafeAutoresetC  = signal(40.0);
+export const watchdogCoolMinMs       = signal(300000);
 // True when the firmware emitted at least one `wd` object — used by the
 // UI to know whether to render any watchdog indicator at all.
 export const watchdogSupported     = signal(false);
@@ -389,6 +398,12 @@ export function updateFromTelemetry(data: Record<string, any>): void {
     if (wd.lu !== undefined) watchdogLastTripUnix.value = wd.lu;
     if (wd.hs !== undefined) watchdogHardStopC.value    = wd.hs;
     if (wd.ar !== undefined) watchdogAutoReset.value    = wd.ar;
+    if (wd.sfm !== undefined) watchdogSensorFaultMs.value  = wd.sfm;
+    if (wd.lsm !== undefined) watchdogLoopStuckMs.value    = wd.lsm;
+    if (wd.gf  !== undefined) watchdogGradFactor.value     = wd.gf;
+    if (wd.gw  !== undefined) watchdogGradWindow.value     = wd.gw;
+    if (wd.sa  !== undefined) watchdogSafeAutoresetC.value = wd.sa;
+    if (wd.cm  !== undefined) watchdogCoolMinMs.value      = wd.cm;
   }
 
   // Add to history

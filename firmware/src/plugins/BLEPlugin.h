@@ -584,8 +584,14 @@ private:
             wd[Protocol::WD_FIELD_LAST_CAUSE] = getWatchdogCauseName(gState.watchdogLastCause);
             wd[Protocol::WD_FIELD_LAST_UNIX]  = gState.watchdogLastTripUnix;
         }
-        wd[Protocol::WD_FIELD_HARD_STOP]  = round2(gState.watchdogHardStopC);
-        wd[Protocol::WD_FIELD_AUTO_RESET] = gState.watchdogAutoResetEnabled;
+        wd[Protocol::WD_FIELD_HARD_STOP]        = round2(gState.watchdogHardStopC);
+        wd[Protocol::WD_FIELD_AUTO_RESET]       = gState.watchdogAutoResetEnabled;
+        wd[Protocol::WD_FIELD_SENSOR_FAULT_MS]  = gState.watchdogSensorFaultMs;
+        wd[Protocol::WD_FIELD_LOOP_STUCK_MS]    = gState.watchdogLoopStuckMs;
+        wd[Protocol::WD_FIELD_GRAD_FACTOR]      = gState.watchdogGradFactor;
+        wd[Protocol::WD_FIELD_GRAD_WINDOW]      = gState.watchdogGradWindow;
+        wd[Protocol::WD_FIELD_SAFE_AUTORESET_C] = round2(gState.watchdogSafeAutoresetC);
+        wd[Protocol::WD_FIELD_COOL_MIN_MS]      = gState.watchdogCoolMinMs;
 
         sendJson(doc);
     }
