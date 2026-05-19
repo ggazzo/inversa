@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <cmath>
 #include <SimpleKalmanFilter.h>
 #include "../core/Plugin.h"
 #include "../core/constants.h"
@@ -39,6 +40,17 @@ public:
     float getFilteredTemp() const { return gState.currentTemp; }
 
 private:
+    // Steinhart-Hart B-parameter precomputed constants. The reference
+    // resistor and the 1/T0 offset are compile-time invariants — the old
+    // code recomputed them as doubles every ADC sample (~10 Hz). Hoisting
+    // them as `constexpr float` lets the compiler fold the arithmetic and
+    // keeps the entire NTC math single-precision on the ESP32 FPU.
+    static constexpr float R_REF_F          = (float)NTC_REFERENCE_RESISTANCE;
+    static constexpr float R_NOM_F          = (float)NTC_NOMINAL_RESISTANCE;
+    static constexpr float INV_B            = 1.0f / (float)NTC_B_COEFFICIENT;
+    static constexpr float INV_T0_K         = 1.0f / ((float)NTC_NOMINAL_TEMPERATURE + 273.15f);
+    static constexpr float ADC_MAX_F        = (float)NTC_ADC_RESOLUTION;
+
     SimpleKalmanFilter _kalman{KALMAN_MEASURE_ERROR, KALMAN_ESTIMATE_ERROR, KALMAN_PROCESS_NOISE};
     uint32_t _lastRead = 0;
     float _lastRaw = 0.0f;
@@ -49,29 +61,28 @@ private:
             return TEMP_ERROR_VALUE;
         }
 
+        const float adcF = (float)adcValue;
+
         // Topology selected at compile time via NTC_HIGH_SIDE
         // (constants.h, override per env via -DNTC_HIGH_SIDE=0).
         //   NTC_HIGH_SIDE=1: 3.3V → NTC → ADC → R_ref → GND
-        //     V_adc = V_s · R_ref / (R_ntc + R_ref)
         //     R_ntc = R_ref · (ADC_MAX − adc) / adc
         //   NTC_HIGH_SIDE=0: 3.3V → R_ref → ADC → NTC → GND
-        //     V_adc = V_s · R_ntc / (R_ntc + R_ref)
         //     R_ntc = R_ref · adc / (ADC_MAX − adc)
 #if NTC_HIGH_SIDE
-        float resistance = (float)NTC_REFERENCE_RESISTANCE * (NTC_ADC_RESOLUTION - adcValue) / adcValue;
+        float resistance = R_REF_F * (ADC_MAX_F - adcF) / adcF;
 #else
-        float resistance = (float)NTC_REFERENCE_RESISTANCE * adcValue / (NTC_ADC_RESOLUTION - adcValue);
+        float resistance = R_REF_F * adcF / (ADC_MAX_F - adcF);
 #endif
 
-        // Steinhart-Hart simplified (B-parameter equation)
-        float steinhart = resistance / (float)NTC_NOMINAL_RESISTANCE;   // R/R0
-        steinhart = log(steinhart);                                      // ln(R/R0)
-        steinhart /= (float)NTC_B_COEFFICIENT;                          // ln(R/R0) / B
-        steinhart += 1.0f / ((float)NTC_NOMINAL_TEMPERATURE + 273.15f); // + 1/T0
-        steinhart = 1.0f / steinhart;                                    // invert
-        steinhart -= 273.15f;                                            // to Celsius
+        // Steinhart-Hart simplified (B-parameter equation), single
+        // precision throughout. `logf` is the ~80-cycle float variant —
+        // `log` was the ~200-cycle double variant the ESP32 has to emulate
+        // (no hard double on the FPU).
+        float kelvin_inv = logf(resistance / R_NOM_F) * INV_B + INV_T0_K;
+        float celsius    = 1.0f / kelvin_inv - 273.15f;
 
-        _lastRaw = steinhart;
-        return steinhart;
+        _lastRaw = celsius;
+        return celsius;
     }
 };
