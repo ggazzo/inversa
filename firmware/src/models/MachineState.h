@@ -38,6 +38,29 @@ enum class RecipeState : uint8_t {
     Completed
 };
 
+// ─── Watchdog Cause ─────────────────────────────────────────
+// Last trigger reason for the thermal watchdog latch. NONE means
+// either never tripped or just reset.
+enum class WatchdogCause : uint8_t {
+    NONE         = 0,
+    OVERTEMP     = 1,
+    SENSOR_FAULT = 2,
+    LOOP_STUCK   = 3,
+    GRADIENT     = 4,
+    MANUAL       = 5
+};
+
+inline const char* getWatchdogCauseName(WatchdogCause c) {
+    switch (c) {
+        case WatchdogCause::OVERTEMP:     return "OVERTEMP";
+        case WatchdogCause::SENSOR_FAULT: return "SENSOR_FAULT";
+        case WatchdogCause::LOOP_STUCK:   return "LOOP_STUCK";
+        case WatchdogCause::GRADIENT:     return "GRADIENT";
+        case WatchdogCause::MANUAL:       return "MANUAL";
+        default:                          return "NONE";
+    }
+}
+
 // ─── Brewing Step (for UI visualization) ────────────────────
 // Represents the current phase in the brewing process
 enum class BrewingStep : uint8_t {
@@ -199,6 +222,25 @@ struct MachineState {
     // NVS by NVSStorage::saveTempCalibration.
     float    tempCalSlope       = 1.0f;
     float    tempCalOffset      = 0.0f;
+
+    // Thermal Watchdog — independent safety layer (001-thermal-watchdog).
+    // Tripped is consulted by HeaterPlugin and PIDPlugin to short-circuit
+    // any heat command. Persisted bits (count, last cause/unix, latched,
+    // config) are mirrored from NVS; non-persisted bits (armed, current
+    // tripped flag rebuilt from wd_latched on boot).
+    bool          watchdogArmed             = true;
+    bool          watchdogTripped           = false;
+    WatchdogCause watchdogLastCause         = WatchdogCause::NONE;
+    uint32_t      watchdogTripCount         = 0;
+    uint32_t      watchdogLastTripUnix      = 0;
+    bool          watchdogAutoResetEnabled  = true;
+    float         watchdogHardStopC         = 105.0f;     // WATCHDOG_DEFAULT_HARDSTOP_C
+    uint32_t      watchdogSensorFaultMs     = 10000;      // WATCHDOG_DEFAULT_SENSOR_FAULT_MS
+    uint32_t      watchdogLoopStuckMs       = 5000;       // WATCHDOG_DEFAULT_LOOP_STUCK_MS
+    uint8_t       watchdogGradFactor        = 5;          // WATCHDOG_DEFAULT_GRAD_FACTOR
+    uint8_t       watchdogGradWindow        = 20;         // WATCHDOG_DEFAULT_GRAD_WINDOW
+    float         watchdogSafeAutoresetC    = 40.0f;      // WATCHDOG_DEFAULT_SAFE_AUTORESET_C
+    uint32_t      watchdogCoolMinMs         = 300000;     // WATCHDOG_DEFAULT_COOL_MIN_MS
 };
 
 // Global state — accessible by all plugins

@@ -26,7 +26,8 @@ import {
   timerActive, timerRemaining,
   schedulerActive, schedulerStatus,
   autoTuneActive, autoTuneProgress,
-  waitingForConfirm, confirmMessage
+  waitingForConfirm, confirmMessage,
+  watchdogTripped, watchdogLastCause, watchdogTripCount
 } from '@inversa/stores';
 
 class ConnectionManagerClass {
@@ -233,6 +234,19 @@ class ConnectionManagerClass {
 
   async installUpdate() {
     return BleClient.request('req:ota:install');
+  }
+
+  // Thermal Watchdog (001-thermal-watchdog). Rejects with the firmware's
+  // error string (wd_still_unsafe / wd_not_tripped / wd_range:<field>) so
+  // the UI can render a precise message.
+  async resetWatchdog() {
+    return BleClient.request('req:watchdog:reset');
+  }
+
+  async configureWatchdog(cfg) {
+    // Pass through any subset of: hard_stop, sensor_fault_ms, loop_stuck_ms,
+    // grad_factor, grad_window, safe_autoreset_c, cool_min_ms, auto_reset_enabled.
+    return BleClient.request('req:watchdog:config', cfg);
   }
 
   // Thermal parameters (P13). Persisted in NVS; loaded on boot by
@@ -523,6 +537,25 @@ class ConnectionManagerClass {
         autoTuneActive.value = false;
         showToast(`Auto-Tune concluído! Kp=${data.kp?.toFixed(2)}, Ki=${data.ki?.toFixed(4)}, Kd=${data.kd?.toFixed(0)}`, 'success', 10000);
         this._sendNotification('Auto-Tune Concluído', `Novos valores PID calculados`);
+        break;
+
+      // Thermal Watchdog (001-thermal-watchdog)
+      case 'evt:watchdog:tripped':
+        watchdogTripped.value = true;
+        watchdogLastCause.value = data.cause || '';
+        watchdogTripCount.value = watchdogTripCount.value + 1;
+        showToast(`Watchdog: corte automático (${data.cause})`, 'error', 15000);
+        this._sendNotification(
+          'Inversa: corte automático',
+          `Causa: ${data.cause}. Temperatura: ${(data.temp ?? 0).toFixed(1)}°C`
+        );
+        break;
+
+      case 'evt:watchdog:reset':
+        watchdogTripped.value = false;
+        watchdogLastCause.value = '';
+        const auto = data.auto === true;
+        showToast(auto ? 'Watchdog: auto-reset por resfriamento' : 'Watchdog: rearmado', 'success');
         break;
     }
 

@@ -311,25 +311,56 @@ inversa/
 
 ### Firmware Plugins
 
-| Plugin            | Function                       |
-| ----------------- | ------------------------------ |
-| TemperaturePlugin | NTC reading with Kalman filter |
-| PIDPlugin         | PID control with feed-forward  |
-| HeaterPlugin      | Soft PWM for SSR               |
-| PumpPlugin        | Pump control                   |
-| RecipePlugin      | Recipe execution               |
-| BoilTimerPlugin   | Boil timer with hop additions  |
-| TimerPlugin       | Generic timer                  |
-| SchedulerPlugin   | "Ready at" scheduling          |
-| RampPlugin        | Gradual heating                |
-| BLEPlugin         | Bluetooth communication        |
-| WiFiPlugin        | WiFi management                |
-| OTAPlugin         | OTA updates                    |
-| SDCardPlugin      | SD storage                     |
-| RTCPlugin         | Real-time clock                |
-| AutoTunePlugin    | PID calibration                |
-| BrewLogPlugin     | Brew session logging           |
-| CommandHandler    | Command routing                |
+| Plugin                | Function                                           |
+| --------------------- | -------------------------------------------------- |
+| TemperaturePlugin     | NTC reading with Kalman filter                     |
+| PIDPlugin             | PID control with feed-forward                      |
+| HeaterPlugin          | Soft PWM for SSR                                   |
+| ThermalWatchdogPlugin | Independent safety layer (overtemp / fault / loop-stuck / gradient) |
+| PumpPlugin            | Pump control                                       |
+| RecipePlugin          | Recipe execution                                   |
+| BoilTimerPlugin       | Boil timer with hop additions                      |
+| TimerPlugin           | Generic timer                                      |
+| SchedulerPlugin       | "Ready at" scheduling                              |
+| RampPlugin            | Gradual heating                                    |
+| BLEPlugin             | Bluetooth communication                            |
+| WiFiPlugin            | WiFi management                                    |
+| OTAPlugin             | OTA updates                                        |
+| SDCardPlugin          | SD storage                                         |
+| RTCPlugin             | Real-time clock                                    |
+| AutoTunePlugin        | PID calibration                                    |
+| BrewLogPlugin         | Brew session logging                               |
+| CommandHandler        | Command routing                                    |
+
+### Thermal Watchdog
+
+`ThermalWatchdogPlugin` is a redundant safety layer that monitors the
+control loop and forces the SSR off through a direct GPIO write when any
+of four conditions trip:
+
+- **Overtemp** — `currentTemp > T_HARDSTOP` (default 105 °C)
+- **Sensor fault** — `tempSensorOk == false` for ≥ `T_SENSOR_FAULT_MS` (default 10 s)
+- **Loop stuck** — main `loop()` has not called `kick()` for ≥ `T_LOOP_STUCK_MS` (default 5 s; checked by an `esp_timer` task every 100 ms)
+- **Gradient** — `|dT|` exceeds `GRAD_FACTOR ×` running median of the last `GRAD_WINDOW` samples (defaults 5 × median, 20 samples / 4 s history)
+
+On trip the SSR is forced LOW, the latch is persisted in NVS (so it
+survives reboot), `HeaterPlugin` and `PIDPlugin` suppress further heat
+commands, and an `evt:watchdog:tripped` event is sent over BLE. The
+latch is cleared in one of two ways:
+
+- The user issues `req:watchdog:reset` while the temperature is safely below `T_HARDSTOP − 5 °C`
+- Cooldown auto-reset (default enabled): `currentTemp < T_SAFE_AUTORESET` (40 °C) for `T_COOL_MIN_MS` (5 minutes) with no other condition active
+
+Configurable via `req:watchdog:config`; all limits are validated and
+persisted in NVS under the `wd_*` keys.
+
+A future redundant hardware cut path can be plugged in via the
+`IExternalCut` interface (declared in `firmware/src/plugins/IExternalCut.h`),
+without changing the watchdog core. No concrete external implementation
+ships in this release.
+
+See `_reversa_forward/001-thermal-watchdog/` (requirements, roadmap,
+data-delta, interfaces, onboarding) for the full specification.
 
 ## License
 

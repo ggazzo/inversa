@@ -91,6 +91,12 @@ enum class EventType : uint8_t {
     SystemReady,
     SystemError,
     SettingsChanged,
+
+    // Thermal Watchdog (001-thermal-watchdog)
+    WatchdogTripped,        // int: WatchdogCause enum value
+    WatchdogReset,          // bool: true = auto-reset by cooldown, false = manual
+    WatchdogConfigChanged,  // —
+    WatchdogKick,           // — (debug; ISR sentinel)
 };
 
 // ─── Event Data ─────────────────────────────────────────────

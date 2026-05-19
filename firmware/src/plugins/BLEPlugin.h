@@ -538,6 +538,21 @@ private:
             doc["cm"] = (const char*)gState.confirmMessage;
         }
 
+        // Thermal Watchdog status (001-thermal-watchdog T024). Nested
+        // object key avoids short-key collisions documented in DT-01.
+        // Always emitted so the app can render an indicator and detect
+        // firmware that supports the feature.
+        auto wd = doc[Protocol::FIELD_WATCHDOG].to<JsonObject>();
+        wd[Protocol::WD_FIELD_ARMED]      = gState.watchdogArmed;
+        wd[Protocol::WD_FIELD_TRIPPED]    = gState.watchdogTripped;
+        wd[Protocol::WD_FIELD_COUNT]      = gState.watchdogTripCount;
+        if (gState.watchdogLastCause != WatchdogCause::NONE) {
+            wd[Protocol::WD_FIELD_LAST_CAUSE] = getWatchdogCauseName(gState.watchdogLastCause);
+            wd[Protocol::WD_FIELD_LAST_UNIX]  = gState.watchdogLastTripUnix;
+        }
+        wd[Protocol::WD_FIELD_HARD_STOP]  = round2(gState.watchdogHardStopC);
+        wd[Protocol::WD_FIELD_AUTO_RESET] = gState.watchdogAutoResetEnabled;
+
         sendJson(doc);
     }
 

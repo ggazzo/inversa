@@ -99,6 +99,21 @@ export const schedulerStatus = signal('');
 export const autoTuneActive = signal(false);
 export const autoTuneProgress = signal(0);
 
+// ─── Thermal Watchdog State (001-thermal-watchdog) ──────────
+// Driven by the `wd:{...}` nested object inside `evt:status` telemetry,
+// plus the discrete `evt:watchdog:tripped` and `evt:watchdog:reset`
+// events handled in ConnectionManager._handleMessage.
+export const watchdogArmed         = signal(false);
+export const watchdogTripped       = signal(false);
+export const watchdogTripCount     = signal(0);
+export const watchdogLastCause     = signal<string>('');   // 'OVERTEMP' | 'SENSOR_FAULT' | 'LOOP_STUCK' | 'GRADIENT' | 'MANUAL' | ''
+export const watchdogLastTripUnix  = signal(0);
+export const watchdogHardStopC     = signal(105.0);
+export const watchdogAutoReset     = signal(true);
+// True when the firmware emitted at least one `wd` object — used by the
+// UI to know whether to render any watchdog indicator at all.
+export const watchdogSupported     = signal(false);
+
 // ─── Brewing Step (UI visualization) ────────────────────────
 export const brewingStep = signal(0);
 export const brewingStepCustom = signal('');
@@ -361,6 +376,20 @@ export function updateFromTelemetry(data: Record<string, any>): void {
     if (!data.wc) confirmMessage.value = '';
   }
   if (data.cm !== undefined) confirmMessage.value = data.cm;
+
+  // Thermal Watchdog telemetry (001-thermal-watchdog). Nested object
+  // `wd:{a,t,c,lc,lu,hs,ar}` — `lc/lu` may be absent when never tripped.
+  if (data.wd !== undefined) {
+    watchdogSupported.value = true;
+    const wd = data.wd;
+    if (wd.a  !== undefined) watchdogArmed.value        = wd.a;
+    if (wd.t  !== undefined) watchdogTripped.value      = wd.t;
+    if (wd.c  !== undefined) watchdogTripCount.value    = wd.c;
+    if (wd.lc !== undefined) watchdogLastCause.value    = wd.lc;
+    if (wd.lu !== undefined) watchdogLastTripUnix.value = wd.lu;
+    if (wd.hs !== undefined) watchdogHardStopC.value    = wd.hs;
+    if (wd.ar !== undefined) watchdogAutoReset.value    = wd.ar;
+  }
 
   // Add to history
   addTelemetryPoint(

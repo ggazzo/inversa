@@ -27,6 +27,7 @@
 #include "plugins/TimerPlugin.h"
 #include "plugins/AutoTunePlugin.h"
 #include "plugins/SchedulerPlugin.h"
+#include "plugins/ThermalWatchdogPlugin.h"
 #include "plugins/CommandHandler.h"
 
 // ─── Global State ───────────────────────────────────────────
@@ -34,6 +35,9 @@ MachineState gState;
 
 // ─── Command Handler (not a plugin, wired manually) ─────────
 CommandHandler commandHandler;
+
+// ─── Watchdog handle (kicked from loop()) ───────────────────
+static ThermalWatchdogPlugin* g_watchdog = nullptr;
 
 void setup() {
     Serial.begin(115200);
@@ -74,16 +78,23 @@ void setup() {
 
     auto& pm = PluginManager::instance();
 
-    // Register plugins in dependency order
-    auto* temp    = pm.add<TemperaturePlugin>();
-    auto* pid     = pm.add<PIDPlugin>();
-    auto* heater  = pm.add<HeaterPlugin>();
-    auto* pump    = pm.add<PumpPlugin>();
-    auto* sd      = pm.add<SDCardPlugin>();
-    auto* recipe  = pm.add<RecipePlugin>();
-    auto* ble     = pm.add<BLEPlugin>();
-    auto* wifi    = pm.add<WiFiPlugin>(gState);
-    auto* ota     = pm.add<OTAPlugin>(gState, *wifi);
+    // Register plugins in dependency order. ThermalWatchdog is placed
+    // AFTER HeaterPlugin so HeaterPlugin::setup() has configured the
+    // SSR pin as OUTPUT before Watchdog::setup() exercises it. Run-
+    // order trade-off (Heater may write HIGH then Watchdog overrides
+    // LOW in the same iteration on a fresh trip) is mitigated by the
+    // direct gpio_set_level inside Watchdog::trip().
+    auto* temp     = pm.add<TemperaturePlugin>();
+    auto* pid      = pm.add<PIDPlugin>();
+    auto* heater   = pm.add<HeaterPlugin>();
+    auto* watchdog = pm.add<ThermalWatchdogPlugin>();
+    g_watchdog     = watchdog;
+    auto* pump     = pm.add<PumpPlugin>();
+    auto* sd       = pm.add<SDCardPlugin>();
+    auto* recipe   = pm.add<RecipePlugin>();
+    auto* ble      = pm.add<BLEPlugin>();
+    auto* wifi     = pm.add<WiFiPlugin>(gState);
+    auto* ota      = pm.add<OTAPlugin>(gState, *wifi);
     auto* ramp      = pm.add<RampPlugin>();
     auto* brewLog   = pm.add<BrewLogPlugin>();
     auto* boilTimer = pm.add<BoilTimerPlugin>();
@@ -105,7 +116,7 @@ void setup() {
     RecoveryManager::instance().noteBootAttempt();
 
     // Wire up command handler (routes BLE commands to plugins)
-    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler);
+    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler, watchdog);
 
     // Check for power loss recovery
     if (RecoveryManager::instance().hasValidRecovery()) {
@@ -145,6 +156,11 @@ void setup() {
 void loop() {
     PluginManager::instance().loop();
     gState.uptimeMs = millis();
+
+    // Thermal Watchdog heartbeat (001-thermal-watchdog T026).
+    // The esp_timer task reads this counter every WATCHDOG_ISR_INTERVAL_US
+    // and trips LOOP_STUCK if the gap exceeds watchdogLoopStuckMs.
+    if (g_watchdog) g_watchdog->kick();
 
     // ─── P9: confirmar firmware estável após 60s sem crash ──────
     if (gState.otaVerifyDeadline > 0 && millis() > gState.otaVerifyDeadline) {
