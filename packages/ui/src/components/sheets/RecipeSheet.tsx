@@ -18,8 +18,12 @@ export function RecipeSheet({ open, onClose }: Props) {
     function refresh() {
         if (!open) return;
         setRecipes(null); setErr(null);
+        // ConnectionManager.listRecipes() returns the recipe array
+        // directly (it already unwraps `res.recipes`). Previously this
+        // expected an envelope object and read `r.recipes`, which was
+        // always undefined → empty list in the UI.
         ConnectionManager.listRecipes()
-            .then((r: any) => setRecipes(r.recipes || []))
+            .then((r: string[]) => setRecipes(r ?? []))
             .catch((e: any) => { setErr(e?.message || 'Falha'); setRecipes([]); });
     }
     useEffect(refresh, [open]);
