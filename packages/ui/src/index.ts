@@ -12,6 +12,7 @@ export { RecipeSheet }       from './components/sheets/RecipeSheet';
 export { BrewLogSheet }      from './components/sheets/BrewLogSheet';
 export { DevicePickerSheet } from './components/sheets/DevicePickerSheet';
 export { DebugSheet }        from './components/sheets/DebugSheet';
+export { CalibrationSheet }  from './components/sheets/CalibrationSheet';
 export { WizardEquipment }    from './components/wizards/WizardEquipment';
 export { WizardConnectivity } from './components/wizards/WizardConnectivity';
 export { WizardTuning }       from './components/wizards/WizardTuning';

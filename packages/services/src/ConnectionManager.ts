@@ -245,6 +245,15 @@ class ConnectionManagerClass {
       { volumeL, powerW, ambientC, diameterM, lossCoeff });
   }
 
+  // Temperature calibration (T_real = slope · T_medido + offset).
+  // Firmware persists in NVS and applies after the Kalman filter.
+  async getTempCalibration() {
+    return BleClient.request('req:settings:cal:get');
+  }
+  async setTempCalibration(slope, offset) {
+    return BleClient.request('req:settings:cal:set', { slope, offset });
+  }
+
   // Factory reset (P7). Requires `confirm: "ERASE_ALL"` literal; the
   // firmware refuses anything else.
   async factoryReset(confirm) {
