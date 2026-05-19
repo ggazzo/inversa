@@ -8,7 +8,8 @@
         "ble-probe": "./probe.mjs"
     },
     "scripts": {
-        "start": "node probe.mjs"
+        "start":  "node probe.mjs",
+        "health": "node health.mjs"
     },
     "dependencies": {
         "@abandonware/noble": "^1.9.2-26"
