@@ -101,6 +101,24 @@ public:
         return _prefs.isKey("therm_vol_l");
     }
 
+    // ── Temperature Calibration ─────────────────────────────
+    // Linear correction applied after the Kalman filter:
+    //     T_real = slope · T_medido + offset
+    // Default = identity (slope=1, offset=0). Keys ≤15 chars.
+    void saveTempCalibration(float slope, float offset) {
+        _prefs.putFloat("cal_t_slope", slope);
+        _prefs.putFloat("cal_t_off",   offset);
+        DEBUG_PRINTF("[NVS] Saved temp calibration: slope=%.4f offset=%.2f\n",
+                     slope, offset);
+    }
+
+    float loadTempCalSlope(float defaultVal)  { return _prefs.getFloat("cal_t_slope", defaultVal); }
+    float loadTempCalOffset(float defaultVal) { return _prefs.getFloat("cal_t_off",   defaultVal); }
+
+    bool hasTempCalibration() {
+        return _prefs.isKey("cal_t_slope");
+    }
+
     // ── RTC / Timezone (P14) ────────────────────────────────
     // UTC offset in minutes — supports half-hour zones (e.g., India = 330).
     // Default −180 = UTC-3 (Brazil; matches previous hardcoded behavior).

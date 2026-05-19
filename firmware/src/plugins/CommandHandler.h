@@ -655,6 +655,32 @@ public:
             NVSStorage::instance().saveThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff);
             sendOk(rid);
         }
+        // ── Temperature Calibration: Get ────────────────────
+        else if (strcmp(type, Protocol::REQ_SETTINGS_CAL_GET) == 0) {
+            JsonDocument res;
+            res[Protocol::FIELD_TYPE] = Protocol::RES_SETTINGS_CAL;
+            res[Protocol::FIELD_REQUEST_ID] = rid;
+            res["slope"]     = gState.tempCalSlope;
+            res["offset"]    = gState.tempCalOffset;
+            res["persisted"] = NVSStorage::instance().hasTempCalibration();
+            _ble->sendJson(res);
+        }
+        // ── Temperature Calibration: Set + persist ──────────
+        else if (strcmp(type, Protocol::REQ_SETTINGS_CAL_SET) == 0) {
+            float slope  = doc["slope"]  | gState.tempCalSlope;
+            float offset = doc["offset"] | gState.tempCalOffset;
+
+            // Defensive ranges — keep users from masking a broken sensor.
+            // Slope error budget covers NTC tolerance + reference resistor
+            // tolerance. Offset covers typical wiring / probe drift.
+            if (slope  < 0.8f  || slope  > 1.2f)  { sendError(rid, "slope must be 0.8-1.2");   return; }
+            if (offset < -10.0f|| offset > 10.0f) { sendError(rid, "offset must be -10..10C"); return; }
+
+            gState.tempCalSlope  = slope;
+            gState.tempCalOffset = offset;
+            NVSStorage::instance().saveTempCalibration(slope, offset);
+            sendOk(rid);
+        }
         // ── Factory Reset (P7, guarded) ─────────────────────
         // Requires {confirm: "ERASE_ALL"} to wipe the NVS namespace.
         else if (strcmp(type, Protocol::REQ_FACTORY_RESET) == 0) {
