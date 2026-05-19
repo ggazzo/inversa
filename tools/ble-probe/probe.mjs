@@ -26,18 +26,30 @@ const NUS_TX_CHAR_UUID = '6e400003b5a3f393e0a9e50e24dcca9e'; // notify: device �
 const NUS_RX_CHAR_UUID = '6e400002b5a3f393e0a9e50e24dcca9e'; // write:  app → device
 
 // ── CLI args ─────────────────────────────────────────────────────
+import { readFileSync } from 'node:fs';
+import { basename } from 'node:path';
+
 const args = process.argv.slice(2);
 let scanTimeoutMs = 10_000;
 let reqTimeoutMs  = 5_000;
 let watchSec      = 0;             // >0: telemetry watch mode
+let saveRecipe    = null;          // { file, content } when --save-recipe is used
 const cmds = [];
 for (let i = 0; i < args.length; i++) {
     if (args[i] === '--timeout')     { scanTimeoutMs = (+args[++i]) * 1000; continue; }
     if (args[i] === '--req-timeout') { reqTimeoutMs  = (+args[++i]) * 1000; continue; }
     if (args[i] === '--watch')       { watchSec       =  +args[++i] || 10;  continue; }
+    if (args[i] === '--save-recipe') {
+        const path = args[++i];
+        const file = args[i + 1] && !args[i + 1].startsWith('-') ? args[++i] : basename(path);
+        saveRecipe = { file, content: readFileSync(path, 'utf8') };
+        continue;
+    }
     cmds.push(args[i]);
 }
-if (cmds.length === 0 && watchSec === 0) cmds.push('req:info', 'req:settings:get', 'req:recipe:list');
+if (cmds.length === 0 && watchSec === 0 && !saveRecipe) {
+    cmds.push('req:info', 'req:settings:get', 'req:recipe:list');
+}
 
 function pad(s, n) { return (s + ' '.repeat(n)).slice(0, n); }
 
@@ -161,6 +173,7 @@ noble.on('discover', async (p) => {
         // can lose its response. 300ms settle covers it.
         await new Promise((r) => setTimeout(r, 300));
 
+        if (saveRecipe) await runSaveRecipe();
         if (watchSec > 0) await runWatch();
         if (cmds.length > 0) await runSuite();
         await p.disconnectAsync();
@@ -171,7 +184,7 @@ noble.on('discover', async (p) => {
     }
 });
 
-async function send(type) {
+async function send(type, extra = {}) {
     return new Promise((resolve, reject) => {
         const rid = `b${nextRid++}`;
         const timer = setTimeout(() => {
@@ -180,7 +193,7 @@ async function send(type) {
         }, reqTimeoutMs);
         pending.set(rid, { resolve, reject, timer });
 
-        const payload = Buffer.from(JSON.stringify({ tp: type, rid }), 'utf8');
+        const payload = Buffer.from(JSON.stringify({ tp: type, rid, ...extra }), 'utf8');
         // MTU on macOS CoreBluetooth defaults around 185 bytes; firmware
         // expects chunks under that. Chunk at 180 to match the RN adapter.
         const chunkSize = 180;
@@ -190,6 +203,19 @@ async function send(type) {
             }
         })().catch(reject);
     });
+}
+
+async function runSaveRecipe() {
+    const { file, content } = saveRecipe;
+    console.log(`[ble-probe] uploading recipe "${file}" (${content.length} bytes)`);
+    const t0 = Date.now();
+    try {
+        const res = await send('req:recipe:save', { file, content });
+        console.log(`[ble-probe] ✓ saved in ${Date.now() - t0}ms`, JSON.stringify(res).slice(0, 120));
+    } catch (e) {
+        console.error(`[ble-probe] ✗ save failed: ${e.message}`);
+        process.exitCode = 1;
+    }
 }
 
 async function runWatch() {
