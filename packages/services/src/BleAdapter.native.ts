@@ -276,6 +276,18 @@ class NativeBleAdapter implements BleAdapter {
             try { manager.stopDeviceScan(); } catch { /* noop */ }
             this.scanning = false;
         }
+        // Defensive cleanup of any half-cancelled link to the same id.
+        // If the user disconnected and immediately re-tapped Conectar,
+        // ble-plx may still hold an entry for this device id; calling
+        // connectToDevice while one is pending makes the new promise
+        // hang indefinitely. cancelDeviceConnection() is a no-op when
+        // the device is already disconnected.
+        try {
+            const stillConnected = await manager.isDeviceConnected(id);
+            if (stillConnected) {
+                await manager.cancelDeviceConnection(id);
+            }
+        } catch { /* noop — id not known to ble-plx yet */ }
         // ble-plx's connectToDevice() does the GATT handshake; we still
         // need our own service/characteristic discovery + monitor setup
         // on top, which attachToDevice handles.
@@ -430,18 +442,54 @@ class NativeBleAdapter implements BleAdapter {
             // onclose handler fires _onDisconnect; nothing else to do.
             return;
         }
+
+        // Order matters here for the reconnect bug we just fixed:
+        //
+        //   1. KEEP onDisconnected attached while cancelConnection runs
+        //      so the existing callback fires once ble-plx finishes
+        //      tearing down the link. The previous implementation
+        //      remove()d that subscription *before* cancelling, so
+        //      ConnectionManager never saw onDisconnect and the UI
+        //      stayed in the "connected" state. The next connect()
+        //      then walked into a half-cancelled ble-plx state and the
+        //      promise from manager.connectToDevice() never resolved.
+        //
+        //   2. Eagerly clear our own `device`/`connected` flags so a
+        //      reconnect attempt that races the cancel doesn't think
+        //      we already have a live device.
+        //
+        //   3. Drop the monitor subscription synchronously so further
+        //      TX notifications don't reach handleChunk after we
+        //      signalled disconnect.
+        const dev = this.device;
+        this.device = null;
+        this.connected = false;
         if (this.monitorSub) { try { this.monitorSub.remove(); } catch { /* noop */ } this.monitorSub = null; }
-        if (this.connectSub) { try { this.connectSub.remove(); } catch { /* noop */ } this.connectSub = null; }
-        if (this.device) {
-            // `cancelConnection` returns a promise — fire and forget;
-            // the onDisconnected callback above will clear our state.
-            this.device.cancelConnection().catch(() => { /* noop */ });
+
+        if (dev) {
+            dev.cancelConnection()
+                .catch(() => { /* swallow — ble-plx throws if already gone */ })
+                .finally(() => {
+                    // The onDisconnected callback usually fires from
+                    // cancelConnection itself, but on some Android
+                    // builds it doesn't when the user-initiated
+                    // disconnect lands while the link is already
+                    // wobbling. Make the callback unconditional once
+                    // the cancel promise settles, AND only then drop
+                    // the listener so we don't lose a real-world
+                    // onDisconnected race.
+                    if (this.connectSub) {
+                        try { this.connectSub.remove(); } catch { /* noop */ }
+                        this.connectSub = null;
+                    }
+                    this._onDisconnect?.();
+                });
         } else {
-            // No active device yet: still signal disconnect so the UI
-            // can return to the "Conectar" CTA.
+            if (this.connectSub) { try { this.connectSub.remove(); } catch { /* noop */ } this.connectSub = null; }
+            // No active device — signal disconnect so the UI can return
+            // to the "Conectar" CTA.
             this._onDisconnect?.();
         }
-        this.connected = false;
     }
 
     async send(message: object): Promise<void> {
