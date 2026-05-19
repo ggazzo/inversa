@@ -93,7 +93,18 @@ public:
     }
 
     bool isConnected() const {
-        return WiFi.status() == WL_CONNECTED;
+        // Use the event-driven cached state instead of polling
+        // `WiFi.status()`. On arduino-esp32 v3 (ESP-IDF v5.x) the
+        // arduino WiFi shim can return non-WL_CONNECTED for short
+        // transients even while the link is fine (DHCP renew,
+        // re-auth, scan-while-connected). The app then sees the
+        // controller flip-flop, and `req:ota:check` rejects with
+        // "WiFi not connected" even though telemetry has
+        // `wifiConnected:true` running through it. `_state.wifiConnected`
+        // is set in `handleWiFiEvent` on `STA_GOT_IP` and cleared
+        // on `STA_DISCONNECTED`, which matches what users actually
+        // see in the app.
+        return _state.wifiConnected;
     }
 
     String getIP() const {
