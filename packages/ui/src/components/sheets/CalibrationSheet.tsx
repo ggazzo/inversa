@@ -178,7 +178,8 @@ export function CalibrationSheet({ open, onClose }: Props) {
                             <Input
                                 id={`cal-m-${i}`}
                                 size="$3"
-                                keyboardType="numeric"
+                                keyboardType="numbers-and-punctuation"
+                                inputMode="decimal"
                                 value={row.measured}
                                 onChangeText={(s: string) => updateRow(i, { measured: s })}
                                 placeholder="ex. 24.6"
@@ -190,7 +191,8 @@ export function CalibrationSheet({ open, onClose }: Props) {
                             <Input
                                 id={`cal-r-${i}`}
                                 size="$3"
-                                keyboardType="numeric"
+                                keyboardType="numbers-and-punctuation"
+                                inputMode="decimal"
                                 value={row.reference}
                                 onChangeText={(s: string) => updateRow(i, { reference: s })}
                                 placeholder="ex. 25.0"

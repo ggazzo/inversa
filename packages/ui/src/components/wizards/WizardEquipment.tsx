@@ -5,14 +5,18 @@ import { ConnectionManager } from '@inversa/services';
 import { showToast } from '@inversa/stores';
 import { WizardSheet } from './WizardSheet';
 
+// Stored as strings so partial entries ("-", "0.", ".5") survive a
+// re-render without being eaten by parseFloat. parseFloat happens at
+// save() time; anything that fails to parse falls back to the persisted
+// value (so a blank ambient field doesn't silently send NaN).
 interface FormState {
-    volumeL: number; powerW: number; ambientC: number;
-    diameterM: number; lossCoeff: number;
+    volumeL: string; powerW: string; ambientC: string;
+    diameterM: string; lossCoeff: string;
     // Temperature calibration "fast path": this wizard only exposes the
     // additive offset. The slope is held in `currentSlope` (state below)
     // and preserved across saves — to recompute it from multiple
     // calibration points the user opens the dedicated Calibration sheet.
-    tempOffsetC: number;
+    tempOffsetC: string;
 }
 
 const FIELDS: Array<{ key: keyof FormState; label: string; min: number; max: number; step: number; hint: string }> = [
@@ -24,11 +28,22 @@ const FIELDS: Array<{ key: keyof FormState; label: string; min: number; max: num
     { key: 'tempOffsetC', label: 'Offset sensor (°C)',  min: -10,  max: 10,    step: 0.1,  hint: '-10 - 10  •  ajuste rápido; para calibração com pontos múltiplos use "Calibrar sensor"' },
 ];
 
+function num(s: string, fallback: number): number {
+    const v = parseFloat(s);
+    return Number.isFinite(v) ? v : fallback;
+}
+
 interface Props { open: boolean; onClose: () => void }
 
 export function WizardEquipment({ open, onClose }: Props) {
     const [form, setForm]               = useState<FormState | null>(null);
-    const [currentSlope, setSlope]      = useState(1.0);
+    // The slope is held in a hidden state alongside the form (this
+    // wizard only edits the offset). The persisted snapshot lets save()
+    // fall back to the last good number when a string fails to parse.
+    const [persistedForm, setPersistedForm] = useState<{
+        volumeL: number; powerW: number; ambientC: number;
+        diameterM: number; lossCoeff: number; offset: number; slope: number;
+    } | null>(null);
     const [persisted, setPersisted]     = useState(false);
     const [calPersisted, setCalPersisted] = useState(false);
     const [loading, setLoading]         = useState(true);
@@ -43,13 +58,21 @@ export function WizardEquipment({ open, onClose }: Props) {
             ConnectionManager.getTempCalibration(),
         ])
             .then(([thermal, cal]: any[]) => {
+                const offset = typeof cal?.offset === 'number' ? cal.offset : 0;
+                const slope  = typeof cal?.slope  === 'number' ? cal.slope  : 1.0;
                 setForm({
+                    volumeL:     String(thermal.volumeL),
+                    powerW:      String(thermal.powerW),
+                    ambientC:    String(thermal.ambientC),
+                    diameterM:   String(thermal.diameterM),
+                    lossCoeff:   String(thermal.lossCoeff),
+                    tempOffsetC: String(offset),
+                });
+                setPersistedForm({
                     volumeL: thermal.volumeL, powerW: thermal.powerW,
                     ambientC: thermal.ambientC, diameterM: thermal.diameterM,
-                    lossCoeff: thermal.lossCoeff,
-                    tempOffsetC: typeof cal?.offset === 'number' ? cal.offset : 0,
+                    lossCoeff: thermal.lossCoeff, offset, slope,
                 });
-                setSlope(typeof cal?.slope === 'number' ? cal.slope : 1.0);
                 setPersisted(!!thermal.persisted);
                 setCalPersisted(!!cal?.persisted);
             })
@@ -58,15 +81,21 @@ export function WizardEquipment({ open, onClose }: Props) {
     }, [open]);
 
     function save() {
-        if (!form) return;
+        if (!form || !persistedForm) return;
+        const volumeL   = num(form.volumeL,   persistedForm.volumeL);
+        const powerW    = num(form.powerW,    persistedForm.powerW);
+        const ambientC  = num(form.ambientC,  persistedForm.ambientC);
+        const diameterM = num(form.diameterM, persistedForm.diameterM);
+        const lossCoeff = num(form.lossCoeff, persistedForm.lossCoeff);
+        const offset    = num(form.tempOffsetC, persistedForm.offset);
         // Send both writes in parallel. Thermal params + the calibration
         // pair are persisted in independent NVS keys; ordering doesn't
         // matter, and either failing surfaces as a toast without rolling
         // the other back (firmware state stays consistent because each
         // SET handler validates on its own).
         Promise.all([
-            ConnectionManager.setThermalParams(form.volumeL, form.powerW, form.ambientC, form.diameterM, form.lossCoeff),
-            ConnectionManager.setTempCalibration(currentSlope, form.tempOffsetC),
+            ConnectionManager.setThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff),
+            ConnectionManager.setTempCalibration(persistedForm.slope, offset),
         ])
             .then(() => {
                 showToast('Parâmetros salvos', 'success');
@@ -105,12 +134,10 @@ export function WizardEquipment({ open, onClose }: Props) {
                     <Input
                         id={`fld-${f.key}`}
                         size="$3"
-                        keyboardType="numeric"
-                        value={String(form[f.key])}
-                        onChangeText={(s: string) => {
-                            const v = parseFloat(s);
-                            if (!isNaN(v)) setForm({ ...form, [f.key]: v });
-                        }}
+                        keyboardType="numbers-and-punctuation"
+                        inputMode="decimal"
+                        value={form[f.key]}
+                        onChangeText={(s: string) => setForm({ ...form, [f.key]: s })}
                     />
                 </YStack>
             ))}
