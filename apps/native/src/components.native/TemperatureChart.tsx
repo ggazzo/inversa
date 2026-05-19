@@ -13,14 +13,14 @@ import { View, Text, type LayoutChangeEvent } from 'react-native';
 import { useSignals } from '@preact/signals-react/runtime';
 import Svg, { G, Line, Polyline, Text as SvgText } from 'react-native-svg';
 import {
-    tempHistory, targetHistory, outputHistory,
+    tempHistory, targetHistory, outputHistory, timeLabels,
 } from '@inversa/stores';
 
-const HEIGHT = 192;
+const HEIGHT = 208;
 const PAD_L  = 28;  // left margin for °C labels
 const PAD_R  = 8;
 const PAD_T  = 8;
-const PAD_B  = 16;  // bottom margin for tick labels
+const PAD_B  = 28;  // bottom margin for °C + HH:MM tick labels
 
 const COLOR_TEMP    = '#f59e0b';
 const COLOR_TARGET  = '#ef4444';
@@ -53,6 +53,7 @@ export function TemperatureChart() {
     const temps   = tempHistory.value;
     const targets = targetHistory.value;
     const outs    = outputHistory.value;
+    const labels  = timeLabels.value;
 
     const hasData = temps.length > 0;
 
@@ -96,6 +97,28 @@ export function TemperatureChart() {
 
     // Horizontal grid lines at min, midpoint, max.
     const grid = [minY, (minY + maxY) / 2, maxY];
+
+    // X-axis time ticks. Up to 5 evenly spaced timestamps; if the
+    // sample buffer is tiny just show start and end so labels don't
+    // collide. timeLabels.value tracks tempHistory 1:1 (see
+    // packages/stores/src/state.ts::addTelemetryPoint), so labels[i]
+    // is the HH:MM:SS that produced temps[i]. We render HH:MM only
+    // — full precision would overlap on narrow phones.
+    const tickCount = Math.min(5, Math.max(2, labels.length));
+    const tickIdx: number[] = [];
+    if (labels.length > 0) {
+        for (let i = 0; i < tickCount; i++) {
+            const idx = Math.round(((labels.length - 1) * i) / (tickCount - 1 || 1));
+            tickIdx.push(idx);
+        }
+    }
+    const step = temps.length > 1 ? plotW / (temps.length - 1) : 0;
+    function toHHMM(s: string | undefined): string {
+        if (!s) return '';
+        // Source format is `HH:MM:SS` from toLocaleTimeString pt-BR.
+        // Trim the seconds so we fit comfortably under the chart.
+        return s.length >= 5 ? s.slice(0, 5) : s;
+    }
 
     return (
         <View onLayout={onLayout} style={{ width: '100%', height: HEIGHT }}>
@@ -149,6 +172,34 @@ export function TemperatureChart() {
                             fill="none"
                         />
                     )}
+
+                    {/* X-axis time ticks: small vertical mark + HH:MM
+                        below the plot. Edge labels are anchored to the
+                        edge so they don't run off the chart bounds. */}
+                    {tickIdx.map((idx, k) => {
+                        const x = PAD_L + idx * step;
+                        const yTop = PAD_T + plotH;
+                        const yLabel = HEIGHT - 4;
+                        const isFirst = k === 0;
+                        const isLast  = k === tickIdx.length - 1;
+                        const anchor  = isFirst ? 'start' : isLast ? 'end' : 'middle';
+                        return (
+                            <G key={`t-${idx}`}>
+                                <Line
+                                    x1={x} x2={x}
+                                    y1={yTop} y2={yTop + 4}
+                                    stroke={COLOR_AXIS} strokeWidth={1}
+                                />
+                                <SvgText
+                                    x={x} y={yLabel}
+                                    fontSize={9} fill={COLOR_AXIS}
+                                    textAnchor={anchor}
+                                >
+                                    {toHHMM(labels[idx])}
+                                </SvgText>
+                            </G>
+                        );
+                    })}
                 </G>
             </Svg>
         </View>
