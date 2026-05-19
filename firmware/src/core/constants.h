@@ -41,6 +41,15 @@
 #define NTC_SUPPLY_VOLTAGE_MV     3300    // 3.3V supply
 #define NTC_ADC_RESOLUTION        4095    // 12-bit ADC
 
+// Divider topology. Inversa board wires NTC on the high side
+// (3.3V → NTC → ADC node → R_ref → GND). Set to 0 for boards
+// wired the other way (3.3V → R_ref → ADC node → NTC → GND).
+// Override per environment via `-DNTC_HIGH_SIDE=0` in platformio.ini
+// build_flags if needed.
+#ifndef NTC_HIGH_SIDE
+#define NTC_HIGH_SIDE             1
+#endif
+
 // ─── Temperature Limits ─────────────────────────────────────
 #define TEMP_MIN                  0.0f
 #define TEMP_MAX                  150.0f
