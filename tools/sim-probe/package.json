@@ -1,0 +1,16 @@
+{
+    "name": "@inversa/sim-probe",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "description": "End-to-end protocol roundtrip probe — sends req:* via the sim-bridge WebSocket, waits for the matching res:*.",
+    "bin": {
+        "sim-probe": "./probe.mjs"
+    },
+    "scripts": {
+        "start": "node probe.mjs"
+    },
+    "engines": {
+        "node": ">=22"
+    }
+}
