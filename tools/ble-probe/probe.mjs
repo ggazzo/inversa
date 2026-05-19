@@ -29,13 +29,15 @@ const NUS_RX_CHAR_UUID = '6e400002b5a3f393e0a9e50e24dcca9e'; // write:  app → 
 const args = process.argv.slice(2);
 let scanTimeoutMs = 10_000;
 let reqTimeoutMs  = 5_000;
+let watchSec      = 0;             // >0: telemetry watch mode
 const cmds = [];
 for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--timeout') { scanTimeoutMs = (+args[++i]) * 1000; continue; }
-    if (args[i] === '--req-timeout') { reqTimeoutMs = (+args[++i]) * 1000; continue; }
+    if (args[i] === '--timeout')     { scanTimeoutMs = (+args[++i]) * 1000; continue; }
+    if (args[i] === '--req-timeout') { reqTimeoutMs  = (+args[++i]) * 1000; continue; }
+    if (args[i] === '--watch')       { watchSec       =  +args[++i] || 10;  continue; }
     cmds.push(args[i]);
 }
-if (cmds.length === 0) cmds.push('req:info', 'req:settings:get', 'req:recipe:list');
+if (cmds.length === 0 && watchSec === 0) cmds.push('req:info', 'req:settings:get', 'req:recipe:list');
 
 function pad(s, n) { return (s + ' '.repeat(n)).slice(0, n); }
 
@@ -74,6 +76,7 @@ let rxBuffer = '';
 const pending = new Map();
 let nextRid = 1;
 let sawStatus = false;
+let telemetry = null;          // { count, missingCt, ctSamples[], firstTs, lastTs }
 
 noble.on('stateChange', async (state) => {
     console.log(`[ble-probe] Bluetooth state: ${state}`);
@@ -131,7 +134,17 @@ noble.on('discover', async (p) => {
                     if (data.tp === 'res:error') slot.reject(new Error(data.err || 'res:error'));
                     else                          slot.resolve(data);
                 } else if (data.tp === 'evt:status') {
-                    if (!sawStatus) {
+                    if (telemetry) {
+                        // Watch mode: log every frame, accumulate stats.
+                        telemetry.count++;
+                        if (data.ct === undefined) telemetry.missingCt++;
+                        else telemetry.ctSamples.push(data.ct);
+                        if (telemetry.firstTs === 0) telemetry.firstTs = Date.now();
+                        telemetry.lastTs = Date.now();
+                        const ct = data.ct === undefined ? '(absent)' : data.ct;
+                        const tt = data.tt === undefined ? '(absent)' : data.tt;
+                        console.log(`[ble-probe] · evt:status #${telemetry.count} ct=${ct} tt=${tt} h=${data.h ?? '-'} p=${data.p ?? '-'} out=${data.out ?? '-'}`);
+                    } else if (!sawStatus) {
                         sawStatus = true;
                         console.log(`[ble-probe] · evt:status (further hidden) ct=${data.ct} tt=${data.tt}`);
                     }
@@ -143,7 +156,13 @@ noble.on('discover', async (p) => {
         await txChar.subscribeAsync();
         console.log('[ble-probe] subscribed to TX (notify)');
 
-        await runSuite();
+        // iOS GATT registers the notify subscription a moment after
+        // subscribeAsync resolves; first request inside that window
+        // can lose its response. 300ms settle covers it.
+        await new Promise((r) => setTimeout(r, 300));
+
+        if (watchSec > 0) await runWatch();
+        if (cmds.length > 0) await runSuite();
         await p.disconnectAsync();
     } catch (e) {
         console.error('[ble-probe] error:', e?.message ?? e);
@@ -171,6 +190,36 @@ async function send(type) {
             }
         })().catch(reject);
     });
+}
+
+async function runWatch() {
+    telemetry = { count: 0, missingCt: 0, ctSamples: [], firstTs: 0, lastTs: 0 };
+    console.log(`[ble-probe] watching telemetry for ${watchSec}s…`);
+    await new Promise((r) => setTimeout(r, watchSec * 1000));
+
+    const { count, missingCt, ctSamples, firstTs, lastTs } = telemetry;
+    console.log('');
+    console.log(`[ble-probe] watch summary:`);
+    console.log(`  evt:status frames     : ${count}`);
+    if (count === 0) {
+        console.log('  ✗ NO telemetry arrived — firmware not publishing or subscription dropped');
+        process.exitCode = 1;
+        telemetry = null;
+        return;
+    }
+    const elapsedSec = (lastTs - firstTs) / 1000;
+    console.log(`  frames / sec          : ${(count / Math.max(elapsedSec, 1)).toFixed(2)}`);
+    console.log(`  frames missing 'ct'   : ${missingCt}`);
+    if (ctSamples.length > 0) {
+        const min = Math.min(...ctSamples);
+        const max = Math.max(...ctSamples);
+        const avg = ctSamples.reduce((a, b) => a + b, 0) / ctSamples.length;
+        console.log(`  ct min / avg / max    : ${min.toFixed(2)} / ${avg.toFixed(2)} / ${max.toFixed(2)} °C`);
+    } else {
+        console.log('  ✗ no frame contained `ct` field — firmware sending status without temperature');
+        process.exitCode = 1;
+    }
+    telemetry = null;
 }
 
 async function runSuite() {
