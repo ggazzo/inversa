@@ -73,6 +73,23 @@ public:
     }
 
     void loop() override {
+        // Drain any BLE command queued by onWrite. Doing this here
+        // instead of inside onWrite means the synchronous handlers
+        // (SD reads, JSON serialization, notify bursts) run on the
+        // main loop task, not on the NimBLE host task. The host
+        // task being blocked for >300 ms is what was tripping the
+        // BLE supervision timer and disconnecting on req:recipe:load.
+        if (_hasPendingCommand) {
+            String cmd;
+            // Atomic swap-and-clear so a write that races with this
+            // dispatch is just queued for next loop() instead of lost.
+            std::swap(cmd, _pendingCommand);
+            _hasPendingCommand = false;
+            if (cmd.length() > 0) {
+                bus().publish(EventType::BLECommandReceived, cmd);
+            }
+        }
+
         // Send telemetry periodically
         uint32_t now = millis();
         if (_connected && (now - _lastTelemetry >= TELEMETRY_INTERVAL_MS)) {
@@ -290,6 +307,14 @@ private:
     JsonDocument _telemetryDoc;
     String _telemetryBuf;
 
+    // Deferred command dispatch — populated from the NimBLE host
+    // task (onWrite), drained from the main task (loop). `volatile`
+    // is enough for the bool: it's a single-word RMW that the ESP32
+    // toolchain emits as one store, and we don't rely on inter-task
+    // ordering beyond "main task notices the flip on its next tick."
+    String          _pendingCommand;
+    volatile bool   _hasPendingCommand = false;
+
     // ── NimBLE Server Callbacks ─────────────────────────────
 
     void onConnect(NimBLEServer* server, NimBLEConnInfo& connInfo) override {
@@ -362,17 +387,29 @@ private:
     }
 
     // ── Command Handler ─────────────────────────────────────
-
+    //
+    // Called from onWrite on the NimBLE host task. We DO NOT run the
+    // real handler here — synchronous SD reads + JSON serialize +
+    // notify bursts can keep the host task pinned past the BLE
+    // supervision timeout. Instead we capture the raw JSON and let
+    // loop() (main task) publish it on the EventBus where the actual
+    // handlers can take their time without killing the link.
     void handleCommand(JsonDocument& doc) {
         const char* type = doc[Protocol::FIELD_TYPE] | "";
-        String rid = doc[Protocol::FIELD_REQUEST_ID] | "";
-
         DEBUG_PRINTF("[BLE] Command: %s\n", type);
 
-        // Publish raw command for other plugins
+        if (_hasPendingCommand) {
+            // Previous command still queued — drop the new one rather
+            // than overwrite. Clients should serialize requests, but
+            // we'd rather log a drop than silently lose state.
+            DEBUG_PRINTLN("[BLE] command dropped: previous still queued");
+            return;
+        }
+
         String raw;
         serializeJson(doc, raw);
-        bus().publish(EventType::BLECommandReceived, raw);
+        _pendingCommand     = std::move(raw);
+        _hasPendingCommand  = true;
     }
 
     // ── Telemetry ───────────────────────────────────────────
