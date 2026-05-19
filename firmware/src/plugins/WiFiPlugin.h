@@ -105,28 +105,30 @@ public:
     }
 
     void sendWiFiStatus(const char* status = nullptr) {
-        JsonDocument doc;
-        doc[Protocol::FIELD_TYPE] = Protocol::EVT_WIFI_STATUS;
-        doc["conn"] = _state.wifiConnected;
-        doc["ssid"] = (const char*)_state.wifiSSID;
-        doc["ip"]   = (const char*)_state.wifiIP;
-        doc["cfg"]  = (const char*)_state.wifiConfiguredSSID;  // Configured SSID
+        _doc.clear();
+        _doc[Protocol::FIELD_TYPE] = Protocol::EVT_WIFI_STATUS;
+        _doc["conn"] = _state.wifiConnected;
+        _doc["ssid"] = (const char*)_state.wifiSSID;
+        _doc["ip"]   = (const char*)_state.wifiIP;
+        _doc["cfg"]  = (const char*)_state.wifiConfiguredSSID;  // Configured SSID
         if (status) {
-            doc["st"] = status;
+            _doc["st"] = status;
         }
         if (!isEmptyStr(_state.otaError)) {
-            doc["err"] = (const char*)_state.otaError;
+            _doc["err"] = (const char*)_state.otaError;
         }
 
-        String json;
-        serializeJson(doc, json);
-        bus().publish(Event(EventType::BLESend, json));
+        _jsonBuf = "";
+        serializeJson(_doc, _jsonBuf);
+        bus().publish(Event(EventType::BLESend, _jsonBuf));
     }
 
 private:
     MachineState& _state;
     bool _connecting = false;
     unsigned long _connectStartTime = 0;
+    JsonDocument _doc;        // Reused by sendWiFiStatus().
+    String       _jsonBuf;    // Reused serialize buffer.
 
     void handleWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
         switch (event) {
