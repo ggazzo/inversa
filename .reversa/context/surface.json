@@ -1,0 +1,135 @@
+{
+  "generated_at": "2026-05-11T00:00:00Z",
+  "project_root": "/Users/guilhermegazzo/dev/inversa",
+  "languages": [
+    { "name": "C++", "extensions": [".h", ".cpp"], "file_count": 35 },
+    { "name": "JavaScript", "extensions": [".jsx", ".js"], "file_count": 14 },
+    { "name": "Python", "extensions": [".py"], "file_count": 1 },
+    { "name": "YAML", "extensions": [".yml"], "file_count": 3 },
+    { "name": "HTML/CSS", "extensions": [".html", ".css"], "file_count": 2 }
+  ],
+  "primary_language": "C++",
+  "frameworks": [
+    { "name": "Arduino", "version": "platformio:espressif32", "source": "firmware/platformio.ini" },
+    { "name": "NimBLE-Arduino", "version": "^2.3.0", "source": "firmware/platformio.ini" },
+    { "name": "ArduinoJson", "version": "^7.4.1", "source": "firmware/platformio.ini" },
+    { "name": "SimpleKalmanFilter", "version": "^0.1.0", "source": "firmware/platformio.ini" },
+    { "name": "RTClib", "version": "^2.1.4", "source": "firmware/platformio.ini" },
+    { "name": "Unity", "version": "^2.6.0", "source": "firmware/platformio.ini" },
+    { "name": "Preact", "version": "^10.25.0", "source": "web/package.json" },
+    { "name": "@preact/signals", "version": "^2.0.0", "source": "web/package.json" },
+    { "name": "preact-router", "version": "^4.1.2", "source": "web/package.json" },
+    { "name": "Chart.js", "version": "^4.4.0", "source": "web/package.json" },
+    { "name": "Vite", "version": "^6.0.0", "source": "web/package.json" },
+    { "name": "Tailwind CSS", "version": "^4.1.0", "source": "web/package.json" },
+    { "name": "DaisyUI", "version": "^5.0.0", "source": "web/package.json" }
+  ],
+  "package_manager": "platformio (firmware) + yarn/npm (web)",
+  "entry_points": [
+    { "path": "firmware/src/main.cpp", "type": "firmware_entry" },
+    { "path": "firmware/platformio.ini", "type": "build_config" },
+    { "path": "web/src/index.jsx", "type": "app_entry" },
+    { "path": "web/src/app.jsx", "type": "router_entry" },
+    { "path": "web/index.html", "type": "html_entry" },
+    { "path": "web/public/sw.js", "type": "service_worker" }
+  ],
+  "config_files": [
+    "firmware/platformio.ini",
+    "firmware/scripts/auto_firmware_version.py",
+    "web/package.json",
+    "web/vite.config.js",
+    "web/.yarnrc.yml",
+    "web/index.html"
+  ],
+  "ci_cd": [
+    ".github/workflows/platformio.yml",
+    ".github/workflows/web.yml",
+    ".github/workflows/dependabot.yml"
+  ],
+  "docker": {},
+  "database_hints": [
+    { "path": "firmware/src/core/NVSStorage.h", "type": "nvs_wrapper" },
+    { "path": "firmware/src/plugins/SDCardPlugin.h", "type": "sdcard_persistence" },
+    { "path": "firmware/data/", "type": "spiffs_assets" }
+  ],
+  "test_framework": "Unity (firmware) — no web tests",
+  "test_file_count": 5,
+  "modules": [
+    "firmware-core",
+    "firmware-plugin-Temperature",
+    "firmware-plugin-PID",
+    "firmware-plugin-Heater",
+    "firmware-plugin-Pump",
+    "firmware-plugin-SDCard",
+    "firmware-plugin-Recipe",
+    "firmware-plugin-BLE",
+    "firmware-plugin-WiFi",
+    "firmware-plugin-OTA",
+    "firmware-plugin-Ramp",
+    "firmware-plugin-BrewLog",
+    "firmware-plugin-BoilTimer",
+    "firmware-plugin-RTC",
+    "firmware-plugin-Timer",
+    "firmware-plugin-AutoTune",
+    "firmware-plugin-Scheduler",
+    "firmware-plugin-CommandHandler",
+    "firmware-protocol",
+    "firmware-models",
+    "firmware-boards",
+    "web-pages",
+    "web-components",
+    "web-services",
+    "web-stores"
+  ],
+  "total_files": 55,
+  "subsystems": [
+    {
+      "name": "firmware",
+      "language": "C++17",
+      "framework": "Arduino/PlatformIO",
+      "architecture": "plugin-based (PluginManager + EventBus + MachineState)",
+      "targets": ["wemos_s3_mini", "wemos_c3_mini", "native"]
+    },
+    {
+      "name": "web",
+      "language": "JavaScript (JSX)",
+      "framework": "Preact + Vite",
+      "architecture": "PWA cliente BLE (5 rotas)",
+      "targets": ["browser", "served-from-SPIFFS"]
+    }
+  ],
+  "external_integrations": [
+    { "name": "GitHub Releases API", "purpose": "OTA firmware update", "where": "firmware/src/plugins/OTAPlugin.h + firmware/src/core/constants.h" },
+    { "name": "NTP", "purpose": "RTC time sync", "where": "firmware/src/plugins/RTCPlugin.h" },
+    { "name": "Web Bluetooth (NUS)", "purpose": "App ↔ firmware protocol", "where": "web/src/services/BLEService.js + firmware/src/plugins/BLEPlugin.h" }
+  ],
+  "organization_suggestion": {
+    "granularity": "module",
+    "rationale": "Estrutura top-level por domínio em ambos subsistemas: firmware/src/{core,plugins,models,protocol,boards} com 16 plugins independentes, e web/src/{pages,components,services,stores}. A arquitetura plugin-based domina e cada plugin já tem responsabilidade de domínio bem delimitada.",
+    "signals": [
+      {
+        "type": "top_level_domain_folders",
+        "evidence": [
+          "firmware/src/plugins/",
+          "firmware/src/core/",
+          "firmware/src/models/",
+          "firmware/src/protocol/",
+          "firmware/src/boards/",
+          "web/src/pages/",
+          "web/src/components/",
+          "web/src/services/",
+          "web/src/stores/"
+        ]
+      },
+      {
+        "type": "plugin_based_architecture",
+        "evidence": [
+          "firmware/src/main.cpp",
+          "firmware/src/core/PluginManager.h",
+          "firmware/src/core/Plugin.h"
+        ]
+      }
+    ],
+    "features": []
+  }
+}

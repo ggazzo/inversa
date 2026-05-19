@@ -1,0 +1,28 @@
+{
+  "name": "inversa-web",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:firmware": "vite build --outDir ../../firmware/data --emptyOutDir",
+    "icons": "node scripts/generate-icons.mjs",
+    "prebuild": "node scripts/generate-icons.mjs",
+    "prebuild:firmware": "node scripts/generate-icons.mjs"
+  },
+  "dependencies": {
+    "@preact/signals": "^2.0.0",
+    "chart.js": "^4.4.0",
+    "preact": "^10.25.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.9.0",
+    "@tailwindcss/vite": "^4.1.0",
+    "daisyui": "^5.0.0",
+    "sharp": "^0.33.0",
+    "tailwindcss": "^4.1.0",
+    "vite": "^6.0.0"
+  }
+}

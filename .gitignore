@@ -9,9 +9,20 @@ compile_commands.json
 .DS_Store
 .qodo
 
-# Web App
-web/node_modules/
-web/dist/
+# Workspaces — apps/web/, apps/web-legacy/, apps/native/ (when it lands),
+# plus packages/* for their own build artifacts.
+node_modules/
+apps/*/node_modules/
+apps/*/dist/
+apps/*/.tamagui/
+apps/*/tsconfig.tsbuildinfo
+apps/*/.expo/
+apps/*/ios/build/
+apps/*/android/build/
+apps/*/android/.gradle/
+packages/*/node_modules/
+packages/*/dist/
+packages/*/tsconfig.tsbuildinfo
 firmware/data/
 
 # Tooling

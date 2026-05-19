@@ -1,0 +1,31 @@
+/* main.css — minimal global resets the Tamagui compiler doesn't own.
+   Tamagui handles tokens/typography/colours; we only normalize the
+   body and the #app host node here. */
+
+html, body, #app {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--background, #1d232a);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    font-family:
+        -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+        'Helvetica Neue', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Respect prefers-reduced-motion for any animation we didn't route
+   through Tamagui's animation driver. */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+    }
+}

@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "Inversa",
+    "slug": "inversa",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "scheme": "inversa",
+    "userInterfaceStyle": "automatic",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.inversa.controller",
+      "infoPlist": {
+        "NSBluetoothAlwaysUsageDescription": "Inversa precisa do Bluetooth para se conectar ao controlador de fermentação.",
+        "NSBluetoothPeripheralUsageDescription": "Inversa precisa do Bluetooth para se conectar ao controlador de fermentação."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#1d232a"
+      },
+      "package": "com.inversa.controller",
+      "permissions": [
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN"
+      ]
+    },
+    "plugins": [
+      "expo-dev-client",
+      "react-native-ble-plx",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "buildReactNativeFromSource": true
+          }
+        }
+      ]
+    ],
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6816366e-b327-41f6-9f3b-5a0fb7a5074d"
+      }
+    }
+  }
+}

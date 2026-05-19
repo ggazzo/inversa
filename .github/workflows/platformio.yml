@@ -8,6 +8,7 @@ on:
       - develop
       - v2
       - v3
+      - v4-tamagui
     paths:
       - "firmware/**"
       - ".github/workflows/platformio.yml"
@@ -16,6 +17,7 @@ on:
       - develop
       - v2
       - v3
+      - v4-tamagui
     paths:
       - "firmware/**"
       - ".github/workflows/platformio.yml"

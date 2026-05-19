@@ -1,0 +1,64 @@
+name: Native App CI
+
+# Smoke test for apps/native — no device build (those go through EAS,
+# not GitHub Actions, because of macOS runner cost). What we verify:
+#
+#   1. TypeScript across the workspace still compiles after a fresh install.
+#   2. Metro can resolve every import and bundle the app to Hermes
+#      bytecode. This catches missing peer deps, broken babel plugin
+#      chains, and `@inversa/*` workspace resolution problems before
+#      they surface on someone's laptop.
+
+on:
+  push:
+    branches:
+      - develop
+      - v2
+      - v3
+      - v4-tamagui
+    paths:
+      - "apps/native/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/native.yml"
+  pull_request:
+    branches:
+      - develop
+      - v2
+      - v3
+      - v4-tamagui
+    paths:
+      - "apps/native/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/native.yml"
+
+jobs:
+  bundle:
+    name: Bundle (Metro)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies (workspaces)
+        run: npm ci
+
+      - name: Typecheck apps/native
+        run: npm run native:typecheck
+
+      - name: Metro bundle (iOS target)
+        working-directory: apps/native
+        run: npx expo export --platform ios --output-dir .expo/dist
+
+      - name: Metro bundle (Android target)
+        working-directory: apps/native
+        run: npx expo export --platform android --output-dir .expo/dist
