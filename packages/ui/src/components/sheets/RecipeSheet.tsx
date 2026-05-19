@@ -87,14 +87,51 @@ export function RecipeSheet({ open, onClose }: Props) {
                 </Paragraph>
             )}
             {recipes?.map((file) => (
-                <XStack key={file} ai="center" gap="$2" padding="$2"
-                        hoverStyle={{ backgroundColor: '$backgroundFocus' }} br="$2">
-                    <Text fontFamily="$mono" fontSize="$2" flex={1} numberOfLines={1}>
+                // The whole row is the "Ver" surface — that's by far the
+                // most common action and using the row itself as the tap
+                // target gives us a 44pt+ touch area without crowding the
+                // buttons. Iniciar stays as the prominent CTA on the right
+                // (still tappable as a discrete action), Apagar moves to a
+                // smaller chrome-less icon button with an explicit
+                // accessibility label since "🗑" alone isn't a label.
+                <XStack
+                    key={file}
+                    ai="center"
+                    gap="$3"
+                    paddingVertical="$3"
+                    paddingHorizontal="$3"
+                    minHeight={56}
+                    br="$3"
+                    backgroundColor="$backgroundHover"
+                    hoverStyle={{ backgroundColor: '$backgroundFocus' }}
+                    pressStyle={{ backgroundColor: '$backgroundFocus', scale: 0.98 }}
+                    cursor="pointer"
+                    onPress={() => openPreview(file)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Visualizar receita ${file}`}
+                    accessibilityHint="Toque para abrir o conteúdo da receita"
+                >
+                    <Text fontFamily="$mono" fontSize="$4" flex={1} numberOfLines={1}>
                         {file}
                     </Text>
-                    <Button size="$1" chromeless onPress={() => openPreview(file)}>Ver</Button>
-                    <Button size="$1" theme="active" onPress={() => start(file)}>Iniciar</Button>
-                    <Button size="$1" chromeless theme="red" onPress={() => del(file)}>🗑</Button>
+                    <Button
+                        size="$3"
+                        theme="active"
+                        onPress={(e: any) => { e?.stopPropagation?.(); start(file); }}
+                        accessibilityLabel={`Iniciar receita ${file}`}
+                    >
+                        Iniciar
+                    </Button>
+                    <Button
+                        size="$3"
+                        chromeless
+                        theme="red"
+                        onPress={(e: any) => { e?.stopPropagation?.(); del(file); }}
+                        accessibilityLabel={`Apagar receita ${file}`}
+                        aria-label={`Apagar receita ${file}`}
+                    >
+                        🗑
+                    </Button>
                 </XStack>
             ))}
         </WizardSheet>
