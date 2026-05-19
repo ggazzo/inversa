@@ -20,7 +20,11 @@ public:
         : _data(data), _mode(mode), _valid(true) {
         if (mode == FILE_WRITE && data) data->clear();
     }
-    explicit operator bool() const { return _valid && _data; }
+    // A File is "truthy" if it is either a regular file with a backing
+    // buffer OR a directory iterator. Testing `_data` alone made
+    // `SD.open("/recipes")` look closed to SDCardPlugin::listRecipes,
+    // which short-circuited and returned an empty list in the sim.
+    explicit operator bool() const { return _valid && (_data || _isDir); }
 
     size_t size() const { return _data ? _data->size() : 0; }
 
@@ -60,7 +64,11 @@ public:
 
     // Internals exposed for the SDClass below:
     void setDirectoryEntries(std::vector<std::pair<std::string, std::vector<uint8_t>*>> e) {
-        _isDir = true; _entries = std::move(e);
+        // _valid must flip with the directory marker. The previous
+        // default-constructed File had _valid=false, so listRecipes'
+        // `if (!dir || !dir.isDirectory())` short-circuited even when
+        // entries were present.
+        _valid = true; _isDir = true; _entries = std::move(e);
     }
 
 private:
