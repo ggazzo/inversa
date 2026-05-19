@@ -7,6 +7,7 @@
 #endif
 
 #include <functional>
+#include <utility>
 #include <vector>
 #include <algorithm>
 
@@ -133,12 +134,23 @@ public:
     // Subscribe to a specific event type. Returns subscription ID.
     uint16_t subscribe(EventType type, EventCallback callback) {
         uint16_t id = _nextId++;
-        _subscriptions.push_back({type, callback, id});
+        if (_dispatchDepth > 0) {
+            _pendingAdds.push_back({type, std::move(callback), id});
+        } else {
+            _subscriptions.push_back({type, std::move(callback), id});
+        }
         return id;
     }
 
     // Unsubscribe by ID
     void unsubscribe(uint16_t id) {
+        if (_dispatchDepth > 0) {
+            // Defer removal: keep the live subscription firing for the rest of
+            // the current dispatch (snapshot semantics matching the legacy
+            // copy-on-publish behavior). Pruned once dispatch unwinds.
+            _pendingRemoves.push_back(id);
+            return;
+        }
         _subscriptions.erase(
             std::remove_if(_subscriptions.begin(), _subscriptions.end(),
                 [id](const Subscription& s) { return s.id == id; }),
@@ -149,20 +161,48 @@ public:
 #ifdef NATIVE_BUILD
     // Test-only helpers — the singleton is shared across the Unity binary
     // so each test resets state explicitly.
-    void   reset()           { _subscriptions.clear(); _nextId = 1; }
+    void   reset()           {
+        _subscriptions.clear();
+        _pendingAdds.clear();
+        _pendingRemoves.clear();
+        _nextId = 1;
+        _dispatchDepth = 0;
+    }
     size_t subscriberCount() { return _subscriptions.size(); }
 #endif
 
     // Publish an event to all subscribers.
-    // P12 fix: copy _subscriptions before iterating so that subscribers may
-    // safely call subscribe()/unsubscribe() inside their own callback without
-    // invalidating the iterator. Cost: ~50 elements × ~16 bytes per publish
-    // (irrelevant on ESP32 at typical publish rates).
+    // P12 fix: subscribers may safely subscribe()/unsubscribe() inside their
+    // own callback. Instead of copying the whole vector per publish, we iterate
+    // by index against the live vector and queue mutations into pending lists,
+    // flushing once the outermost dispatch finishes. Reentrant publish() is
+    // supported via _dispatchDepth.
     void publish(const Event& event) {
-        auto subs_copy = _subscriptions;
-        for (auto& sub : subs_copy) {
+        _dispatchDepth++;
+        // Snapshot size at entry so newly-subscribed handlers don't fire for
+        // the current event (matches previous copy-on-publish semantics).
+        const size_t n = _subscriptions.size();
+        for (size_t i = 0; i < n; ++i) {
+            const Subscription& sub = _subscriptions[i];
             if (sub.type == event.type) {
                 sub.callback(event);
+            }
+        }
+        _dispatchDepth--;
+        if (_dispatchDepth == 0) {
+            if (!_pendingRemoves.empty()) {
+                for (uint16_t id : _pendingRemoves) {
+                    _subscriptions.erase(
+                        std::remove_if(_subscriptions.begin(), _subscriptions.end(),
+                            [id](const Subscription& s) { return s.id == id; }),
+                        _subscriptions.end()
+                    );
+                }
+                _pendingRemoves.clear();
+            }
+            if (!_pendingAdds.empty()) {
+                for (auto& a : _pendingAdds) _subscriptions.push_back(std::move(a));
+                _pendingAdds.clear();
             }
         }
     }
@@ -200,5 +240,8 @@ public:
 private:
     EventBus() = default;
     std::vector<Subscription> _subscriptions;
+    std::vector<Subscription> _pendingAdds;
+    std::vector<uint16_t>     _pendingRemoves;
     uint16_t _nextId = 1;
+    uint16_t _dispatchDepth = 0;
 };
