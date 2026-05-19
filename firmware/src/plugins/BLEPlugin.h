@@ -143,12 +143,88 @@ public:
 #endif
 
     void sendJson(JsonDocument& doc) {
-        // Reuse a single String buffer to avoid per-call heap churn on the
-        // BLE notify path. Cleared rather than freed so capacity is retained.
+#ifdef SIM_BUILD
+        // Reuse a single String buffer to avoid per-call heap churn
+        // on the sim stdout bridge. Cleared rather than freed so
+        // capacity is retained.
         _telemetryBuf = "";
         serializeJson(doc, _telemetryBuf);
         send(_telemetryBuf);
+#else
+        if (!_connected || !_txChar) return;
+        // Stream the JSON directly into BLE notify chunks via a
+        // Print-derived adapter (defined below). Avoids the previous
+        // `String json` intermediate, which held the full payload —
+        // ~4 KB for a recipe load — and was the third copy of the
+        // content along with the SD readString() result and the
+        // JsonDocument internal storage. Triple-copy on a heap that
+        // also has NimBLE + WiFi controllers + lwIP was tight enough
+        // to occasionally fail malloc inside ArduinoJson's
+        // serializer, which on ESP-IDF surfaces as a crash → reset →
+        // "BLE desconectou" in the app.
+        ChunkedBleStream stream(_txChar, &_connected,
+                                NimBLEDevice::getMTU() - 3);
+        serializeJson(doc, stream);
+        stream.flushTail();
+#endif
     }
+
+#ifndef SIM_BUILD
+    // ArduinoJson serializeJson() drives anything that implements the
+    // Arduino Print interface: write(uint8_t) + write(buf, n). This
+    // adapter buffers up to one MTU worth of payload and notifies in
+    // place, with the same retry-on-ENOMEM behaviour the legacy
+    // sendBytes() path now has.
+    class ChunkedBleStream : public Print {
+    public:
+        ChunkedBleStream(NimBLECharacteristic* tx, volatile bool* connected,
+                         size_t mtu)
+            : _tx(tx), _connected(connected),
+              _mtu(mtu > sizeof(_buf) ? sizeof(_buf) : mtu) {}
+
+        size_t write(uint8_t c) override { return write(&c, 1); }
+
+        size_t write(const uint8_t* data, size_t n) override {
+            if (_fail) return 0;
+            size_t out = 0;
+            while (n > 0 && *_connected) {
+                size_t room = _mtu - _pos;
+                size_t take = (n < room) ? n : room;
+                memcpy(_buf + _pos, data, take);
+                _pos  += take;
+                data  += take;
+                n     -= take;
+                out   += take;
+                if (_pos == _mtu) flush();
+            }
+            return out;
+        }
+
+        bool flushTail() { if (_pos > 0) flush(); return !_fail; }
+
+    private:
+        NimBLECharacteristic* _tx;
+        volatile bool*        _connected;
+        size_t                _mtu;
+        // Sized to the typical MTU ceiling (185) plus headroom — both
+        // S3 and C3 envs pin CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=185.
+        uint8_t               _buf[192];
+        size_t                _pos  = 0;
+        bool                  _fail = false;
+
+        void flush() {
+            if (!*_connected) { _fail = true; _pos = 0; return; }
+            for (uint8_t attempt = 0; attempt < 3 && *_connected; ++attempt) {
+                _tx->setValue(_buf, _pos);
+                if (_tx->notify()) { _pos = 0; delay(2); return; }
+                delay(5 << attempt);  // 5 / 10 / 20 ms
+            }
+            _fail = true;
+            _pos = 0;
+            DEBUG_PRINTLN("[BLE] notify chunk dropped after 3 retries");
+        }
+    };
+#endif
 
     bool isConnected() const { return _connected; }
 
