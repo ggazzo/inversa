@@ -186,6 +186,15 @@ public:
         try { return std::stoi(_s); } catch (...) { return 0; }
     }
 
+    // Hot-path helpers used by BrewLogPlugin to avoid the per-row += chain
+    // and the realloc spike that came with it. Arduino String exposes both;
+    // the sim stub did not, so the simulator build broke when BrewLog
+    // started calling reserve()/concat().
+    void    reserve(size_t n)                       { _s.reserve(n); }
+    String& concat(const char* buf, size_t n)       { if (buf && n) _s.append(buf, n); return *this; }
+    String& concat(const String& o)                 { _s += o._s; return *this; }
+    String& concat(const char* s)                   { if (s) _s += s; return *this; }
+
     // ── Print / Stream surface (ArduinoJson uses these on String) ──
     // read()/available()/peek() are const because ArduinoJson templates
     // hand us a `const String&` for deserialization; `_readPos` is
