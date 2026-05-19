@@ -13,13 +13,14 @@ import { ConnectionManager } from '@inversa/services';
 import { BleClient } from '@inversa/services';
 
 export type MenuId =
-    | 'recipes' | 'brewlog' | 'equipment' | 'connectivity'
+    | 'recipes' | 'brewlog' | 'equipment' | 'calibration' | 'connectivity'
     | 'tuning'  | 'notifications' | 'about' | 'debug';
 
 const MENU_ITEMS: { id: MenuId; label: string }[] = [
     { id: 'recipes',       label: 'Receitas salvas' },
     { id: 'brewlog',       label: 'Brew log' },
     { id: 'equipment',     label: 'Equipamento' },
+    { id: 'calibration',   label: 'Calibrar sensor' },
     { id: 'connectivity',  label: 'WiFi & OTA' },
     { id: 'tuning',        label: 'PID & AutoTune' },
     { id: 'notifications', label: 'Notificações' },

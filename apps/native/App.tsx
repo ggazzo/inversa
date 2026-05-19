@@ -31,6 +31,7 @@ import { isConnected, theme, manualIntent } from '@inversa/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet, DebugSheet,
+    CalibrationSheet,
     WizardEquipment, WizardConnectivity, WizardTuning,
     WizardNotifications, WizardAbout,
     type MenuId,
@@ -109,6 +110,7 @@ export default function App() {
                                     {openSheet === 'recipes'       && <RecipeSheet        open onClose={close} />}
                                     {openSheet === 'brewlog'       && <BrewLogSheet       open onClose={close} />}
                                     {openSheet === 'equipment'     && <WizardEquipment    open onClose={close} />}
+                                    {openSheet === 'calibration'   && <CalibrationSheet   open onClose={close} />}
                                     {openSheet === 'connectivity'  && <WizardConnectivity open onClose={close} />}
                                     {openSheet === 'tuning'        && <WizardTuning       open onClose={close} />}
                                     {openSheet === 'notifications' && <WizardNotifications open onClose={close} />}
