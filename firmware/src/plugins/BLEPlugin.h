@@ -98,6 +98,23 @@ public:
     }
 
 #ifndef SIM_BUILD
+    // Returns the MTU that the *peer* has agreed to on the current
+    // link. NimBLEDevice::getMTU() returns the locally configured
+    // preferred MTU (185 on this build) regardless of what was
+    // actually negotiated, so chunking by it caused chunks larger
+    // than the peer would accept whenever the central hadn't yet
+    // completed the MTU exchange (BLE default = 23). The controller
+    // silently drops the link in that case — symptom matches the
+    // "BLE desconectou ao abrir uma receita" report.
+    uint16_t getNegotiatedMtu() const {
+        if (_server && _connHandle != BLE_HS_CONN_HANDLE_NONE) {
+            uint16_t mtu = _server->getPeerMTU(_connHandle);
+            if (mtu > 0) return mtu;
+        }
+        // BLE default ATT MTU is 23. Stay conservative pre-exchange.
+        return 23;
+    }
+
     // Core BLE chunked-notify path. Earlier versions dropped chunks
     // silently when NimBLE's TX mbuf pool ran out on a large burst
     // (loadRecipe / brewlog export ~4 KB payloads at MTU=185). The
@@ -117,7 +134,7 @@ public:
     bool sendBytes(const uint8_t* data, size_t len) {
         if (!_connected || !_txChar || len == 0) return false;
 
-        const size_t mtu = NimBLEDevice::getMTU() - 3;  // 3 bytes ATT overhead
+        const size_t mtu = getNegotiatedMtu() - 3;  // 3 bytes ATT overhead
 
         for (size_t i = 0; i < len; i += mtu) {
             if (!_connected || !_txChar) return false;
@@ -162,8 +179,11 @@ public:
         // to occasionally fail malloc inside ArduinoJson's
         // serializer, which on ESP-IDF surfaces as a crash → reset →
         // "BLE desconectou" in the app.
+        // getNegotiatedMtu() falls back to 23 (BLE default ATT MTU)
+        // until the central completes the MTU exchange, so we never
+        // send a chunk larger than the peer actually agreed to.
         ChunkedBleStream stream(_txChar, &_connected,
-                                NimBLEDevice::getMTU() - 3);
+                                getNegotiatedMtu() - 3);
         serializeJson(doc, stream);
         stream.flushTail();
 #endif
@@ -253,6 +273,9 @@ private:
     NimBLEServer* _server = nullptr;
     NimBLECharacteristic* _txChar = nullptr;
     NimBLECharacteristic* _rxChar = nullptr;
+    // Tracked from onConnect/onDisconnect so we can query the
+    // per-connection negotiated MTU before each notify burst.
+    uint16_t _connHandle = BLE_HS_CONN_HANDLE_NONE;
 #ifdef SIM_BUILD
     // Simulator runs as if a client is permanently connected so telemetry
     // streams without a connection handshake.
@@ -271,14 +294,22 @@ private:
 
     void onConnect(NimBLEServer* server, NimBLEConnInfo& connInfo) override {
         _connected = true;
+        // Capture the connection handle so sendJson/sendBytes can ask
+        // NimBLE for the *negotiated* MTU on this specific link, not
+        // the configured preferred MTU returned by NimBLEDevice::getMTU.
+        // Until the central completes the MTU exchange the link is on
+        // the BLE default of 23; sending 182-byte chunks against a
+        // peer that hasn't agreed to >23 makes the controller drop
+        // the link with no log on either side.
+        _connHandle = connInfo.getConnHandle();
         gState.bleConnected = true;
         bus().publish(EventType::BLEClientConnected);
-        DEBUG_PRINTF("[BLE] Client connected: %s\n", 
-                      connInfo.getAddress().toString().c_str());
-        
+        DEBUG_PRINTF("[BLE] Client connected: %s (conn=%u)\n",
+                      connInfo.getAddress().toString().c_str(), _connHandle);
+
         // Allow multiple connections
         NimBLEDevice::getAdvertising()->start();
-        
+
         // Notify app if recovery data is available
         if (gState.hasRecoveryData) {
             delay(500);  // Give app time to set up
@@ -297,6 +328,7 @@ private:
 
     void onDisconnect(NimBLEServer* server, NimBLEConnInfo& connInfo, int reason) override {
         _connected = (server->getConnectedCount() > 0);
+        if (!_connected) _connHandle = BLE_HS_CONN_HANDLE_NONE;
         gState.bleConnected = _connected;
         if (!_connected) {
             bus().publish(EventType::BLEClientDisconnected);
