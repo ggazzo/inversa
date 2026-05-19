@@ -32,4 +32,4 @@ Thumbs.db
 _reversa_sdd/
 
 # OTA signing keys (P8) — NEVER commit private keys
-firmware/secrets/
+firmware/secrets/tools/ble-probe/node_modules/
