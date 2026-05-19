@@ -13,6 +13,8 @@ export { BrewLogSheet }      from './components/sheets/BrewLogSheet';
 export { DevicePickerSheet } from './components/sheets/DevicePickerSheet';
 export { DebugSheet }        from './components/sheets/DebugSheet';
 export { CalibrationSheet }  from './components/sheets/CalibrationSheet';
+export { WatchdogSheet }     from './components/sheets/WatchdogSheet';
+export { WatchdogIndicator } from './components/WatchdogIndicator';
 export { WizardEquipment }    from './components/wizards/WizardEquipment';
 export { WizardConnectivity } from './components/wizards/WizardConnectivity';
 export { WizardTuning }       from './components/wizards/WizardTuning';

@@ -73,21 +73,20 @@ public:
     }
 
     void loop() override {
-        // Drain any BLE command queued by onWrite. Doing this here
+        // Drain any BLE commands queued by onWrite. Doing this here
         // instead of inside onWrite means the synchronous handlers
         // (SD reads, JSON serialization, notify bursts) run on the
         // main loop task, not on the NimBLE host task. The host
         // task being blocked for >300 ms is what was tripping the
         // BLE supervision timer and disconnecting on req:recipe:load.
-        if (_hasPendingCommand) {
-            String cmd;
-            // Atomic swap-and-clear so a write that races with this
-            // dispatch is just queued for next loop() instead of lost.
-            std::swap(cmd, _pendingCommand);
-            _hasPendingCommand = false;
-            if (cmd.length() > 0) {
-                bus().publish(EventType::BLECommandReceived, cmd);
-            }
+        //
+        // Drain up to CMD_QUEUE_DEPTH per tick so a burst (e.g. the
+        // app firing req:settings:thermal:get + req:settings:cal:get
+        // on connect) clears in one pass instead of trickling out one
+        // command per loop iteration.
+        String cmd;
+        while (popCommand(cmd)) {
+            bus().publish(EventType::BLECommandReceived, cmd);
         }
 
         // Send telemetry periodically
@@ -308,12 +307,51 @@ private:
     String _telemetryBuf;
 
     // Deferred command dispatch — populated from the NimBLE host
-    // task (onWrite), drained from the main task (loop). `volatile`
-    // is enough for the bool: it's a single-word RMW that the ESP32
-    // toolchain emits as one store, and we don't rely on inter-task
-    // ordering beyond "main task notices the flip on its next tick."
-    String          _pendingCommand;
-    volatile bool   _hasPendingCommand = false;
+    // task (onWrite), drained from the main task (loop). SPSC ring
+    // with portMUX critical sections on hardware: previously a single
+    // slot dropped any second command that arrived between two main
+    // loop ticks (e.g. app firing thermal:get + cal:get on connect).
+    static constexpr size_t CMD_QUEUE_DEPTH = 8;
+    String           _cmdQueue[CMD_QUEUE_DEPTH];
+    uint8_t          _cmdHead = 0;
+    uint8_t          _cmdTail = 0;
+    uint8_t          _cmdCount = 0;
+#ifndef SIM_BUILD
+    portMUX_TYPE     _cmdMux = portMUX_INITIALIZER_UNLOCKED;
+#endif
+
+    bool pushCommand(String&& raw) {
+#ifndef SIM_BUILD
+        portENTER_CRITICAL(&_cmdMux);
+#endif
+        bool full = (_cmdCount >= CMD_QUEUE_DEPTH);
+        if (!full) {
+            _cmdQueue[_cmdHead] = std::move(raw);
+            _cmdHead = (_cmdHead + 1) % CMD_QUEUE_DEPTH;
+            _cmdCount++;
+        }
+#ifndef SIM_BUILD
+        portEXIT_CRITICAL(&_cmdMux);
+#endif
+        return !full;
+    }
+
+    bool popCommand(String& out) {
+#ifndef SIM_BUILD
+        portENTER_CRITICAL(&_cmdMux);
+#endif
+        bool empty = (_cmdCount == 0);
+        if (!empty) {
+            out = std::move(_cmdQueue[_cmdTail]);
+            _cmdQueue[_cmdTail] = String();
+            _cmdTail = (_cmdTail + 1) % CMD_QUEUE_DEPTH;
+            _cmdCount--;
+        }
+#ifndef SIM_BUILD
+        portEXIT_CRITICAL(&_cmdMux);
+#endif
+        return !empty;
+    }
 
     // ── NimBLE Server Callbacks ─────────────────────────────
 
@@ -398,18 +436,14 @@ private:
         const char* type = doc[Protocol::FIELD_TYPE] | "";
         DEBUG_PRINTF("[BLE] Command: %s\n", type);
 
-        if (_hasPendingCommand) {
-            // Previous command still queued — drop the new one rather
-            // than overwrite. Clients should serialize requests, but
-            // we'd rather log a drop than silently lose state.
-            DEBUG_PRINTLN("[BLE] command dropped: previous still queued");
-            return;
-        }
-
         String raw;
         serializeJson(doc, raw);
-        _pendingCommand     = std::move(raw);
-        _hasPendingCommand  = true;
+        if (!pushCommand(std::move(raw))) {
+            // Ring full — drop newest. Depth is CMD_QUEUE_DEPTH; if we
+            // overflow that, the consumer side is stuck and dropping is
+            // the lesser evil vs. blocking the NimBLE host task.
+            DEBUG_PRINTLN("[BLE] command dropped: queue full");
+        }
     }
 
     // ── Telemetry ───────────────────────────────────────────
@@ -537,6 +571,27 @@ private:
         if (gState.waitingForConfirm && !isEmptyStr(gState.confirmMessage)) {
             doc["cm"] = (const char*)gState.confirmMessage;
         }
+
+        // Thermal Watchdog status (001-thermal-watchdog T024). Nested
+        // object key avoids short-key collisions documented in DT-01.
+        // Always emitted so the app can render an indicator and detect
+        // firmware that supports the feature.
+        auto wd = doc[Protocol::FIELD_WATCHDOG].to<JsonObject>();
+        wd[Protocol::WD_FIELD_ARMED]      = gState.watchdogArmed;
+        wd[Protocol::WD_FIELD_TRIPPED]    = gState.watchdogTripped;
+        wd[Protocol::WD_FIELD_COUNT]      = gState.watchdogTripCount;
+        if (gState.watchdogLastCause != WatchdogCause::NONE) {
+            wd[Protocol::WD_FIELD_LAST_CAUSE] = getWatchdogCauseName(gState.watchdogLastCause);
+            wd[Protocol::WD_FIELD_LAST_UNIX]  = gState.watchdogLastTripUnix;
+        }
+        wd[Protocol::WD_FIELD_HARD_STOP]        = round2(gState.watchdogHardStopC);
+        wd[Protocol::WD_FIELD_AUTO_RESET]       = gState.watchdogAutoResetEnabled;
+        wd[Protocol::WD_FIELD_SENSOR_FAULT_MS]  = gState.watchdogSensorFaultMs;
+        wd[Protocol::WD_FIELD_LOOP_STUCK_MS]    = gState.watchdogLoopStuckMs;
+        wd[Protocol::WD_FIELD_GRAD_FACTOR]      = gState.watchdogGradFactor;
+        wd[Protocol::WD_FIELD_GRAD_WINDOW]      = gState.watchdogGradWindow;
+        wd[Protocol::WD_FIELD_SAFE_AUTORESET_C] = round2(gState.watchdogSafeAutoresetC);
+        wd[Protocol::WD_FIELD_COOL_MIN_MS]      = gState.watchdogCoolMinMs;
 
         sendJson(doc);
     }

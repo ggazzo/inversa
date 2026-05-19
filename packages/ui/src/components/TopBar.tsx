@@ -11,10 +11,11 @@ import { isStale } from '@inversa/stores';
 import { theme as themeSignal, toggleTheme } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { BleClient } from '@inversa/services';
+import { WatchdogIndicator } from './WatchdogIndicator';
 
 export type MenuId =
     | 'recipes' | 'brewlog' | 'equipment' | 'calibration' | 'connectivity'
-    | 'tuning'  | 'notifications' | 'about' | 'debug';
+    | 'tuning'  | 'notifications' | 'about' | 'debug' | 'watchdog';
 
 const MENU_ITEMS: { id: MenuId; label: string }[] = [
     { id: 'recipes',       label: 'Receitas salvas' },
@@ -23,6 +24,7 @@ const MENU_ITEMS: { id: MenuId; label: string }[] = [
     { id: 'calibration',   label: 'Calibrar sensor' },
     { id: 'connectivity',  label: 'WiFi & OTA' },
     { id: 'tuning',        label: 'PID & AutoTune' },
+    { id: 'watchdog',      label: 'Watchdog Térmico' },
     { id: 'notifications', label: 'Notificações' },
     { id: 'about',         label: 'Sobre' },
     { id: 'debug',         label: 'Debug (BLE trace)' },
@@ -128,6 +130,11 @@ export function TopBar({ onMenuSelect }: Props) {
                     <Text fontSize="$1">{modeLabel.value}</Text>
                 </XStack>
             )}
+
+            {/* Thermal Watchdog chip (001-thermal-watchdog T031). Hidden
+                if disconnected or if the firmware does not advertise the
+                feature. Tap opens the watchdog sheet for full status. */}
+            <WatchdogIndicator onPress={() => onMenuSelect('watchdog')} />
 
             <XStack flex={1} />
 

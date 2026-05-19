@@ -21,6 +21,7 @@
 #include "TimerPlugin.h"
 #include "AutoTunePlugin.h"
 #include "SchedulerPlugin.h"
+#include "ThermalWatchdogPlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -33,7 +34,8 @@ public:
               RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr,
               BoilTimerPlugin* boilTimer = nullptr, RTCPlugin* rtc = nullptr,
               TimerPlugin* timer = nullptr, AutoTunePlugin* autoTune = nullptr,
-              SchedulerPlugin* scheduler = nullptr) {
+              SchedulerPlugin* scheduler = nullptr,
+              ThermalWatchdogPlugin* watchdog = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
@@ -47,6 +49,7 @@ public:
         _timer = timer;
         _autoTune = autoTune;
         _scheduler = scheduler;
+        _watchdog = watchdog;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             // Reuse the same JsonDocument for every inbound command. BLE
@@ -681,6 +684,40 @@ public:
             NVSStorage::instance().saveTempCalibration(slope, offset);
             sendOk(rid);
         }
+        // ── Thermal Watchdog (001-thermal-watchdog) ─────────
+        else if (strcmp(type, Protocol::REQ_WATCHDOG_RESET) == 0) {
+            if (!_watchdog) { sendError(rid, "wd_unavailable"); return; }
+            auto r = _watchdog->requestReset();
+            if (r == ThermalWatchdogPlugin::ResetResult::Accepted) {
+                sendOk(rid);
+            } else if (r == ThermalWatchdogPlugin::ResetResult::NotTripped) {
+                sendError(rid, "wd_not_tripped");
+            } else {
+                sendError(rid, "wd_still_unsafe");
+            }
+        }
+        else if (strcmp(type, Protocol::REQ_WATCHDOG_CONFIG) == 0) {
+            if (!_watchdog) { sendError(rid, "wd_unavailable"); return; }
+            // Start from current config; overlay only the fields present in
+            // the request (partial updates allowed, all-or-nothing on validation).
+            auto cfg = _watchdog->getConfig();
+            if (doc["hard_stop"].is<float>())          cfg.hardStopC       = doc["hard_stop"].as<float>();
+            if (doc["sensor_fault_ms"].is<uint32_t>()) cfg.sensorFaultMs   = doc["sensor_fault_ms"].as<uint32_t>();
+            if (doc["loop_stuck_ms"].is<uint32_t>())   cfg.loopStuckMs     = doc["loop_stuck_ms"].as<uint32_t>();
+            if (doc["grad_factor"].is<int>())          cfg.gradFactor      = (uint8_t)doc["grad_factor"].as<int>();
+            if (doc["grad_window"].is<int>())          cfg.gradWindow      = (uint8_t)doc["grad_window"].as<int>();
+            if (doc["safe_autoreset_c"].is<float>())   cfg.safeAutoresetC  = doc["safe_autoreset_c"].as<float>();
+            if (doc["cool_min_ms"].is<uint32_t>())     cfg.coolMinMs       = doc["cool_min_ms"].as<uint32_t>();
+            if (doc["auto_reset_enabled"].is<bool>())  cfg.autoResetEnabled= doc["auto_reset_enabled"].as<bool>();
+
+            const char* badField = nullptr;
+            if (!ThermalWatchdogPlugin::validateConfig(cfg, &badField)) {
+                String msg = String("wd_range:") + (badField ? badField : "?");
+                sendError(rid, msg); return;
+            }
+            _watchdog->setConfig(cfg);
+            sendOk(rid);
+        }
         // ── Factory Reset (P7, guarded) ─────────────────────
         // Requires {confirm: "ERASE_ALL"} to wipe the NVS namespace.
         else if (strcmp(type, Protocol::REQ_FACTORY_RESET) == 0) {
@@ -711,6 +748,7 @@ private:
     TimerPlugin* _timer = nullptr;
     AutoTunePlugin* _autoTune = nullptr;
     SchedulerPlugin* _scheduler = nullptr;
+    ThermalWatchdogPlugin* _watchdog = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;

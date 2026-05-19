@@ -104,6 +104,10 @@ namespace Protocol {
     constexpr const char* REQ_SCHEDULER_SET   = "req:sched:set";    // {hour, min, temp, vol}
     constexpr const char* REQ_SCHEDULER_STOP  = "req:sched:stop";
 
+    // Thermal Watchdog (app → device) — 001-thermal-watchdog
+    constexpr const char* REQ_WATCHDOG_RESET  = "req:watchdog:reset";   // no args
+    constexpr const char* REQ_WATCHDOG_CONFIG = "req:watchdog:config";  // partial config object
+
     // WiFi Events (device → app)
     constexpr const char* EVT_WIFI_STATUS     = "evt:wifi:status";
 
@@ -138,6 +142,10 @@ namespace Protocol {
     constexpr const char* EVT_AUTOTUNE_STATUS = "evt:autotune:status"; // Progress/status
     constexpr const char* EVT_AUTOTUNE_RESULT = "evt:autotune:result"; // Final Kp, Ki, Kd
 
+    // Thermal Watchdog Events (device → app) — 001-thermal-watchdog
+    constexpr const char* EVT_WATCHDOG_TRIPPED = "evt:watchdog:tripped"; // {cause, temp, unix}
+    constexpr const char* EVT_WATCHDOG_RESET   = "evt:watchdog:reset";   // {auto, prev_cause}
+
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";
     constexpr const char* RES_ERROR         = "res:error";
@@ -166,6 +174,24 @@ namespace Protocol {
     constexpr const char* FIELD_RECIPE_NAME  = "rn";
     constexpr const char* FIELD_TIMER_LEFT   = "tl";
     constexpr const char* FIELD_UPTIME       = "up";
+
+    // Thermal Watchdog telemetry — nested object key + subfields
+    constexpr const char* FIELD_WATCHDOG     = "wd";
+    constexpr const char* WD_FIELD_ARMED       = "a";
+    constexpr const char* WD_FIELD_TRIPPED     = "t";
+    constexpr const char* WD_FIELD_COUNT       = "c";
+    constexpr const char* WD_FIELD_LAST_CAUSE  = "lc";
+    constexpr const char* WD_FIELD_LAST_UNIX   = "lu";
+    constexpr const char* WD_FIELD_HARD_STOP   = "hs";
+    constexpr const char* WD_FIELD_AUTO_RESET  = "ar";
+    // Full config — exposed so the UI can render every editable field
+    // (T032 ext). Keys mirror the JSON accepted by req:watchdog:config.
+    constexpr const char* WD_FIELD_SENSOR_FAULT_MS  = "sfm";
+    constexpr const char* WD_FIELD_LOOP_STUCK_MS    = "lsm";
+    constexpr const char* WD_FIELD_GRAD_FACTOR      = "gf";
+    constexpr const char* WD_FIELD_GRAD_WINDOW      = "gw";
+    constexpr const char* WD_FIELD_SAFE_AUTORESET_C = "sa";
+    constexpr const char* WD_FIELD_COOL_MIN_MS      = "cm";
 
     // Mode values
     constexpr const char* MODE_IDLE          = "idle";

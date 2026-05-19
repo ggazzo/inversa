@@ -73,7 +73,11 @@ public:
     }
 
     void loop() override {
-        if (gState.mode == OperatingMode::Idle) {
+        // Watchdog guard (001-thermal-watchdog T020). Extends the Idle
+        // short-circuit: if the thermal watchdog has latched, hold the
+        // PID output at 0 so any subsequent `PIDOutputChanged` carries
+        // zero, complementing HeaterPlugin's direct GPIO suppression.
+        if (gState.mode == OperatingMode::Idle || gState.watchdogTripped) {
             _output = 0;
             gState.pidOutput = 0;
             return;

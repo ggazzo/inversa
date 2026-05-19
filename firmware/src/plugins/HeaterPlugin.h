@@ -35,6 +35,17 @@ public:
     }
 
     void loop() override {
+        // Thermal Watchdog override (001-thermal-watchdog T019).
+        // When the watchdog latch is active, HeaterPlugin must NEVER
+        // assert HIGH on the SSR, even if _active and a non-zero
+        // _dutyCycle are still present. Same defense-in-depth pattern
+        // as the existing Idle/PID-output guard (RB-06).
+        if (gState.watchdogTripped) {
+            digitalWrite(PIN_HEATER_SSR, LOW);
+            gState.heaterOn = false;
+            return;
+        }
+
         if (!_active) {
             digitalWrite(PIN_HEATER_SSR, LOW);
             gState.heaterOn = false;

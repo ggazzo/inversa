@@ -10,6 +10,14 @@
 // ─── Brew Log Entry ─────────────────────────────────────────
 // Packed so SD round-trips are deterministic across builds.
 // Size: 4 + 4 + 4 + 4 + 1 + 1 = 18 bytes (with packing).
+//
+// TODO(001-thermal-watchdog T004): current schema is a uniform telemetry
+// stream — there is no entry-type variant. Recording discrete events such
+// as WATCHDOG_TRIP (cause + temperature at trip) requires either (a) an
+// additional `uint8_t entryType` byte breaking on-disk compatibility, or
+// (b) a parallel event log file. Decision deferred to a follow-up feature.
+// Until then, watchdog trip context is preserved in NVS (`wd_trip_*`) and
+// surfaced via BLE telemetry/events, which the app can render.
 #pragma pack(push, 1)
 struct BrewLogEntry {
     uint32_t timestamp;   // ms since log start

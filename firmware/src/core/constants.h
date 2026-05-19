@@ -107,3 +107,35 @@
 #define AUTOTUNE_SAMPLE_TIME_MS   500      // Sample interval during tuning
 // Effective lookback = LOOKBACK_SIZE (50) * AUTOTUNE_SAMPLE_TIME_MS (500ms) = 25s
 #define AUTOTUNE_TIMEOUT_MS       3600000  // 1 hour max tuning time
+
+// ─── Thermal Watchdog Configuration ─────────────────────────
+// Independent safety layer that forces SSR off via direct GPIO write
+// (bypasses EventBus and HeaterPlugin) when any of four conditions trip:
+// overtemp, sensor fault timeout, main loop stuck, or adaptive gradient.
+// Defaults are applied when NVS keys (wd_cfg_*) are absent.
+#define WATCHDOG_DEFAULT_HARDSTOP_C        105.0f
+#define WATCHDOG_DEFAULT_SENSOR_FAULT_MS   10000
+#define WATCHDOG_DEFAULT_LOOP_STUCK_MS     5000
+#define WATCHDOG_DEFAULT_GRAD_FACTOR       5         // Trip when |dT| > factor * median(window)
+#define WATCHDOG_DEFAULT_GRAD_WINDOW       20        // Ring buffer length (samples @5Hz = 4s)
+#define WATCHDOG_DEFAULT_SAFE_AUTORESET_C  40.0f
+#define WATCHDOG_DEFAULT_COOL_MIN_MS       300000    // 5 minutes contiguous below T_SAFE
+#define WATCHDOG_SAMPLE_INTERVAL_MS        200       // 5 Hz
+#define WATCHDOG_ISR_INTERVAL_US           100000    // 100 ms loop-stuck check
+#define WATCHDOG_RESET_MARGIN_C            5.0f      // Reset rejected if temp >= hardStop - margin
+
+// Validation ranges (used by CommandHandler::req:watchdog:config)
+#define WATCHDOG_HARDSTOP_MIN_C            80.0f
+#define WATCHDOG_HARDSTOP_MAX_C            130.0f
+#define WATCHDOG_SENSOR_FAULT_MIN_MS       1000
+#define WATCHDOG_SENSOR_FAULT_MAX_MS       60000
+#define WATCHDOG_LOOP_STUCK_MIN_MS         1000
+#define WATCHDOG_LOOP_STUCK_MAX_MS         30000
+#define WATCHDOG_GRAD_FACTOR_MIN           2
+#define WATCHDOG_GRAD_FACTOR_MAX           20
+#define WATCHDOG_GRAD_WINDOW_MIN           5
+#define WATCHDOG_GRAD_WINDOW_MAX           100
+#define WATCHDOG_SAFE_AUTORESET_MIN_C      20.0f
+#define WATCHDOG_SAFE_AUTORESET_MAX_C      80.0f
+#define WATCHDOG_COOL_MIN_MIN_MS           60000
+#define WATCHDOG_COOL_MIN_MAX_MS           1800000

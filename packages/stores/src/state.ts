@@ -99,6 +99,30 @@ export const schedulerStatus = signal('');
 export const autoTuneActive = signal(false);
 export const autoTuneProgress = signal(0);
 
+// ─── Thermal Watchdog State (001-thermal-watchdog) ──────────
+// Driven by the `wd:{...}` nested object inside `evt:status` telemetry,
+// plus the discrete `evt:watchdog:tripped` and `evt:watchdog:reset`
+// events handled in ConnectionManager._handleMessage.
+export const watchdogArmed         = signal(false);
+export const watchdogTripped       = signal(false);
+export const watchdogTripCount     = signal(0);
+export const watchdogLastCause     = signal<string>('');   // 'OVERTEMP' | 'SENSOR_FAULT' | 'LOOP_STUCK' | 'GRADIENT' | 'MANUAL' | ''
+export const watchdogLastTripUnix  = signal(0);
+export const watchdogHardStopC     = signal(105.0);
+export const watchdogAutoReset     = signal(true);
+// Full config mirror — populated from the `wd` object once the firmware
+// reports each field. Defaults match constants.h so the UI renders
+// sensible values before the first telemetry frame.
+export const watchdogSensorFaultMs   = signal(10000);
+export const watchdogLoopStuckMs     = signal(5000);
+export const watchdogGradFactor      = signal(5);
+export const watchdogGradWindow      = signal(20);
+export const watchdogSafeAutoresetC  = signal(40.0);
+export const watchdogCoolMinMs       = signal(300000);
+// True when the firmware emitted at least one `wd` object — used by the
+// UI to know whether to render any watchdog indicator at all.
+export const watchdogSupported     = signal(false);
+
 // ─── Brewing Step (UI visualization) ────────────────────────
 export const brewingStep = signal(0);
 export const brewingStepCustom = signal('');
@@ -361,6 +385,26 @@ export function updateFromTelemetry(data: Record<string, any>): void {
     if (!data.wc) confirmMessage.value = '';
   }
   if (data.cm !== undefined) confirmMessage.value = data.cm;
+
+  // Thermal Watchdog telemetry (001-thermal-watchdog). Nested object
+  // `wd:{a,t,c,lc,lu,hs,ar}` — `lc/lu` may be absent when never tripped.
+  if (data.wd !== undefined) {
+    watchdogSupported.value = true;
+    const wd = data.wd;
+    if (wd.a  !== undefined) watchdogArmed.value        = wd.a;
+    if (wd.t  !== undefined) watchdogTripped.value      = wd.t;
+    if (wd.c  !== undefined) watchdogTripCount.value    = wd.c;
+    if (wd.lc !== undefined) watchdogLastCause.value    = wd.lc;
+    if (wd.lu !== undefined) watchdogLastTripUnix.value = wd.lu;
+    if (wd.hs !== undefined) watchdogHardStopC.value    = wd.hs;
+    if (wd.ar !== undefined) watchdogAutoReset.value    = wd.ar;
+    if (wd.sfm !== undefined) watchdogSensorFaultMs.value  = wd.sfm;
+    if (wd.lsm !== undefined) watchdogLoopStuckMs.value    = wd.lsm;
+    if (wd.gf  !== undefined) watchdogGradFactor.value     = wd.gf;
+    if (wd.gw  !== undefined) watchdogGradWindow.value     = wd.gw;
+    if (wd.sa  !== undefined) watchdogSafeAutoresetC.value = wd.sa;
+    if (wd.cm  !== undefined) watchdogCoolMinMs.value      = wd.cm;
+  }
 
   // Add to history
   addTelemetryPoint(
