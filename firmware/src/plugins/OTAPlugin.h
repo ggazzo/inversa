@@ -248,6 +248,8 @@ private:
     size_t        _downloadSize = 0;
     String        _signatureUrl = "";
     uint32_t      _restartAt    = 0;
+    JsonDocument  _doc;       // Reused by sendStatus() — avoids per-status heap churn.
+    String        _jsonBuf;   // Reused serialize buffer (retains capacity across calls).
 
     // P8 — download `<bin>.sig` into `out` (ECDSA DER, ≤72 bytes).
     bool downloadSignature(uint8_t* out, size_t maxLen, size_t& outLen) {
@@ -290,16 +292,16 @@ private:
     }
 
     void sendStatus() {
-        JsonDocument doc;
-        doc[Protocol::FIELD_TYPE] = Protocol::EVT_OTA_STATUS;
-        doc["st"]  = (const char*)_state.otaStatus;
-        doc["ver"] = (const char*)_state.otaLatestVersion;
-        doc["pct"] = _state.otaProgress;
-        doc["cur"] = BUILD_GIT_VERSION;
-        if (!isEmptyStr(_state.otaError)) doc["err"] = (const char*)_state.otaError;
+        _doc.clear();
+        _doc[Protocol::FIELD_TYPE] = Protocol::EVT_OTA_STATUS;
+        _doc["st"]  = (const char*)_state.otaStatus;
+        _doc["ver"] = (const char*)_state.otaLatestVersion;
+        _doc["pct"] = _state.otaProgress;
+        _doc["cur"] = BUILD_GIT_VERSION;
+        if (!isEmptyStr(_state.otaError)) _doc["err"] = (const char*)_state.otaError;
 
-        String json;
-        serializeJson(doc, json);
-        bus().publish(Event(EventType::BLESend, json));
+        _jsonBuf = "";
+        serializeJson(_doc, _jsonBuf);
+        bus().publish(Event(EventType::BLESend, _jsonBuf));
     }
 };
