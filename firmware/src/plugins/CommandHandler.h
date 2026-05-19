@@ -49,10 +49,13 @@ public:
         _scheduler = scheduler;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
-            JsonDocument doc;
-            DeserializationError err = deserializeJson(doc, e.stringValue);
+            // Reuse the same JsonDocument for every inbound command. BLE
+            // commands are serialized (NimBLE doesn't deliver overlapping
+            // writes), so single-buffer reuse is safe.
+            _doc.clear();
+            DeserializationError err = deserializeJson(_doc, e.stringValue);
             if (err) return;
-            handle(doc);
+            handle(_doc);
         });
 
         DEBUG_PRINTLN("[CommandHandler] Initialized");
@@ -685,14 +688,20 @@ private:
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;
-        JsonDocument doc;
-        doc[Protocol::FIELD_TYPE] = Protocol::RES_OK;
-        doc[Protocol::FIELD_REQUEST_ID] = rid;
-        _ble->sendJson(doc);
+        _replyDoc.clear();
+        _replyDoc[Protocol::FIELD_TYPE] = Protocol::RES_OK;
+        _replyDoc[Protocol::FIELD_REQUEST_ID] = rid;
+        _ble->sendJson(_replyDoc);
     }
 
     void sendError(const String& rid, const String& msg) {
         if (!_ble) return;
         _ble->sendError(rid, msg);
     }
+
+    // Reused docs — _doc is for inbound deserialization, _replyDoc for
+    // outbound sendOk. handle() runs on the EventBus thread, never
+    // reentrant, so single-buffer reuse is safe.
+    JsonDocument _doc;
+    JsonDocument _replyDoc;
 };
