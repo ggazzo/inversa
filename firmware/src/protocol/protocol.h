@@ -43,6 +43,9 @@ namespace Protocol {
     // P13 — persisted thermal params (volume, heater power, ambient, vessel)
     constexpr const char* REQ_SETTINGS_THERMAL_GET = "req:settings:thermal:get";
     constexpr const char* REQ_SETTINGS_THERMAL_SET = "req:settings:thermal:set";
+    // Temperature calibration — linear correction { slope, offset }.
+    constexpr const char* REQ_SETTINGS_CAL_GET     = "req:settings:cal:get";
+    constexpr const char* REQ_SETTINGS_CAL_SET     = "req:settings:cal:set";
     // P7 — guarded factory reset (requires {confirm: "ERASE_ALL"})
     constexpr const char* REQ_FACTORY_RESET = "req:factory:reset";
     constexpr const char* REQ_STATUS        = "req:status";
@@ -142,6 +145,7 @@ namespace Protocol {
     constexpr const char* RES_RECIPE_LOAD   = "res:recipe:load";
     constexpr const char* RES_SETTINGS      = "res:settings";
     constexpr const char* RES_SETTINGS_THERMAL = "res:settings:thermal";
+    constexpr const char* RES_SETTINGS_CAL     = "res:settings:cal";
     constexpr const char* RES_INFO          = "res:info";
 
     // ── JSON Field Names ────────────────────────────────────

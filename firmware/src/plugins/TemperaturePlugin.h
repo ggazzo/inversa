@@ -31,6 +31,11 @@ public:
         }
 
         float filtered = _kalman.updateEstimate(raw);
+        // Apply the user-configured linear calibration AFTER the Kalman
+        // filter so the filter still smooths the raw sensor signal
+        // (operating on the calibrated value would let a fresh offset
+        // edit get interpreted as a slope change for ~1 s).
+        filtered = gState.tempCalSlope * filtered + gState.tempCalOffset;
         gState.currentTemp = filtered;
         gState.tempSensorOk = true;
         bus().publish(EventType::TemperatureRead, filtered);

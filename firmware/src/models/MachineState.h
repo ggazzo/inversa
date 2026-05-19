@@ -192,6 +192,13 @@ struct MachineState {
     float    ambientTemp        = 25.0f;  // Ambient temperature
     float    vesselDiameter     = 0.35f;  // Vessel diameter in meters (~35cm)
     float    heatLossCoeff      = 10.0f;  // Heat transfer coefficient (W/m²K)
+
+    // Temperature calibration: T_real = slope · T_medido + offset.
+    // Default is identity (no correction). Set via req:settings:cal:set,
+    // applied in TemperaturePlugin after the Kalman filter, persisted in
+    // NVS by NVSStorage::saveTempCalibration.
+    float    tempCalSlope       = 1.0f;
+    float    tempCalOffset      = 0.0f;
 };
 
 // Global state — accessible by all plugins

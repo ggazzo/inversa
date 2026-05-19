@@ -64,6 +64,12 @@ void setup() {
                          gState.volumeLiters, gState.heaterPowerWatts, gState.ambientTemp,
                          gState.vesselDiameter, gState.heatLossCoeff);
         }
+        if (nvs.hasTempCalibration()) {
+            gState.tempCalSlope  = nvs.loadTempCalSlope(gState.tempCalSlope);
+            gState.tempCalOffset = nvs.loadTempCalOffset(gState.tempCalOffset);
+            DEBUG_PRINTF("[System] Temp calibration loaded: slope=%.4f offset=%.2f\n",
+                         gState.tempCalSlope, gState.tempCalOffset);
+        }
     }
 
     auto& pm = PluginManager::instance();
