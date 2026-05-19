@@ -49,8 +49,13 @@ private:
             return TEMP_ERROR_VALUE;
         }
 
-        // Voltage divider: NTC on top, reference resistor to GND
-        float resistance = (float)NTC_REFERENCE_RESISTANCE * adcValue / (NTC_ADC_RESOLUTION - adcValue);
+        // Voltage divider: 3.3V → NTC → ADC node → R_ref → GND
+        // (NTC on top, matches the physical Inversa board — confirmed
+        // against develop's NTC_Thermistor_CustomFormula_ESP32 lib,
+        // which uses the same formula).
+        // V_adc = V_supply · R_ref / (R_ntc + R_ref)
+        // ⇒ R_ntc = R_ref · (ADC_MAX − adc) / adc
+        float resistance = (float)NTC_REFERENCE_RESISTANCE * (NTC_ADC_RESOLUTION - adcValue) / adcValue;
 
         // Steinhart-Hart simplified (B-parameter equation)
         float steinhart = resistance / (float)NTC_NOMINAL_RESISTANCE;   // R/R0
