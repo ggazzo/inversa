@@ -42,6 +42,17 @@ public:
             _setpoint = e.floatValue;
         });
 
+        // Cache the cylinder surface area derived from volumeLiters +
+        // vesselDiameter. Both inputs change only via NVS load or BLE
+        // command (SettingsChanged event), so recomputing at 10 Hz on the
+        // hot PID path was pure waste. Recompute lazily on SettingsChanged
+        // and seed once here from the values loaded by main.cpp before
+        // plugin setup().
+        invalidateSurfaceArea();
+        bus().subscribe(EventType::SettingsChanged, [this](const Event&) {
+            invalidateSurfaceArea();
+        });
+
         // Listen for PID param changes
         bus().subscribe(EventType::PIDParamsChanged, [this](const Event& e) {
             // Params sent as JSON string "kp,ki,kd"
@@ -88,11 +99,9 @@ public:
         // Feed-forward: compensate for heat loss
         float ffTerm = 0;
         if (_feedForwardEnabled && _setpoint > gState.ambientTemp) {
-            float surfaceArea = ThermalCalc::cylinderSurfaceArea(
-                gState.volumeLiters, gState.vesselDiameter);
             float ffOutput = ThermalCalc::calculateFeedForward(
                 _setpoint, _input, gState.heaterPowerWatts,
-                gState.volumeLiters, gState.ambientTemp, surfaceArea,
+                gState.volumeLiters, gState.ambientTemp, surfaceArea(),
                 gState.heatLossCoeff);
             ffTerm = ffOutput * _outputMax;
         }
@@ -147,4 +156,28 @@ private:
     uint32_t _sampleTime = 1000;
     uint32_t _lastCompute = 0;
     bool _feedForwardEnabled = true;  // Enable by default
+
+    // Cached surface area + inputs used to compute it. Recomputed lazily
+    // when the inputs change since the last query (handles both
+    // SettingsChanged events and the boot-time load order where NVS
+    // updates gState after our setup() ran).
+    float _cachedSurfaceArea = 0;
+    float _cachedVolumeLiters = 0;
+    float _cachedVesselDiameter = 0;
+
+    void invalidateSurfaceArea() {
+        _cachedVolumeLiters = -1;
+        _cachedVesselDiameter = -1;
+    }
+
+    float surfaceArea() {
+        if (_cachedVolumeLiters    != gState.volumeLiters ||
+            _cachedVesselDiameter  != gState.vesselDiameter) {
+            _cachedVolumeLiters   = gState.volumeLiters;
+            _cachedVesselDiameter = gState.vesselDiameter;
+            _cachedSurfaceArea    = ThermalCalc::cylinderSurfaceArea(
+                _cachedVolumeLiters, _cachedVesselDiameter);
+        }
+        return _cachedSurfaceArea;
+    }
 };
