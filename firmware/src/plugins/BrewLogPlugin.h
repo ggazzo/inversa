@@ -121,36 +121,42 @@ public:
 
     String exportCSV(uint16_t startIdx = 0, uint16_t count = 50) {
         String csv;
+        // ~56 bytes per CSV line + header (40 bytes). Reserve up front to avoid
+        // ~6 reallocations per entry across the `+=` chain below.
+        csv.reserve((size_t)count * 56 + (startIdx == 0 ? 40 : 0));
         if (startIdx == 0) {
             csv = "time_s,temp,target,output,heater,pump\n";
         }
         uint16_t endIdx = min((uint16_t)_size, (uint16_t)(startIdx + count));
         for (uint16_t i = startIdx; i < endIdx; i++) {
             const BrewLogEntry& e = at(i);
-            csv += String(e.timestamp / 1000.0f, 1) + ",";
-            csv += String(e.temp,   2) + ",";
-            csv += String(e.target, 2) + ",";
-            csv += String(e.output, 1) + ",";
-            csv += String(e.heater ? 1 : 0) + ",";
-            csv += String(e.pump   ? 1 : 0) + "\n";
+            char line[64];
+            int n = snprintf(line, sizeof(line), "%.1f,%.2f,%.2f,%.1f,%u,%u\n",
+                             e.timestamp / 1000.0f, e.temp, e.target, e.output,
+                             (unsigned)(e.heater ? 1 : 0),
+                             (unsigned)(e.pump   ? 1 : 0));
+            if (n > 0) csv.concat(line, (size_t)n);
         }
         return csv;
     }
 
     String exportJSON(uint16_t startIdx = 0, uint16_t count = 30) {
         String json;
+        // ~64 bytes per entry + framing. Pre-reserve to collapse N reallocs.
+        json.reserve((size_t)count * 64 + 16);
         if (startIdx == 0) json = "{\"entries\":[";
 
         uint16_t endIdx = min((uint16_t)_size, (uint16_t)(startIdx + count));
         for (uint16_t i = startIdx; i < endIdx; i++) {
             const BrewLogEntry& e = at(i);
-            if (i > startIdx || startIdx > 0) json += ",";
-            json += "{\"t\":" + String(e.timestamp / 1000.0f, 1);
-            json += ",\"c\":" + String(e.temp,   2);
-            json += ",\"s\":" + String(e.target, 2);
-            json += ",\"o\":" + String(e.output, 1);
-            json += ",\"h\":" + String(e.heater ? 1 : 0);
-            json += ",\"p\":" + String(e.pump   ? 1 : 0) + "}";
+            char buf[96];
+            int n = snprintf(buf, sizeof(buf),
+                             "%s{\"t\":%.1f,\"c\":%.2f,\"s\":%.2f,\"o\":%.1f,\"h\":%u,\"p\":%u}",
+                             (i > startIdx || startIdx > 0) ? "," : "",
+                             e.timestamp / 1000.0f, e.temp, e.target, e.output,
+                             (unsigned)(e.heater ? 1 : 0),
+                             (unsigned)(e.pump   ? 1 : 0));
+            if (n > 0) json.concat(buf, (size_t)n);
         }
         if (endIdx >= _size) json += "]}";
         return json;

@@ -63,18 +63,25 @@ namespace ThermalCalc {
     // Includes both convection and radiation losses
     //
     // @param emissivity  Surface emissivity (0.1-0.95, stainless ~0.3, oxidized ~0.8)
+    // pow(x, 4) is ~200 cycles on ESP32; called in the PID feed-forward hot
+    // path (~10 Hz). x*x*x*x folds to two muls, ~10 cycles.
+    inline float pow4f(float x) {
+        float x2 = x * x;
+        return x2 * x2;
+    }
+
     inline float calculateHeatLossWithRadiation(float liquidTemp, float ambientTemp,
                                                  float surfaceArea, float heatTransferCoeff = 10.0f,
                                                  float emissivity = 0.5f) {
         // Convection
         float Q_conv = calculateHeatLoss(liquidTemp, ambientTemp, surfaceArea, heatTransferCoeff);
-        
+
         // Radiation (Stefan-Boltzmann law)
         float T_liquid_K = liquidTemp + 273.15f;
         float T_ambient_K = ambientTemp + 273.15f;
-        float Q_rad = emissivity * STEFAN_BOLTZMANN * surfaceArea * 
-                      (pow(T_liquid_K, 4) - pow(T_ambient_K, 4));
-        
+        float Q_rad = emissivity * STEFAN_BOLTZMANN * surfaceArea *
+                      (pow4f(T_liquid_K) - pow4f(T_ambient_K));
+
         return Q_conv + Q_rad;
     }
 
