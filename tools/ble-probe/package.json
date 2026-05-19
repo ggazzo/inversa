@@ -1,0 +1,19 @@
+{
+    "name": "@inversa/ble-probe",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Real-BLE end-to-end probe — pairs with the Inversa controller via macOS CoreBluetooth (noble), sends req:* commands, prints the matching res:*.",
+    "bin": {
+        "ble-probe": "./probe.mjs"
+    },
+    "scripts": {
+        "start": "node probe.mjs"
+    },
+    "dependencies": {
+        "@abandonware/noble": "^1.9.2-26"
+    },
+    "engines": {
+        "node": ">=22"
+    }
+}
