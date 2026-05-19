@@ -305,29 +305,34 @@ private:
     }
 
     void sendProgress() {
-        JsonDocument doc;
-        doc[Protocol::FIELD_TYPE] = Protocol::EVT_AUTOTUNE_STATUS;
-        doc["active"] = _state.autoTuneActive;
-        doc["progress"] = _state.autoTuneProgress;
-        doc["status"] = (const char*)_state.autoTuneStatus;
-        doc["cycles"] = _cycleCount;
-        doc["setpoint"] = _setpoint;
+        _doc.clear();
+        _doc[Protocol::FIELD_TYPE] = Protocol::EVT_AUTOTUNE_STATUS;
+        _doc["active"] = _state.autoTuneActive;
+        _doc["progress"] = _state.autoTuneProgress;
+        _doc["status"] = (const char*)_state.autoTuneStatus;
+        _doc["cycles"] = _cycleCount;
+        _doc["setpoint"] = _setpoint;
 
-        String json;
-        serializeJson(doc, json);
-        bus().publish(EventType::BLESend, json);
+        _jsonBuf = "";
+        serializeJson(_doc, _jsonBuf);
+        bus().publish(EventType::BLESend, _jsonBuf);
     }
 
     void sendResult(float kp, float ki, float kd) {
-        JsonDocument doc;
-        doc[Protocol::FIELD_TYPE] = Protocol::EVT_AUTOTUNE_RESULT;
-        doc["kp"] = kp;
-        doc["ki"] = ki;
-        doc["kd"] = kd;
-        doc["success"] = true;
+        _doc.clear();
+        _doc[Protocol::FIELD_TYPE] = Protocol::EVT_AUTOTUNE_RESULT;
+        _doc["kp"] = kp;
+        _doc["ki"] = ki;
+        _doc["kd"] = kd;
+        _doc["success"] = true;
 
-        String json;
-        serializeJson(doc, json);
-        bus().publish(EventType::BLESend, json);
+        _jsonBuf = "";
+        serializeJson(_doc, _jsonBuf);
+        bus().publish(EventType::BLESend, _jsonBuf);
     }
+
+    // Reused doc + buffer — sendProgress/sendResult fire each cycle and
+    // previously allocated both per call.
+    JsonDocument _doc;
+    String       _jsonBuf;
 };
