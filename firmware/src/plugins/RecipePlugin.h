@@ -166,7 +166,7 @@ public:
             }
         }
 
-        gState.recipeName = name;
+        setStr(gState.recipeName, name);
         gState.recipeTotalSteps = _commands.size();
         gState.recipeStep = 0;
 
@@ -640,7 +640,7 @@ private:
             case RecipeCommandType::WaitConfirm:
                 gState.recipeState = RecipeState::WaitingForConfirm;
                 gState.waitingForConfirm = true;  // P5
-                gState.confirmMessage = cmd.message;
+                setStr(gState.confirmMessage, cmd.message);
                 bus().publish(EventType::RecipeWaitConfirm, cmd.message);
                 DEBUG_PRINTF("[Recipe] WAIT_CONFIRM: %s\n", cmd.message.c_str());
                 break;
@@ -649,10 +649,10 @@ private:
             case RecipeCommandType::Step:
                 if (cmd.value > 0) {
                     gState.brewingStep = (BrewingStep)(int)cmd.value;
-                    gState.brewingStepCustom = "";
+                    gState.brewingStepCustom[0] = 0;
                 } else {
                     gState.brewingStep = BrewingStep::None;
-                    gState.brewingStepCustom = cmd.message;
+                    setStr(gState.brewingStepCustom, cmd.message);
                 }
                 DEBUG_PRINTF("[Recipe] STEP: %s\n", cmd.message.c_str());
                 advanceStep();

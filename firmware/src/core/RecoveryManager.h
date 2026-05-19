@@ -109,7 +109,7 @@ public:
 
         // Filename — INCLUDING ".txt" extension. P4 fix: stop concatenating
         // ".txt" at resume time; the suffix is authoritative here.
-        strncpy(data.recipeName, gState.recipeName.c_str(), sizeof(data.recipeName) - 1);
+        strncpy(data.recipeName, gState.recipeName, sizeof(data.recipeName) - 1);
         data.recipeName[sizeof(data.recipeName) - 1] = 0;
 
         data.currentStep            = gState.recipeStep;

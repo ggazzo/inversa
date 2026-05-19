@@ -108,7 +108,7 @@ void setup() {
             DEBUG_PRINTF("[System] Recovery available: '%s' step %d/%d\n", 
                          recoveryData.recipeName, recoveryData.currentStep, recoveryData.totalSteps);
             gState.hasRecoveryData = true;
-            gState.recoveryRecipeName = String(recoveryData.recipeName);
+            setStr(gState.recoveryRecipeName, recoveryData.recipeName);
             // Notify app via BLE when client connects (handled in BLEPlugin)
         }
     }

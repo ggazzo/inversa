@@ -25,8 +25,8 @@ public:
 
         // Load stored SSID for display (don't auto-connect)
         if (NVSStorage::instance().hasWiFiCredentials()) {
-            _state.wifiConfiguredSSID = NVSStorage::instance().getWiFiSSID();
-            DEBUG_PRINTF("[WiFi] Stored SSID: %s\n", _state.wifiConfiguredSSID.c_str());
+            setStr(_state.wifiConfiguredSSID, NVSStorage::instance().getWiFiSSID());
+            DEBUG_PRINTF("[WiFi] Stored SSID: %s\n", _state.wifiConfiguredSSID);
         }
 
         // Register WiFi events
@@ -43,7 +43,7 @@ public:
         if (_connecting && millis() - _connectStartTime > WIFI_CONNECT_TIMEOUT_MS) {
             _connecting = false;
             _state.wifiConnected = false;
-            _state.otaError = "WiFi connection timeout";
+            setStr(_state.otaError, "WiFi connection timeout");
             DEBUG_PRINTLN("[WiFi] Connection timeout");
             sendWiFiStatus();
         }
@@ -53,7 +53,7 @@ public:
 
     void configure(const String& ssid, const String& password) {
         NVSStorage::instance().saveWiFiCredentials(ssid, password);
-        _state.wifiConfiguredSSID = ssid;
+        setStr(_state.wifiConfiguredSSID, ssid);
         DEBUG_PRINTF("[WiFi] Credentials saved for: %s\n", ssid.c_str());
     }
 
@@ -65,7 +65,7 @@ public:
         }
 
         if (!NVSStorage::instance().hasWiFiCredentials()) {
-            _state.otaError = "No WiFi credentials configured";
+            setStr(_state.otaError, "No WiFi credentials configured");
             DEBUG_PRINTLN("[WiFi] No credentials stored");
             sendWiFiStatus();
             return;
@@ -87,8 +87,8 @@ public:
         _connecting = false;
         WiFi.disconnect(true);
         _state.wifiConnected = false;
-        _state.wifiSSID = "";
-        _state.wifiIP = "";
+        _state.wifiSSID[0] = 0;
+        _state.wifiIP[0]   = 0;
         sendWiFiStatus();
     }
 
@@ -108,14 +108,14 @@ public:
         JsonDocument doc;
         doc[Protocol::FIELD_TYPE] = Protocol::EVT_WIFI_STATUS;
         doc["conn"] = _state.wifiConnected;
-        doc["ssid"] = _state.wifiSSID;
-        doc["ip"] = _state.wifiIP;
-        doc["cfg"] = _state.wifiConfiguredSSID;  // Configured SSID
+        doc["ssid"] = (const char*)_state.wifiSSID;
+        doc["ip"]   = (const char*)_state.wifiIP;
+        doc["cfg"]  = (const char*)_state.wifiConfiguredSSID;  // Configured SSID
         if (status) {
             doc["st"] = status;
         }
-        if (_state.otaError.length() > 0) {
-            doc["err"] = _state.otaError;
+        if (!isEmptyStr(_state.otaError)) {
+            doc["err"] = (const char*)_state.otaError;
         }
 
         String json;
@@ -133,10 +133,10 @@ private:
             case ARDUINO_EVENT_WIFI_STA_GOT_IP:
                 _connecting = false;
                 _state.wifiConnected = true;
-                _state.wifiSSID = WiFi.SSID();
-                _state.wifiIP = WiFi.localIP().toString();
-                _state.otaError = "";
-                DEBUG_PRINTF("[WiFi] Connected! IP: %s\n", _state.wifiIP.c_str());
+                setStr(_state.wifiSSID, WiFi.SSID());
+                setStr(_state.wifiIP,   WiFi.localIP().toString());
+                _state.otaError[0] = 0;
+                DEBUG_PRINTF("[WiFi] Connected! IP: %s\n", _state.wifiIP);
                 sendWiFiStatus();
                 bus().publish(EventType::WiFiConnected);
                 break;
@@ -145,8 +145,8 @@ private:
                 if (_state.wifiConnected) {
                     DEBUG_PRINTLN("[WiFi] Disconnected");
                     _state.wifiConnected = false;
-                    _state.wifiSSID = "";
-                    _state.wifiIP = "";
+                    _state.wifiSSID[0] = 0;
+                    _state.wifiIP[0]   = 0;
                     sendWiFiStatus();
                     bus().publish(EventType::WiFiDisconnected);
                 }
