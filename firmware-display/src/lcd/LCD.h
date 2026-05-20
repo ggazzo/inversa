@@ -41,12 +41,19 @@ constexpr int LCD_H = 320;
 
 // LovyanGFX device subclass — bound at compile time so the panel/bus
 // init runs without runtime dispatch.
+//
+// NOTE — LovyanGFX 1.2.21 ships no first-class Panel_JD9853; we use
+// Panel_ST7789 as the closest compatible driver (same SPI command set
+// for the 172×320 init path that Waveshare ships). If colors look
+// wrong on real hardware, drop the bespoke init bytes from Waveshare's
+// reference firmware into a custom subclass — typed-out init sequence
+// goes in writeCommand_impl. TODO before shipping to brewery.
 class WaveshareS3Lcd : public lgfx::LGFX_Device {
 public:
     WaveshareS3Lcd();
 
 private:
-    lgfx::Panel_JD9853       _panel;
+    lgfx::Panel_ST7789       _panel;
     lgfx::Bus_SPI            _bus;
     lgfx::Light_PWM          _light;
 };
