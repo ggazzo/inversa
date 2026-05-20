@@ -125,3 +125,32 @@ bench` is harmless without a connected ESP.
 
 Each case is self-cleaning (`resetState` at entry) so a failure in one
 doesn't poison the next.
+
+### Manual UI suite
+
+Opt-in cases that pause for visual verification or actual taps in the
+connected PWA. Useful for validating app wiring end to end against real
+firmware.
+
+```bash
+HIL_MANUAL=1 HIL_PORT=/dev/cu.usbmodem<XXX> npm run bench -- --test-name-pattern "manual UI"
+```
+
+Per-prompt timeout (default 60 s):
+
+```bash
+HIL_MANUAL=1 HIL_MANUAL_TIMEOUT=120 HIL_PORT=... npm run bench -- --test-name-pattern "manual UI"
+```
+
+Cases (6):
+
+- **transitions** — recipe started → step → completed shows in UI
+- **confirm dialog** — WAIT_CONFIRM unblocks when you tap confirm
+- **pause/resume** — app buttons drive the firmware state
+- **hop alerts** — ADD_HOP fires `evt:boil:addition` notifications
+- **watchdog warning** — trip is visible, reset clears it
+- **step label** — STEP "name" displays in the UI
+
+Each case prints what the operator should see and what to do, then
+asserts the firmware-side reaction. Without `HIL_MANUAL=1` the entire
+`manual UI` describe is skipped.

@@ -456,5 +456,188 @@ async function runBench(port: string): Promise<void> {
         assert.ok(payload.total >= 3, `total should be ≥3, got ${payload.total}`);
       });
     });
+
+    // ── Manual UI suite (opt-in via HIL_MANUAL=1) ──────────────
+    // Cases here pause for visual verification or actual taps in the
+    // connected PWA. Each prints what the operator should see and what
+    // to do, then asserts the firmware-side reaction (BLE event arrives,
+    // recipe advances, etc.).
+    //
+    // Run only these:
+    //   HIL_MANUAL=1 HIL_PORT=... npm run bench -- --test-name-pattern manual
+    //
+    // Per-test wait timeout overrideable: HIL_MANUAL_TIMEOUT=<seconds>.
+    const MANUAL = process.env.HIL_MANUAL === "1";
+    const MANUAL_TIMEOUT_MS = Number(process.env.HIL_MANUAL_TIMEOUT ?? "60") * 1000;
+    const prompt = (msg: string): void => {
+      process.stderr.write(`\n  ⏸  ${msg}\n`);
+    };
+
+    describe("manual UI", { skip: !MANUAL }, () => {
+      test("UI shows recipe transitions: started → step → completed", async () => {
+        await conn.resetState();
+        conn.send({ cmd: "watchdog", op: "detections", enable: false });
+        conn.drain();
+        const dsl = 'STEP "Pre-aquec"\nSET_TEMP 50\nWAIT_TEMP 1.0\nSTEP "Fim"\nHEATER_OFF';
+        conn.send({ cmd: "recipe", op: "load", name: "ui-flow", content: dsl });
+        await conn.waitFor((m) => m.event === "ack" && m.ok === true);
+        prompt(
+          'open the app. You should see the recipe go through:\n' +
+          '     start → step "Pre-aquec" → setpoint 50°C → step "Fim" → completed.\n' +
+          '     The bench will drive the NTC to satisfy WAIT_TEMP.'
+        );
+        conn.send({ cmd: "recipe", op: "start" });
+        await conn.sleep(2000);
+        for (let t = 25; t <= 50; t += 5) {
+          conn.send({ cmd: "set", path: "ntc.c", value: t });
+          await conn.sleep(1200);
+        }
+        await conn.waitFor(
+          (f) => isBleFrame(f, "evt:recipe:state") && (f.strValue as string).includes("completed"),
+          MANUAL_TIMEOUT_MS,
+        );
+      });
+
+      test("UI confirm dialog: WAIT_CONFIRM unblocks when you tap confirm", async () => {
+        await conn.resetState();
+        conn.send({ cmd: "watchdog", op: "detections", enable: false });
+        conn.drain();
+        const dsl =
+          'STEP "pre"\nSET_TEMP 30\nWAIT_TEMP 5.0\nWAIT_CONFIRM "Adicione 10L de água"\nSTEP "post"\nHEATER_OFF';
+        conn.send({ cmd: "recipe", op: "load", name: "ui-wc", content: dsl });
+        await conn.waitFor((m) => m.event === "ack" && m.ok === true);
+        conn.send({ cmd: "recipe", op: "start" });
+        conn.send({ cmd: "set", path: "ntc.c", value: 30 });
+        const wait = await conn.waitFor(
+          (f) => isBleFrame(f, "evt:recipe:wait"),
+          5000,
+        );
+        const msg = JSON.parse(wait.strValue as string) as { msg?: string };
+        prompt(
+          `confirmation dialog should appear in the app with text: "${msg.msg ?? ""}".\n` +
+          `     Tap "Confirmar" — recipe should complete and reach the "post" step.`
+        );
+        await conn.waitFor(
+          (f) =>
+            isBleFrame(f, "evt:recipe:state") &&
+            (f.strValue as string).includes("completed"),
+          MANUAL_TIMEOUT_MS,
+        );
+      });
+
+      test("UI pause/resume: app drives pause + resume from buttons", async () => {
+        await conn.resetState();
+        conn.send({ cmd: "watchdog", op: "detections", enable: false });
+        conn.drain();
+        conn.send({
+          cmd: "recipe",
+          op: "load",
+          name: "ui-pause",
+          content: 'STEP "long hold"\nWAIT_TIMER 10\nSTEP "done"\nHEATER_OFF',
+        });
+        await conn.waitFor((m) => m.event === "ack" && m.ok === true);
+        conn.send({ cmd: "recipe", op: "start" });
+        await conn.waitFor(
+          (f) => isBleFrame(f, "evt:recipe:state") && (f.strValue as string).includes("started"),
+          2000,
+        );
+        prompt(
+          'tap the PAUSE button in the app. The state pill should switch to "paused".\n' +
+          '     Then tap RESUME — the state should go back to "running".'
+        );
+        await conn.waitFor(
+          (f) => isBleFrame(f, "evt:recipe:state") && (f.strValue as string).includes("paused"),
+          MANUAL_TIMEOUT_MS,
+        );
+        prompt('paused observed. Now tap RESUME in the app.');
+        await conn.waitFor(
+          (f) => isBleFrame(f, "evt:recipe:state") && (f.strValue as string).includes("resumed"),
+          MANUAL_TIMEOUT_MS,
+        );
+        conn.send({ cmd: "recipe", op: "stop" });
+      });
+
+      test("UI hop alerts: ADD_HOP fires evt:boil:addition during BOIL", async () => {
+        await conn.resetState();
+        conn.send({ cmd: "watchdog", op: "detections", enable: false });
+        conn.drain();
+        const dsl = [
+          'STEP "Pre-fervura"', "SET_TEMP 100", "WAIT_TEMP 2.0",
+          'STEP "Fervura"',
+          'ADD_HOP 2 "Magnum 30g"',
+          'ADD_HOP 1 "Cascade 40g"',
+          "BOIL 2", "WAIT_BOIL",
+          'STEP "Fim"', "HEATER_OFF",
+        ].join("\n");
+        conn.send({ cmd: "recipe", op: "load", name: "ui-hops", content: dsl });
+        await conn.waitFor((m) => m.event === "ack" && m.ok === true);
+        prompt(
+          'watch the app during boil. You should see two hop addition notifications\n' +
+          '     ("Magnum 30g" then "Cascade 40g"). The bench will ramp NTC and advance\n' +
+          '     virtual time through the boil window.'
+        );
+        conn.send({ cmd: "recipe", op: "start" });
+        for (let t = 25; t <= 100; t += 5) {
+          conn.send({ cmd: "set", path: "ntc.c", value: t });
+          await conn.sleep(800);
+        }
+        conn.send({ cmd: "clock", op: "advance", ms: 130_000 });
+        await conn.waitFor(
+          (f) => isBleFrame(f, "evt:recipe:state") && (f.strValue as string).includes("completed"),
+          MANUAL_TIMEOUT_MS,
+        );
+      });
+
+      test("UI watchdog warning: trip is visible and reset clears it", async () => {
+        await conn.resetState();
+        conn.drain();
+        prompt(
+          'about to force a watchdog trip (cause OVERTEMP).\n' +
+          '     The app should show a safety banner / warning state.\n' +
+          '     Then the bench resets — banner should clear.'
+        );
+        conn.send({ cmd: "force", path: "watchdog.trip", value: "OVERTEMP" });
+        await conn.waitFor(
+          (f) => f.event === "bus" && f.type === "WatchdogTripped",
+          2000,
+        );
+        prompt('warning should be visible now. Holding 8 s so you can inspect it.');
+        await conn.sleep(8000);
+        conn.send({ cmd: "force", path: "watchdog.reset" });
+        await conn.waitFor(
+          (f) => f.event === "bus" && f.type === "WatchdogReset",
+          MANUAL_TIMEOUT_MS,
+        );
+        prompt('warning should have cleared in the app now.');
+        await conn.sleep(3000);
+      });
+
+      test("UI step name: app displays the current STEP label", async () => {
+        await conn.resetState();
+        conn.send({ cmd: "watchdog", op: "detections", enable: false });
+        conn.drain();
+        const dsl = [
+          'STEP "Mostura 65°C"',  "SET_TEMP 65",  "WAIT_TEMP 1.0", "WAIT_TIMER 1",
+          'STEP "Mash-out 76°C"', "MASH_OUT 76",  "WAIT_TEMP 1.0",
+          'STEP "Fim"',            "HEATER_OFF",
+        ].join("\n");
+        conn.send({ cmd: "recipe", op: "load", name: "ui-steps", content: dsl });
+        await conn.waitFor((m) => m.event === "ack" && m.ok === true);
+        prompt(
+          'app should display the step label changing:\n' +
+          '     "Mostura 65°C" → "Mash-out 76°C" → "Fim".\n' +
+          '     (drives NTC and advances the timer automatically)'
+        );
+        conn.send({ cmd: "recipe", op: "start" });
+        for (let t = 25; t <= 65; t += 5) { conn.send({ cmd: "set", path: "ntc.c", value: t }); await conn.sleep(900); }
+        conn.send({ cmd: "clock", op: "advance", ms: 65000 });
+        await conn.sleep(2000);
+        for (let t = 67; t <= 76; t += 3) { conn.send({ cmd: "set", path: "ntc.c", value: t }); await conn.sleep(900); }
+        await conn.waitFor(
+          (f) => isBleFrame(f, "evt:recipe:state") && (f.strValue as string).includes("completed"),
+          MANUAL_TIMEOUT_MS,
+        );
+      });
+    });
   });
 }
