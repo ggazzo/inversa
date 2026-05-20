@@ -11,8 +11,13 @@ import { signal as createSignal } from '@preact/signals-react';
 import { Button, Text, YStack } from 'tamagui';
 import { boilAlerts } from '@inversa/stores';
 
-const activeAlert = createSignal<any | null>(null);
-const lastSeenCount = createSignal<number>(0);
+// Index of the next alert in `boilAlerts` that the operator still has
+// to acknowledge. When confirmedCount === boilAlerts.length the overlay
+// is hidden. When more alerts arrive while one is on screen they queue
+// up behind it — previously the overlay always jumped to the latest and
+// silently swallowed earlier ones.
+const confirmedCount = createSignal<number>(0);
+const lastAlertedCount = createSignal<number>(0);
 
 export function HopAlertOverlay() {
     useSignals();
@@ -27,9 +32,14 @@ export function HopAlertOverlay() {
     const count = boilAlerts.value.length;
 
     useEffect(() => {
-        if (count > lastSeenCount.value) {
-            activeAlert.value = boilAlerts.value[count - 1];
-            lastSeenCount.value = count;
+        // Reset when the alert list shrinks (e.g., new recipe started).
+        if (count < lastAlertedCount.value) {
+            confirmedCount.value = 0;
+            lastAlertedCount.value = count;
+            return;
+        }
+        if (count > lastAlertedCount.value) {
+            lastAlertedCount.value = count;
 
             // Vibration: RN's Vibration.vibrate takes a pattern array
             // and accepts identical args on iOS/Android. On web,
@@ -55,8 +65,11 @@ export function HopAlertOverlay() {
         }
     }, [count]);
 
-    const alert = activeAlert.value;
+    // Queue: show the oldest unacked alert; nothing if all are acked.
+    const idx = confirmedCount.value;
+    const alert = idx < count ? boilAlerts.value[idx] : null;
     if (!alert) return null;
+    const pendingAfter = count - idx - 1;
 
     return (
         // Fullscreen takeover. `position: fixed` is web-only; on RN
@@ -81,9 +94,14 @@ export function HopAlertOverlay() {
             <Text fontSize="$5" color="black" opacity={0.8}>
                 @ {alert.min} min restantes
             </Text>
+            {pendingAfter > 0 && (
+                <Text fontSize="$4" color="black" opacity={0.7}>
+                    +{pendingAfter} adição{pendingAfter > 1 ? 'ões' : ''} na fila
+                </Text>
+            )}
             <Button size="$6" theme="dark"
                 width="100%" maxWidth={420} height={80}
-                onPress={() => { activeAlert.value = null; }}>
+                onPress={() => { confirmedCount.value = idx + 1; }}>
                 <Text fontSize="$6">Adicionei ✓</Text>
             </Button>
         </YStack>

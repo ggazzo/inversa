@@ -561,27 +561,41 @@ async function runBench(port: string): Promise<void> {
         await conn.resetState();
         conn.send({ cmd: "watchdog", op: "detections", enable: false });
         conn.drain();
+        // Two ADD_HOPs at distinct minute marks. Boil runs for 4 min so
+        // alerts at min=3 and min=1 fire two real boil-ticks apart. We
+        // advance the virtual clock in 30 s chunks with a real-wall
+        // sleep between each, so the app sees the two alerts arrive
+        // spaced out (vs. all in a single millisecond burst — which
+        // collapses some UIs).
         const dsl = [
           'STEP "Pre-fervura"', "SET_TEMP 100", "WAIT_TEMP 2.0",
           'STEP "Fervura"',
-          'ADD_HOP 2 "Magnum 30g"',
+          'ADD_HOP 3 "Magnum 30g"',
           'ADD_HOP 1 "Cascade 40g"',
-          "BOIL 2", "WAIT_BOIL",
+          "BOIL 4", "WAIT_BOIL",
           'STEP "Fim"', "HEATER_OFF",
         ].join("\n");
         conn.send({ cmd: "recipe", op: "load", name: "ui-hops", content: dsl });
         await conn.waitFor((m) => m.event === "ack" && m.ok === true);
         prompt(
-          'watch the app during boil. You should see two hop addition notifications\n' +
-          '     ("Magnum 30g" then "Cascade 40g"). The bench will ramp NTC and advance\n' +
-          '     virtual time through the boil window.'
+          'watch the app during boil. You should see TWO hop additions arrive\n' +
+          '     ~10 s apart (real time): first "Magnum 30g", then "Cascade 40g".\n' +
+          '     Confirm each individually — the bench will not auto-progress beyond\n' +
+          '     the second alert until both notifications have been delivered.'
         );
         conn.send({ cmd: "recipe", op: "start" });
+        // Land at boil temp.
         for (let t = 25; t <= 100; t += 5) {
           conn.send({ cmd: "set", path: "ntc.c", value: t });
           await conn.sleep(800);
         }
-        conn.send({ cmd: "clock", op: "advance", ms: 130_000 });
+        // Slice the advance so the firmware ticks the boil timer in
+        // pieces, letting each ADD_HOP fire on a distinct wall-clock
+        // moment.
+        for (let i = 0; i < 9; i++) {
+          conn.send({ cmd: "clock", op: "advance", ms: 30_000 });
+          await conn.sleep(5000);
+        }
         await conn.waitFor(
           (f) => isBleFrame(f, "evt:recipe:state") && (f.strValue as string).includes("completed"),
           MANUAL_TIMEOUT_MS,
