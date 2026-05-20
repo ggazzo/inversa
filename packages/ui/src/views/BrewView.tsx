@@ -46,15 +46,9 @@ function deriveSubState(): Sub {
     if (lossTuneActive.value
         || lossTunePhase.value === 'RESULT'
         || lossTunePhase.value === 'ERROR') return 'losstune';
-    // UI-side intent: user tapped "Modo Manual" from Idle. Firmware
-    // only flips to Manual after req:set-temp / req:heater:on (which
-    // the user sends *from* the Manual view), so without this the
-    // first telemetry tick after the tap kicks them back to Idle.
-    // `manualIntent` is cleared by ConnectionManager on disconnect
-    // and by updateFromTelemetry once firmware reports any non-idle
-    // mode.
-    if (mode.value === 'manual' || manualIntent.value) return 'manual';
-
+    // Recipe in flight wins over scheduler — once a recipe is executing,
+    // its own state machine owns the heater and the scheduler's flag is
+    // moot until the recipe ends.
     if (mode.value === 'recipe' &&
         recipeState.value !== 'idle' && recipeState.value !== 'completed') {
         if (recipeState.value === 'paused')          return 'paused';
@@ -65,11 +59,21 @@ function deriveSubState(): Sub {
         return 'mash';
     }
 
-    // Scheduler armed and nothing else is running. The home screen
-    // becomes a single big "Cancelar" so the operator doesn't kick off
-    // a manual run or a recipe that would collide with the scheduled
-    // heat-up at the target time.
+    // Scheduler armed — owns the home screen even while the firmware
+    // has flipped mode=Manual to actually heat (P17 in
+    // SchedulerPlugin::startHeating). Otherwise the Cancel button
+    // disappears the moment heating starts, which was a regression
+    // operators reported.
     if (schedulerActive.value) return 'scheduled';
+
+    // UI-side intent: user tapped "Modo Manual" from Idle. Firmware
+    // only flips to Manual after req:set-temp / req:heater:on (which
+    // the user sends *from* the Manual view), so without this the
+    // first telemetry tick after the tap kicks them back to Idle.
+    // `manualIntent` is cleared by ConnectionManager on disconnect
+    // and by updateFromTelemetry once firmware reports any non-idle
+    // mode.
+    if (mode.value === 'manual' || manualIntent.value) return 'manual';
 
     return 'idle';
 }
