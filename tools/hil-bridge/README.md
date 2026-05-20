@@ -92,27 +92,36 @@ Wire it into `src/scenarios/index.ts` so `run scenario <name>` finds it.
 
 ## Bench suite
 
-End-to-end checks against a real ESP running the HIL firmware. One
-command, one PASS/FAIL line per test, exit code reflects the result.
+End-to-end `node:test` suite that runs the full HIL contract against a
+real ESP.
 
 ```bash
-npm run bench -- --port /dev/cu.usbmodem<XXX>
+HIL_PORT=/dev/cu.usbmodem<XXX> npm run bench
 ```
 
-Filter to a group or a name substring:
+Filter to a subset via node:test's own `--test-name-pattern`:
 
 ```bash
-npm run bench -- --port /dev/cu.usbmodem<XXX> --group recipe
-npm run bench -- --port /dev/cu.usbmodem<XXX> --only WAIT_CONFIRM
+HIL_PORT=/dev/cu.usbmodem<XXX> npm run bench -- --test-name-pattern recipe
+HIL_PORT=/dev/cu.usbmodem<XXX> npm run bench -- --test-name-pattern WAIT_CONFIRM
 ```
 
-Coverage today (14 cases):
+If `HIL_PORT` is unset, the suite emits a single `skip` so `npm run
+bench` is harmless without a connected ESP.
 
-- **connection**: hello + state shape
-- **sensors**: NTC override, ambient override
-- **clock**: advance, freeze, virtual RTC epoch
-- **watchdog**: force OVERTEMP, force reset, detections off bypasses
-  gradient, clock advance does not trip LOOP_STUCK
-- **errors**: unknown cmd, unknown force path
-- **recipe**: load + start + step + completed, WAIT_CONFIRM blocks
-  until confirm
+### Coverage (25 cases)
+
+- **connection** — state frame shape
+- **sensors** — NTC override, ntc.bypassKalman lands without Kalman lag,
+  ambient override + ok flag
+- **clock** — advance, freeze, unfreeze, RTC virtual epoch
+- **watchdog** — force OVERTEMP / MANUAL / PIN_STUCK alias, reset, detections
+  off suppresses gradient, clock advance does not trip LOOP_STUCK
+- **subscriptions** — sub state hz emits + caps + 0 stops, sub events relays
+- **errors** — unknown_cmd, unknown_force_path, still_unsafe on reset
+- **recipe** — load + start + step + completed, WAIT_TIMER advances via
+  virtual clock, WAIT_CONFIRM blocks until confirm, pause + resume,
+  BLE notify shape for `evt:recipe:step`
+
+Each case is self-cleaning (`resetState` at entry) so a failure in one
+doesn't poison the next.

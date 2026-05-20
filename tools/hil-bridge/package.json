@@ -13,7 +13,7 @@
     "typecheck": "tsc --noEmit",
     "start": "tsx src/cli.ts",
     "hil-bridge": "tsx src/cli.ts",
-    "bench": "tsx src/bench.ts"
+    "bench": "node --test --import tsx bench/hil.test.ts"
   },
   "dependencies": {
     "serialport": "^12.0.0",
