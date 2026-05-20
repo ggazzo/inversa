@@ -81,7 +81,15 @@ static void disp_flush_cb(lv_display_t* disp, const lv_area_t* area, uint8_t* px
 
 void lcd_init() {
     s_lcd.init();
-    s_lcd.setBrightness(180);
+    s_lcd.setBrightness(255);
+
+    // Bring-up smoke test — flash red/green/blue/black quickly so the
+    // operator can verify the panel + backlight are wired correctly
+    // before LVGL takes over. Removable once the device is in the
+    // field; for now it's the fastest "did anything happen" signal.
+    s_lcd.fillScreen(TFT_RED);   delay(200);
+    s_lcd.fillScreen(TFT_GREEN); delay(200);
+    s_lcd.fillScreen(TFT_BLUE);  delay(200);
     s_lcd.fillScreen(TFT_BLACK);
 
     lv_init();

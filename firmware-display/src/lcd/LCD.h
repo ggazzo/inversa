@@ -21,19 +21,25 @@ namespace inversa { namespace display {
 // Pin map — verified against the Waveshare ESP32-S3 1.47" "LCD Touch"
 // schematic. If you have the SD-only variant, the pins differ; see the
 // README at firmware-display/README.md for the override knobs.
+// Pin map per the Waveshare ESP32-S3-Touch-LCD-1.47 wiki schematic
+// (rev 1.0, JD9853 + AXS5106L). If your board silkscreen differs (older
+// pre-touch rev or third-party clone) tweak the constants here.
+// Pin map matches the VolosR/Wave147moreExamples reference for the
+// Waveshare ESP32-S3-Touch-LCD-1.47, JD9853 + AXS5106L variant.
+// LCD_RST is shared with TP_RST on this board, so we leave trst at -1
+// and let LovyanGFX pulse the reset line during lcd_init.
 struct LcdPins {
-    static constexpr int sck   = 12;
-    static constexpr int mosi  = 11;
-    static constexpr int miso  = -1;  // not used by JD9853
-    static constexpr int dc    = 8;
-    static constexpr int cs    = 10;
-    static constexpr int rst   = 9;
-    static constexpr int bl    = 7;   // backlight
-    // Touch (I2C, AXS5106L) — Waveshare ESP32-S3-Touch-LCD-1.47 wiring.
-    static constexpr int sda   = 1;
-    static constexpr int scl   = 3;
-    static constexpr int tirq  = 4;
-    static constexpr int trst  = -1;  // shared with LCD_RST on this board
+    static constexpr int sck   = 38;
+    static constexpr int mosi  = 39;
+    static constexpr int miso  = -1;
+    static constexpr int dc    = 45;
+    static constexpr int cs    = 21;
+    static constexpr int rst   = 47;
+    static constexpr int bl    = 46;
+    static constexpr int sda   = 42;
+    static constexpr int scl   = 41;
+    static constexpr int tirq  = 48;
+    static constexpr int trst  = -1;  // shared with LCD_RST on pin 47
 };
 
 constexpr int LCD_W = 172;

@@ -34,22 +34,38 @@ bool probe(uint8_t addr) {
     return Wire.endTransmission() == 0;
 }
 
+// AXS5106L proper read protocol (mirrors Espressif's
+// esp_lcd_touch_axs5106l component): write an 8-byte read-touch command,
+// then read 14 bytes containing up to 1 point. A naive register read
+// (write addr, read N) NACKs every time — the chip ignores anything
+// that's not the magic command sequence.
 void readPoint() {
     if (!s_detected) return;
+    static const uint8_t READ_CMD[8] = {
+        0xB5, 0xAB, 0xA5, 0x5A, 0x00, 0x00, 0x00, 0x08
+    };
+
     Wire.beginTransmission(s_addr);
-    Wire.write(uint8_t(0x01));  // status register
-    if (Wire.endTransmission(false) != 0) {
+    Wire.write(READ_CMD, sizeof(READ_CMD));
+    if (Wire.endTransmission() != 0) {
         s_pressed = false;
         return;
     }
-    Wire.requestFrom(s_addr, uint8_t(8));
-    uint8_t buf[8] = {0};
-    for (size_t i = 0; i < 8 && Wire.available(); ++i) buf[i] = Wire.read();
 
-    uint8_t count = buf[0] >> 4;
+    uint8_t buf[14] = {0};
+    size_t got = Wire.requestFrom(s_addr, uint8_t(sizeof(buf)));
+    for (size_t i = 0; i < got && Wire.available(); ++i) buf[i] = Wire.read();
+    if (got < 6) { s_pressed = false; return; }
+
+    // Layout from the BSP driver:
+    //   buf[1] high nibble = touch count (0 / 1)
+    //   buf[2] high nibble | buf[3] = X (12 bit)
+    //   buf[4] high nibble | buf[5] = Y (12 bit)
+    uint8_t count = (buf[1] & 0x0F);
     if (count == 0) { s_pressed = false; return; }
-    s_x = ((uint16_t(buf[4] & 0x0F) << 8) | buf[5]);
-    s_y = ((uint16_t(buf[6] & 0x0F) << 8) | buf[7]);
+
+    s_x = (uint16_t(buf[2] & 0x0F) << 8) | buf[3];
+    s_y = (uint16_t(buf[4] & 0x0F) << 8) | buf[5];
     s_pressed = true;
 }
 
@@ -65,10 +81,24 @@ void indev_read_cb(lv_indev_t* /*indev*/, lv_indev_data_t* data) {
 }
 }  // namespace
 
+// Scan the bus and print every responder so we can see at boot which
+// chip is actually wired. Useful when the silkscreen documentation
+// disagrees with the board revision in front of us.
+static void scan_i2c() {
+    Serial.printf("[Touch] I2C scan (SDA=%d SCL=%d):", LcdPins::sda, LcdPins::scl);
+    int found = 0;
+    for (uint8_t addr = 0x08; addr <= 0x77; ++addr) {
+        Wire.beginTransmission(addr);
+        if (Wire.endTransmission() == 0) {
+            Serial.printf(" 0x%02X", addr);
+            ++found;
+        }
+    }
+    if (found == 0) Serial.print(" (no responders)");
+    Serial.println();
+}
+
 void touch_init() {
-    // Optional reset pulse — only if the board exposes a dedicated TP
-    // reset line. On Waveshare ESP32-S3-Touch-LCD-1.47 the TP_RST is
-    // tied to LCD_RST and pulsed by LovyanGFX during lcd_init() already.
     if (LcdPins::trst >= 0) {
         pinMode(LcdPins::trst, OUTPUT);
         digitalWrite(LcdPins::trst, LOW);
@@ -77,10 +107,10 @@ void touch_init() {
         delay(50);
     }
 
-    // 100 kHz first; bump to 400 kHz after a clean probe. Some chips
-    // refuse the higher speed before their internal PLL settles.
     Wire.begin(LcdPins::sda, LcdPins::scl, 100000);
     delay(50);
+
+    scan_i2c();  // logs all chips on the bus regardless of expected addr
 
     if (probe(I2C_ADDR_PRIMARY)) {
         s_addr = I2C_ADDR_PRIMARY;
