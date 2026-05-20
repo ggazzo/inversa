@@ -41,6 +41,16 @@ bool probe(uint8_t addr) {
 // that's not the magic command sequence.
 void readPoint() {
     if (!s_detected) return;
+
+    // The AXS5106L drives TP_INT LOW only while a finger is on the
+    // glass. Polling without honoring this returns stale/spurious bytes
+    // (we saw 1370,0 looping). Gate the I2C read on the INT line so
+    // we only ask the chip for coords when it actually has them.
+    if (LcdPins::tirq >= 0 && digitalRead(LcdPins::tirq) == HIGH) {
+        s_pressed = false;
+        return;
+    }
+
     static const uint8_t READ_CMD[8] = {
         0xB5, 0xAB, 0xA5, 0x5A, 0x00, 0x00, 0x00, 0x08
     };
@@ -64,9 +74,24 @@ void readPoint() {
     uint8_t count = (buf[1] & 0x0F);
     if (count == 0) { s_pressed = false; return; }
 
-    s_x = (uint16_t(buf[2] & 0x0F) << 8) | buf[3];
-    s_y = (uint16_t(buf[4] & 0x0F) << 8) | buf[5];
+    // The AXS5106L reports 12-bit raw coordinates over the chip's
+    // internal sensor grid (~0..4095). Scale to the LCD's pixel
+    // dimensions before handing to LVGL, otherwise indev_pointer_proc
+    // complains the point is outside hor/ver resolution.
+    constexpr uint16_t MAX_RAW = 4095;
+    uint16_t raw_x = (uint16_t(buf[2] & 0x0F) << 8) | buf[3];
+    uint16_t raw_y = (uint16_t(buf[4] & 0x0F) << 8) | buf[5];
+    s_x = uint16_t((uint32_t)raw_x * (LCD_W - 1) / MAX_RAW);
+    s_y = uint16_t((uint32_t)raw_y * (LCD_H - 1) / MAX_RAW);
     s_pressed = true;
+
+    // Diagnostic: print the first few touches so the operator can
+    // verify orientation (corner-tap test). Throttled to ~5 prints.
+    static uint8_t logged = 0;
+    if (logged < 5) {
+        Serial.printf("[Touch] raw=(%u,%u) scaled=(%u,%u)\n", raw_x, raw_y, s_x, s_y);
+        ++logged;
+    }
 }
 
 void indev_read_cb(lv_indev_t* /*indev*/, lv_indev_data_t* data) {
@@ -99,6 +124,12 @@ static void scan_i2c() {
 }
 
 void touch_init() {
+    // INT line is open-drain low-active on AXS5106L. Pull-up needed
+    // so HIGH reads as no-touch.
+    if (LcdPins::tirq >= 0) {
+        pinMode(LcdPins::tirq, INPUT_PULLUP);
+    }
+
     if (LcdPins::trst >= 0) {
         pinMode(LcdPins::trst, OUTPUT);
         digitalWrite(LcdPins::trst, LOW);
