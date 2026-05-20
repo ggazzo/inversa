@@ -1,11 +1,13 @@
 #pragma once
 
-// HilState — shared globals consumed by the HIL test seams.
+// HilState — shared globals consumed by the HIL test seams and the
+// virtual clock implementation.
 //
 // HilHarnessPlugin writes to these from the JSONL command parser. The
 // seams in TemperaturePlugin / AmbientSensorPlugin / RTCPlugin / Watchdog
-// read them, gated by `#ifdef HIL_BUILD`. Production builds never see
-// this file (it is included only behind that flag).
+// read them, gated by `#ifdef HIL_BUILD`. The clock state is read by
+// hil_clock_now() in HilClock.cpp. Production builds never see this file
+// (it is included only behind the HIL_BUILD flag).
 
 #ifdef HIL_BUILD
 
@@ -13,6 +15,20 @@
 
 namespace hil {
 
+// ── Clock state ────────────────────────────────────────────
+// `volatile` because the ESP timer task may sample these concurrently
+// with the main loop writing them. 32-bit aligned loads/stores are atomic
+// on xtensa-esp-elf so no further synchronization is needed.
+struct ClockState {
+    volatile int32_t  offsetMs = 0;
+    volatile uint32_t freezeAt = 0;
+    volatile bool     frozen   = false;
+};
+
+// Single global instance. inline = single storage across all TUs.
+inline ClockState g_clock{};
+
+// ── Harness state (sensor overrides, forced trips) ─────────
 struct State {
     // NTC override — when ntcActive=true, TemperaturePlugin bypasses the
     // analogRead path and feeds ntcCelsius into the Kalman filter as if it
@@ -35,13 +51,8 @@ struct State {
     // millis() snapshot at the moment rtcEpoch was set, so the virtual RTC
     // advances second-by-second with the virtual clock.
     uint32_t rtcEpochSetAtMs = 0;
-
-    // Force-trip request — drained by ThermalWatchdogPlugin on its next
-    // loop() tick. -1 = no pending trip.
-    int8_t forceWatchdogCause = -1;
 };
 
-// Single global instance. Defined inline so the header alone is enough.
 inline State g_hil{};
 
 }  // namespace hil

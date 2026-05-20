@@ -149,15 +149,15 @@ private:
             if (!strcmp(op, "advance")) {
                 int32_t add = doc["ms"].as<int32_t>();
                 // Apply additively so successive advances accumulate. If
-                // currently frozen, also bump g_freeze_at so unfreezing
+                // currently frozen, also bump freezeAt so unfreezing
                 // resumes from the advanced point.
-                hil::g_offset_ms += add;
-                if (hil::g_frozen) hil::g_freeze_at += add;
+                hil::g_clock.offsetMs += add;
+                if (hil::g_clock.frozen) hil::g_clock.freezeAt += add;
             } else if (!strcmp(op, "freeze")) {
-                hil::g_freeze_at = hil_clock_now();
-                hil::g_frozen    = true;
+                hil::g_clock.freezeAt = hil_clock_now();
+                hil::g_clock.frozen   = true;
             } else if (!strcmp(op, "unfreeze")) {
-                hil::g_frozen = false;
+                hil::g_clock.frozen = false;
             } else if (!strcmp(op, "epoch")) {
                 hil::g_hil.rtcEpoch        = doc["value"].as<uint32_t>();
                 hil::g_hil.rtcEpochSetAtMs = millis();

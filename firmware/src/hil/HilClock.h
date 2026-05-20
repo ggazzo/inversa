@@ -22,45 +22,32 @@
 // is in effect everywhere src/ code sees `millis`. Framework libs and the
 // arduino-esp32 internals continue to see the real `millis()` because they
 // are compiled without this flag.
+//
+// CRITICAL: hil_clock_now() is declared with C linkage and the EXACT same
+// signature as Arduino's millis() (`unsigned long (*)(void)`). Otherwise
+// downstream `extern "C" { unsigned long millis(void); }` declarations from
+// Arduino.h get macro-rewritten into `unsigned long hil_clock_now(void)`
+// and clash with a C++-linkage definition.
 
 #ifdef HIL_BUILD
 
-#include <stdint.h>
-
-// Forward decl of the real Arduino millis(). We can't include Arduino.h here
-// because this header is force-included before anything else and we'd hit a
-// circular preprocessor mess. The real signature lives in esp32-hal-misc.c.
 #ifdef __cplusplus
 extern "C" {
 #endif
-unsigned long millis(void);  // real arduino-esp32 millis
+
+// Real Arduino millis. Declared here so the implementation below can call
+// the wall-clock symbol even after our macro is in effect.
+unsigned long millis(void);
+
+// Virtual clock now. Implementation lives in hil/HilClock.cpp.
+unsigned long hil_clock_now(void);
+
 #ifdef __cplusplus
 }
 #endif
 
-namespace hil {
-
-// Offset applied to wall millis(). Signed so we can rewind on epoch set.
-// `volatile` because the timer task may read this concurrently with the
-// main loop writing it; ESP32 32-bit aligned loads/stores are atomic.
-inline volatile int32_t g_offset_ms = 0;
-
-// When non-zero, hil_clock_now() returns `g_freeze_at` regardless of wall
-// clock progress. Used by `clock freeze` to deterministically pause time.
-inline volatile uint32_t g_freeze_at = 0;
-inline volatile bool     g_frozen    = false;
-
-}  // namespace hil
-
-// Single virtual now() exposed to firmware code. Marked inline so it folds
-// at every call site (millis() is on the PID/Watchdog hot paths).
-static inline uint32_t hil_clock_now() {
-    if (hil::g_frozen) return hil::g_freeze_at;
-    return (uint32_t)((int32_t)millis() + hil::g_offset_ms);
-}
-
-// Override the millis() the rest of src/ sees. Done AFTER the extern decl
-// above so this file itself still resolves the real symbol.
+// Override the millis() the rest of src/ sees. Has to be done AFTER the
+// extern decls above so this header itself still resolves the real symbol.
 #define millis() hil_clock_now()
 
 #endif  // HIL_BUILD
