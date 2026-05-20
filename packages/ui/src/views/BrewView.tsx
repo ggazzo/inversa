@@ -8,6 +8,7 @@ import {
     isConnected, hasRecovery, mode, manualIntent,
     recipeState, autoTuneActive, boilActive,
     lossTuneActive, lossTunePhase,
+    schedulerActive,
 } from '@inversa/stores';
 import { TempInstrument } from '../components/TempInstrument';
 import { RecipeTimeline } from '../components/RecipeTimeline';
@@ -23,6 +24,7 @@ import { Paused }         from './states/Paused';
 import { Manual }         from './states/Manual';
 import { AutoTune }       from './states/AutoTune';
 import { LossTune }       from './states/LossTune';
+import { Scheduled }      from './states/Scheduled';
 import type { MenuId } from '../components/TopBar';
 
 const RECIPE_SUBS = new Set([
@@ -32,7 +34,7 @@ const RECIPE_SUBS = new Set([
 type Sub =
     | 'disconnected' | 'recovery' | 'autotune' | 'losstune' | 'manual'
     | 'paused' | 'waitconfirm' | 'boil' | 'waittemp' | 'waittimer' | 'mash'
-    | 'idle';
+    | 'scheduled' | 'idle';
 
 function deriveSubState(): Sub {
     if (!isConnected.value)              return 'disconnected';
@@ -62,6 +64,13 @@ function deriveSubState(): Sub {
         if (recipeState.value === 'waiting_timer')   return 'waittimer';
         return 'mash';
     }
+
+    // Scheduler armed and nothing else is running. The home screen
+    // becomes a single big "Cancelar" so the operator doesn't kick off
+    // a manual run or a recipe that would collide with the scheduled
+    // heat-up at the target time.
+    if (schedulerActive.value) return 'scheduled';
+
     return 'idle';
 }
 
@@ -120,6 +129,7 @@ function ContextPanel({ sub, onMenuSelect, onStartManual }:
         case 'waittemp':    return <WaitTemp />;
         case 'waittimer':   return <WaitTimer />;
         case 'mash':        return <Mash />;
+        case 'scheduled':   return <Scheduled />;
         case 'idle':
         default:            return <Idle onMenuSelect={onMenuSelect}
                                          onStartManual={onStartManual} />;
