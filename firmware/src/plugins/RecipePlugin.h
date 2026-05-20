@@ -204,6 +204,8 @@ public:
         gState.mode = OperatingMode::Recipe;
         bus().publish(EventType::RecipeStarted, gState.recipeName);
         bus().publish(EventType::RecipeStepChanged, 0);
+        sendRecipeStateBle("started");
+        sendRecipeStepBle();
         DEBUG_PRINTLN("[Recipe] Started");
     }
 
@@ -222,6 +224,7 @@ public:
         bus().publish(EventType::RecipeStopped);
         bus().publish(EventType::SetpointChanged, 0.0f);
         bus().publish(EventType::HeaterStateChanged, false);
+        sendRecipeStateBle("stopped");
         RecoveryManager::instance().clearRecovery();
         DEBUG_PRINTLN("[Recipe] Stopped");
     }
@@ -235,6 +238,7 @@ public:
             // P3 — capture pause start so the internal WAIT_TIMER doesn't drift.
             _pauseStartMs = millis();
             bus().publish(EventType::RecipePaused);
+            sendRecipeStateBle("paused");
             DEBUG_PRINTLN("[Recipe] Paused");
         }
     }
@@ -251,6 +255,7 @@ public:
             _pauseStartMs = 0;
             gState.recipeState = _pausedState;
             bus().publish(EventType::RecipeResumed);
+            sendRecipeStateBle("resumed");
             DEBUG_PRINTLN("[Recipe] Resumed");
         }
     }
@@ -337,6 +342,36 @@ public:
     }
 
 private:
+    // BLE notifies for recipe lifecycle. App receives these as immediate
+    // notify() messages on the Nordic UART characteristic, without
+    // having to wait for the 1 Hz `evt:status` poll. The shape mirrors
+    // BoilTimer's `evt:boil:*` so the app can use the same JSON router.
+    void sendRecipeStateBle(const char* st) {
+        String json = "{\"tp\":\"evt:recipe:state\",\"st\":\"";
+        json += st;
+        json += "\",\"name\":\"";
+        json += (const char*)gState.recipeName;
+        json += "\"}";
+        bus().publish(EventType::BLESend, json);
+    }
+    void sendRecipeStepBle() {
+        String json = "{\"tp\":\"evt:recipe:step\",\"step\":";
+        json += String(_currentStep);
+        json += ",\"total\":";
+        json += String((int)_commands.size());
+        // brewingStepCustom holds the human-readable label set by STEP "name".
+        json += ",\"name\":\"";
+        json += (const char*)gState.brewingStepCustom;
+        json += "\"}";
+        bus().publish(EventType::BLESend, json);
+    }
+    void sendRecipeWaitBle(const char* msg) {
+        String json = "{\"tp\":\"evt:recipe:wait\",\"msg\":\"";
+        json += msg ? msg : "";
+        json += "\"}";
+        bus().publish(EventType::BLESend, json);
+    }
+
     std::vector<RecipeCommand> _commands;
     std::vector<RecipeCommand> _hopAdditions;  // Collected hop additions for BOIL
     int _currentStep = 0;
@@ -688,6 +723,7 @@ private:
                 gState.waitingForConfirm = true;  // P5
                 setStr(gState.confirmMessage, cmd.message);
                 bus().publish(EventType::RecipeWaitConfirm, cmd.message);
+                sendRecipeWaitBle(cmd.message.c_str());
                 DEBUG_PRINTF("[Recipe] WAIT_CONFIRM: %s\n", cmd.message.c_str());
                 break;
 
@@ -760,6 +796,7 @@ private:
         // that already finished.
         clearWaitFlags();
         bus().publish(EventType::RecipeStepChanged, _currentStep);
+        sendRecipeStepBle();
     }
 
     void clearWaitFlags() {
@@ -776,6 +813,7 @@ private:
         clearWaitFlags();
         gState.recipePausedDurationMs = 0;
         bus().publish(EventType::RecipeCompleted);
+        sendRecipeStateBle("completed");
         bus().publish(EventType::HeaterStateChanged, false);
         RecoveryManager::instance().clearRecovery();
         DEBUG_PRINTLN("[Recipe] Completed!");

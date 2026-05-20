@@ -52,7 +52,13 @@ public:
     const char* getName() const override { return "HilHarness"; }
 
     bool setup() override {
-        _lineBuf.reserve(256);
+        // Enlarge the USB CDC RX buffer so recipe-load payloads (~500 B
+        // of escaped JSON) don't get truncated before our loop drains
+        // them. Default is 256 B on arduino-esp32; we set 4 kB to leave
+        // headroom for future longer cmds (multi-step recipes, batched
+        // sub configs, etc).
+        Serial.setRxBufferSize(4096);
+        _lineBuf.reserve(2048);
         // SSR baseline: capture initial level so the first emit is the
         // boot-time state (likely LOW after Watchdog::setup forces it).
         _lastSsrLevel = digitalRead(PIN_HEATER_SSR);
@@ -74,6 +80,8 @@ public:
         bus().subscribe(EventType::RecipeResumed,          [this](const Event& e){ onBus("RecipeResumed",          e); });
         bus().subscribe(EventType::RecipeStepChanged,      [this](const Event& e){ onBus("RecipeStepChanged",      e); });
         bus().subscribe(EventType::RecipeCompleted,        [this](const Event& e){ onBus("RecipeCompleted",        e); });
+        bus().subscribe(EventType::RecipeWaitConfirm,      [this](const Event& e){ onBus("RecipeWaitConfirm",      e); });
+        bus().subscribe(EventType::BLESend,                [this](const Event& e){ onBus("BLESend",                e); });
         emitRaw("{\"event\":\"hello\",\"t\":%u,\"build\":\"hil_s3_mini\"}\n", millis());
         return true;
     }
@@ -88,7 +96,7 @@ public:
                     handleLine(_lineBuf);
                     _lineBuf = "";
                 }
-            } else if (_lineBuf.length() < 1024) {
+            } else if (_lineBuf.length() < 4096) {
                 _lineBuf += (char)c;
             } else {
                 // Overflow guard: drop the rest of this line.
@@ -324,14 +332,23 @@ private:
         if (!_eventStream) return;
         // Best-effort generic emit. Numeric union access depends on the
         // event family; we just publish all three views so the host can
-        // pick whichever is meaningful.
-        char buf[256];
-        int n = snprintf(buf, sizeof(buf),
-            "{\"event\":\"bus\",\"t\":%u,\"type\":\"%s\","
-            "\"floatValue\":%.3f,\"intValue\":%d,\"boolValue\":%s}\n",
-            (unsigned)millis(), typeName,
-            e.floatValue, e.intValue, e.boolValue ? "true" : "false");
-        if (n > 0) Serial.write((const uint8_t*)buf, (size_t)n);
+        // pick whichever is meaningful. stringValue is forwarded as
+        // `strValue` for events that carry text payloads (BLESend frames,
+        // RecipeStarted name, RecipeWaitConfirm message).
+        ArduinoJson::JsonDocument doc;
+        doc["event"]      = "bus";
+        doc["t"]          = (unsigned)millis();
+        doc["type"]       = typeName;
+        doc["floatValue"] = e.floatValue;
+        doc["intValue"]   = e.intValue;
+        doc["boolValue"]  = e.boolValue;
+        if (e.stringValue.length() > 0) {
+            doc["strValue"] = (const char*)e.stringValue.c_str();
+        }
+        String out;
+        serializeJson(doc, out);
+        Serial.print(out);
+        Serial.print('\n');
     }
 
     void ack(const char* cmd) {
