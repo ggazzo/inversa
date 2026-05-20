@@ -11,6 +11,7 @@ import { theme, manualIntent } from '@inversa/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet, DebugSheet, WatchdogSheet,
+    SchedulerSheet,
     CalibrationSheet,
     WizardEquipment, WizardConnectivity, WizardTuning,
     WizardNotifications, WizardAbout,
@@ -57,6 +58,7 @@ export function App() {
                 <WizardAbout     open={isOpen('about')}         onClose={close} />
                 <DebugSheet      open={isOpen('debug')}         onClose={close} />
                 <WatchdogSheet   open={isOpen('watchdog')}      onClose={close} />
+                <SchedulerSheet  open={isOpen('scheduler')}     onClose={close} />
 
                 <DevicePickerSheet />
 

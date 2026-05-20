@@ -12,14 +12,16 @@ import { theme as themeSignal, toggleTheme } from '@inversa/stores';
 import { ConnectionManager } from '@inversa/services';
 import { BleClient } from '@inversa/services';
 import { WatchdogIndicator } from './WatchdogIndicator';
+import { RtcClock } from './RtcClock';
 
 export type MenuId =
     | 'recipes' | 'brewlog' | 'equipment' | 'calibration' | 'connectivity'
-    | 'tuning'  | 'notifications' | 'about' | 'debug' | 'watchdog';
+    | 'tuning'  | 'notifications' | 'about' | 'debug' | 'watchdog' | 'scheduler';
 
 const MENU_ITEMS: { id: MenuId; label: string }[] = [
     { id: 'recipes',       label: 'Receitas salvas' },
     { id: 'brewlog',       label: 'Brew log' },
+    { id: 'scheduler',     label: 'Agendar temperatura' },
     { id: 'equipment',     label: 'Equipamento' },
     { id: 'calibration',   label: 'Calibrar sensor' },
     { id: 'connectivity',  label: 'WiFi & OTA' },
@@ -135,6 +137,11 @@ export function TopBar({ onMenuSelect }: Props) {
                 if disconnected or if the firmware does not advertise the
                 feature. Tap opens the watchdog sheet for full status. */}
             <WatchdogIndicator onPress={() => onMenuSelect('watchdog')} />
+            {/* RTC chip — lets the operator see at a glance whether
+                the controller knows what time it is (and whether NTP
+                has synced). Tapping opens the scheduler sheet, since
+                that's the feature most affected by clock drift. */}
+            <RtcClock onPress={() => onMenuSelect('scheduler')} />
 
             <XStack flex={1} />
 
