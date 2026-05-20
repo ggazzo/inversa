@@ -89,13 +89,3 @@ initial command sequence, and waits for events. See
 `src/scenarios/overtemp.ts` as the reference.
 
 Wire it into `src/scenarios/index.ts` so `run scenario <name>` finds it.
-
-## Tests
-
-```bash
-npm test
-```
-
-Covers the parser line-classification (`test/transport-parser.test.ts`)
-and a smoke parity check of `ThermalSim` against the C++ reference
-(`test/thermal-sim-parity.test.ts`).
