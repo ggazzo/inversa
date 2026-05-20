@@ -31,6 +31,9 @@
 #include "plugins/AmbientSensorPlugin.h"
 #include "plugins/LossTunePlugin.h"
 #include "plugins/CommandHandler.h"
+#ifdef HIL_BUILD
+#include "plugins/HilHarnessPlugin.h"
+#endif
 
 // ─── Global State ───────────────────────────────────────────
 MachineState gState;
@@ -112,6 +115,15 @@ void setup() {
     auto* ambient   = pm.add<AmbientSensorPlugin>();
     (void)ambient;
     auto* lossTune  = pm.add<LossTunePlugin>();
+
+#ifdef HIL_BUILD
+    // HIL harness — JSONL command channel for the host bridge. Registered
+    // last so all the plugins it can poke (Watchdog, Recipe, etc.) are
+    // already in the manager's vector. setup() runs the same way as any
+    // other plugin.
+    auto* hil = pm.add<HilHarnessPlugin>(watchdog, recipe);
+    (void)hil;
+#endif
 
     // Initialize all plugins
     pm.setup();

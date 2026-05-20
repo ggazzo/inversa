@@ -4,9 +4,22 @@
 // Use DEBUG_PRINT/DEBUG_PRINTF instead of Serial.print/printf
 // These are stripped in release builds (CORE_DEBUG_LEVEL=0)
 #if CORE_DEBUG_LEVEL > 0 || defined(DEBUG_MODE)
+  #ifdef HIL_BUILD
+    // HIL bridge parses stdout as line-delimited JSON. Any non-JSON debug
+    // output must be prefixed with `# ` so the transport layer can drop
+    // those lines without confusing the JSONL parser. Newlines inside the
+    // emitted string are NOT re-prefixed here — callers in src/ are
+    // disciplined about one-line messages, and the printf format strings
+    // they use end with a single `\n`. Multi-line dumps would interleave
+    // with telemetry anyway and are avoided in HIL configurations.
+    #define DEBUG_PRINT(x)    do { Serial.print("# "); Serial.print(x); } while (0)
+    #define DEBUG_PRINTLN(x)  do { Serial.print("# "); Serial.println(x); } while (0)
+    #define DEBUG_PRINTF(...) do { Serial.print("# "); Serial.printf(__VA_ARGS__); } while (0)
+  #else
     #define DEBUG_PRINT(x)    Serial.print(x)
     #define DEBUG_PRINTLN(x)  Serial.println(x)
     #define DEBUG_PRINTF(...) Serial.printf(__VA_ARGS__)
+  #endif
 #else
     #define DEBUG_PRINT(x)
     #define DEBUG_PRINTLN(x)

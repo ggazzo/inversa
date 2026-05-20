@@ -8,6 +8,7 @@ import {
     isConnected, hasRecovery, mode, manualIntent,
     recipeState, autoTuneActive, boilActive,
     lossTuneActive, lossTunePhase,
+    schedulerActive,
 } from '@inversa/stores';
 import { TempInstrument } from '../components/TempInstrument';
 import { RecipeTimeline } from '../components/RecipeTimeline';
@@ -23,6 +24,7 @@ import { Paused }         from './states/Paused';
 import { Manual }         from './states/Manual';
 import { AutoTune }       from './states/AutoTune';
 import { LossTune }       from './states/LossTune';
+import { Scheduled }      from './states/Scheduled';
 import type { MenuId } from '../components/TopBar';
 
 const RECIPE_SUBS = new Set([
@@ -32,7 +34,7 @@ const RECIPE_SUBS = new Set([
 type Sub =
     | 'disconnected' | 'recovery' | 'autotune' | 'losstune' | 'manual'
     | 'paused' | 'waitconfirm' | 'boil' | 'waittemp' | 'waittimer' | 'mash'
-    | 'idle';
+    | 'scheduled' | 'idle';
 
 function deriveSubState(): Sub {
     if (!isConnected.value)              return 'disconnected';
@@ -44,15 +46,9 @@ function deriveSubState(): Sub {
     if (lossTuneActive.value
         || lossTunePhase.value === 'RESULT'
         || lossTunePhase.value === 'ERROR') return 'losstune';
-    // UI-side intent: user tapped "Modo Manual" from Idle. Firmware
-    // only flips to Manual after req:set-temp / req:heater:on (which
-    // the user sends *from* the Manual view), so without this the
-    // first telemetry tick after the tap kicks them back to Idle.
-    // `manualIntent` is cleared by ConnectionManager on disconnect
-    // and by updateFromTelemetry once firmware reports any non-idle
-    // mode.
-    if (mode.value === 'manual' || manualIntent.value) return 'manual';
-
+    // Recipe in flight wins over scheduler — once a recipe is executing,
+    // its own state machine owns the heater and the scheduler's flag is
+    // moot until the recipe ends.
     if (mode.value === 'recipe' &&
         recipeState.value !== 'idle' && recipeState.value !== 'completed') {
         if (recipeState.value === 'paused')          return 'paused';
@@ -62,6 +58,23 @@ function deriveSubState(): Sub {
         if (recipeState.value === 'waiting_timer')   return 'waittimer';
         return 'mash';
     }
+
+    // Scheduler armed — owns the home screen even while the firmware
+    // has flipped mode=Manual to actually heat (P17 in
+    // SchedulerPlugin::startHeating). Otherwise the Cancel button
+    // disappears the moment heating starts, which was a regression
+    // operators reported.
+    if (schedulerActive.value) return 'scheduled';
+
+    // UI-side intent: user tapped "Modo Manual" from Idle. Firmware
+    // only flips to Manual after req:set-temp / req:heater:on (which
+    // the user sends *from* the Manual view), so without this the
+    // first telemetry tick after the tap kicks them back to Idle.
+    // `manualIntent` is cleared by ConnectionManager on disconnect
+    // and by updateFromTelemetry once firmware reports any non-idle
+    // mode.
+    if (mode.value === 'manual' || manualIntent.value) return 'manual';
+
     return 'idle';
 }
 
@@ -120,6 +133,7 @@ function ContextPanel({ sub, onMenuSelect, onStartManual }:
         case 'waittemp':    return <WaitTemp />;
         case 'waittimer':   return <WaitTimer />;
         case 'mash':        return <Mash />;
+        case 'scheduled':   return <Scheduled />;
         case 'idle':
         default:            return <Idle onMenuSelect={onMenuSelect}
                                          onStartManual={onStartManual} />;

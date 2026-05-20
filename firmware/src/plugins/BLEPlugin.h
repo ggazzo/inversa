@@ -541,9 +541,12 @@ private:
             }
         }
 
-        // Scheduler info ("be ready at HH:MM")
+        // Scheduler info ("be ready at HH:MM"). Always emit `sa` so the
+        // app can detect the inactive→active and active→inactive edges
+        // — otherwise canceling never clears the UI because we'd just
+        // stop sending the fields and the cached signals would stay true.
+        doc["sa"] = gState.schedulerActive;
         if (gState.schedulerActive) {
-            doc["sa"] = true;
             doc["sth"] = gState.schedulerTargetHour;
             doc["stm"] = gState.schedulerTargetMinute;
             doc["stt"] = gState.schedulerTargetTemp;
