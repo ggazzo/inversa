@@ -9,6 +9,9 @@
 #include "../core/constants.h"
 #include "../models/MachineState.h"
 #include "WiFiPlugin.h"
+#ifdef HIL_BUILD
+#include "../hil/HilState.h"
+#endif
 
 // ─── RTC Plugin ─────────────────────────────────────────────
 // Manages real-time clock for accurate timekeeping.
@@ -53,6 +56,14 @@ public:
             DEBUG_PRINTLN("[RTC] DS1307 not found!");
         }
 
+#ifdef HIL_BUILD
+        // Under HIL we always expose a virtual RTC to downstream plugins so
+        // scheduler/timer paths can be exercised without DS1307 hardware.
+        // The harness can set epoch via the JSONL cmd. Defaults to 0
+        // (1970-01-01 UTC) until set, matching legacy "rtc absent" UX.
+        _state.rtcAvailable = true;
+#endif
+
         // Subscribe to WiFi connected event for NTP sync
         bus().subscribe(EventType::WiFiConnected, [this](const Event& e) {
             DEBUG_PRINTLN("[RTC] WiFi connected, scheduling NTP sync");
@@ -93,6 +104,16 @@ public:
 
     // Get current unix timestamp
     uint32_t now() {
+#ifdef HIL_BUILD
+        // HIL seam: when the harness has set a virtual epoch, derive the
+        // current unix time from it plus elapsed virtual milliseconds. This
+        // bypasses the DS1307 entirely so scheduler/timer tests can be
+        // deterministic on hardware without an attached RTC chip.
+        if (hil::g_hil.rtcActive) {
+            uint32_t elapsedMs = millis() - hil::g_hil.rtcEpochSetAtMs;
+            return hil::g_hil.rtcEpoch + (elapsedMs / 1000);
+        }
+#endif
         if (_rtcAvailable) {
             return _rtc.now().unixtime();
         }

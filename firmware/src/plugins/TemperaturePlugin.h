@@ -6,6 +6,9 @@
 #include "../core/Plugin.h"
 #include "../core/constants.h"
 #include "../models/MachineState.h"
+#ifdef HIL_BUILD
+#include "../hil/HilState.h"
+#endif
 
 class TemperaturePlugin : public Plugin {
 public:
@@ -23,7 +26,35 @@ public:
         if (now - _lastRead < LOOP_INTERVAL_MS) return;
         _lastRead = now;
 
-        float raw = readNTC();
+        float raw;
+#ifdef HIL_BUILD
+        // HIL seam: when the harness has injected an NTC override, skip the
+        // analogRead/Steinhart-Hart path entirely and feed the injected °C
+        // into the Kalman filter as if it were a freshly-converted ADC
+        // sample. ntcBypassKalman=true also short-circuits the filter so a
+        // step input lands in gState in one tick (useful for the overtemp
+        // trip-latency scenario).
+        if (hil::g_hil.ntcActive) {
+            raw = hil::g_hil.ntcCelsius;
+            _lastRaw = raw;
+            if (raw < TEMP_MIN || raw > TEMP_MAX) {
+                gState.tempSensorOk = false;
+                bus().publish(EventType::TemperatureError);
+                return;
+            }
+            if (hil::g_hil.ntcBypassKalman) {
+                float v = gState.tempCalSlope * raw + gState.tempCalOffset;
+                gState.currentTemp = v;
+                gState.tempSensorOk = true;
+                bus().publish(EventType::TemperatureRead, v);
+                return;
+            }
+        } else {
+            raw = readNTC();
+        }
+#else
+        raw = readNTC();
+#endif
         if (raw < TEMP_MIN || raw > TEMP_MAX) {
             gState.tempSensorOk = false;
             bus().publish(EventType::TemperatureError);

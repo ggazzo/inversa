@@ -35,6 +35,9 @@
 #include "../protocol/protocol.h"
 #include "IExternalCut.h"
 #include "watchdog/WatchdogEvaluator.h"
+#ifdef HIL_BUILD
+#include "../hil/HilState.h"
+#endif
 
 #ifdef NATIVE_BUILD
 // The simulator does not link against ESP-IDF — stub the few symbols the
@@ -126,6 +129,15 @@ public:
         _heartbeat.kick(now);
         _heartbeatMs = now;  // for the esp_timer callback (volatile-ish)
     }
+
+#ifdef HIL_BUILD
+    // HIL-only: force a trip from the harness. The cause maps 1:1 to
+    // WatchdogCause. Goes through trip() so all side effects (GPIO, NVS,
+    // events, BLE) fire identically to a natural trip. This lets the host
+    // bridge exercise the same code path that runs in production without
+    // having to manipulate sensor inputs precisely.
+    void hilForceTrip(WatchdogCause cause) { trip(cause); }
+#endif
 
     // ── Plugin interface ────────────────────────────────────
     bool setup() override {

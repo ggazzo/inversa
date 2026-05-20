@@ -24,6 +24,9 @@
 #include <Arduino.h>
 #include "../core/Plugin.h"
 #include "../models/MachineState.h"
+#ifdef HIL_BUILD
+#include "../hil/HilState.h"
+#endif
 
 class AmbientSensorPlugin : public Plugin {
 public:
@@ -38,6 +41,16 @@ public:
     }
 
     void loop() override {
-        // Intentionally empty. Future impl reads sensor here.
+#ifdef HIL_BUILD
+        // HIL seam: when the harness has injected an ambient override,
+        // mirror it into gState exactly as a real sensor implementation
+        // would. lastMs uses the virtual clock so freshness gates in
+        // getEffectiveAmbient() agree with the rest of the firmware.
+        if (hil::g_hil.ambientActive) {
+            gState.ambientSensorC      = hil::g_hil.ambientCelsius;
+            gState.ambientSensorOk     = hil::g_hil.ambientOk;
+            gState.ambientSensorLastMs = millis();
+        }
+#endif
     }
 };
