@@ -67,11 +67,16 @@ export type ClockCmd =
   | { cmd: "clock"; op: "unfreeze" }
   | { cmd: "clock"; op: "epoch"; value: number };
 
-export type ForceCmd = {
-  cmd: "force";
-  path: "watchdog.trip";
-  value: "OVERTEMP" | "LOOP_STUCK" | "PIN_STUCK" | "SENSOR_FAULT" | "GRADIENT" | "MANUAL";
-};
+export type ForceCmd =
+  | {
+      cmd: "force";
+      path: "watchdog.trip";
+      value: "OVERTEMP" | "LOOP_STUCK" | "PIN_STUCK" | "SENSOR_FAULT" | "GRADIENT" | "MANUAL";
+    }
+  | {
+      cmd: "force";
+      path: "watchdog.reset";
+    };
 
 export type GetCmd = { cmd: "get"; path: "state" };
 

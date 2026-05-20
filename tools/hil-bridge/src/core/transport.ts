@@ -23,6 +23,10 @@ export class SerialTransport {
   private buffer = "";
   private opts: TransportOptions;
   private opened = false;
+  // USB CDC delivers whatever was already streaming when we connected,
+  // so the first chunk is usually a mid-line tail. Sync by dropping
+  // bytes up to the first `\n`; only after that we start emitting lines.
+  private synced = false;
 
   constructor(opts: TransportOptions) {
     this.opts = opts;
@@ -68,6 +72,16 @@ export class SerialTransport {
 
   private onData(chunk: Buffer): void {
     this.buffer += chunk.toString("utf8");
+    if (!this.synced) {
+      const nl = this.buffer.indexOf("\n");
+      if (nl < 0) {
+        // Still waiting for the first line boundary — keep buffering.
+        return;
+      }
+      // Drop the partial pre-newline tail and start fresh on the next byte.
+      this.buffer = this.buffer.slice(nl + 1);
+      this.synced = true;
+    }
     let nl: number;
     while ((nl = this.buffer.indexOf("\n")) >= 0) {
       const raw = this.buffer.slice(0, nl).replace(/\r$/, "");

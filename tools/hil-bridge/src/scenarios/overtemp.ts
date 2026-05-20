@@ -32,6 +32,11 @@ class OvertempDriver implements HilPlugin {
   constructor(private opts: OvertempOptions) {}
 
   setup(ctx: HilPluginContext): void {
+    // Best-effort: if the watchdog is already latched from a previous
+    // boot (NVS persists the latch), clear it before injecting. The
+    // firmware replies with `not_tripped` when there's nothing to reset,
+    // which is fine.
+    ctx.send({ cmd: "force", path: "watchdog.reset" });
     // Force a clean baseline first: a fresh NTC reading at room temp with
     // Kalman bypass, so the firmware doesn't latch on stale ADC noise.
     ctx.send({ cmd: "set", path: "ntc.bypassKalman", value: true });

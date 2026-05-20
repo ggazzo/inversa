@@ -187,6 +187,18 @@ private:
                 ack(cmd);
                 return;
             }
+            if (!strcmp(path, "watchdog.reset")) {
+                if (!_watchdog) { emitErr("no_watchdog", path); return; }
+                auto r = _watchdog->requestReset();
+                if (r == ThermalWatchdogPlugin::ResetResult::Accepted) {
+                    ack(cmd);
+                } else if (r == ThermalWatchdogPlugin::ResetResult::NotTripped) {
+                    emitErr("not_tripped", path);
+                } else {
+                    emitErr("still_unsafe", path);
+                }
+                return;
+            }
             emitErr("unknown_force_path", path);
             return;
         }
