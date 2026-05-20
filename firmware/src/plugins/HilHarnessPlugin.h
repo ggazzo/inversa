@@ -38,11 +38,16 @@
 #include "../models/MachineState.h"
 #include "../hil/HilState.h"
 #include "ThermalWatchdogPlugin.h"
+#include "RecipePlugin.h"
 
 class HilHarnessPlugin : public Plugin {
 public:
-    explicit HilHarnessPlugin(ThermalWatchdogPlugin* wd = nullptr)
-        : _watchdog(wd) {}
+    explicit HilHarnessPlugin(ThermalWatchdogPlugin* wd = nullptr,
+                              RecipePlugin* recipe = nullptr)
+        : _watchdog(wd), _recipe(recipe) {}
+
+    void setWatchdog(ThermalWatchdogPlugin* wd) { _watchdog = wd; }
+    void setRecipe(RecipePlugin* recipe)        { _recipe = recipe; }
 
     const char* getName() const override { return "HilHarness"; }
 
@@ -63,6 +68,12 @@ public:
         bus().subscribe(EventType::SetpointChanged,        [this](const Event& e){ onBus("SetpointChanged",        e); });
         bus().subscribe(EventType::WatchdogConfigChanged,  [this](const Event& e){ onBus("WatchdogConfigChanged",  e); });
         bus().subscribe(EventType::WatchdogKick,           [this](const Event& e){ onBus("WatchdogKick",           e); });
+        bus().subscribe(EventType::RecipeStarted,          [this](const Event& e){ onBus("RecipeStarted",          e); });
+        bus().subscribe(EventType::RecipeStopped,          [this](const Event& e){ onBus("RecipeStopped",          e); });
+        bus().subscribe(EventType::RecipePaused,           [this](const Event& e){ onBus("RecipePaused",           e); });
+        bus().subscribe(EventType::RecipeResumed,          [this](const Event& e){ onBus("RecipeResumed",          e); });
+        bus().subscribe(EventType::RecipeStepChanged,      [this](const Event& e){ onBus("RecipeStepChanged",      e); });
+        bus().subscribe(EventType::RecipeCompleted,        [this](const Event& e){ onBus("RecipeCompleted",        e); });
         emitRaw("{\"event\":\"hello\",\"t\":%u,\"build\":\"hil_s3_mini\"}\n", millis());
         return true;
     }
@@ -203,6 +214,28 @@ private:
             return;
         }
 
+        if (!strcmp(cmd, "recipe")) {
+            if (!_recipe) { emitErr("no_recipe", ""); return; }
+            const char* op = doc["op"] | "";
+            if (!strcmp(op, "load")) {
+                // Inject recipe DSL inline, bypassing the SD card path. The
+                // RecipePlugin parser does not care where the bytes came
+                // from — same code path as a real SD load. Useful in HIL
+                // since SDCardPlugin is not mocked.
+                const char* name    = doc["name"]    | "hil";
+                const char* content = doc["content"] | "";
+                if (_recipe->loadRecipe(String(content), String(name))) ack(cmd);
+                else emitErr("recipe_load_failed", name);
+                return;
+            }
+            if (!strcmp(op, "start"))  { _recipe->start();  ack(cmd); return; }
+            if (!strcmp(op, "stop"))   { _recipe->stop();   ack(cmd); return; }
+            if (!strcmp(op, "pause"))  { _recipe->pause();  ack(cmd); return; }
+            if (!strcmp(op, "resume")) { _recipe->resume(); ack(cmd); return; }
+            emitErr("unknown_recipe_op", op);
+            return;
+        }
+
         if (!strcmp(cmd, "get")) {
             const char* path = doc["path"] | "";
             if (!strcmp(path, "state")) {
@@ -310,6 +343,7 @@ private:
     static const char* jb(bool b) { return b ? "true" : "false"; }
 
     ThermalWatchdogPlugin* _watchdog;
+    RecipePlugin*          _recipe;
     String   _lineBuf;
     int      _stateHz       = 0;
     uint32_t _lastStateMs   = 0;

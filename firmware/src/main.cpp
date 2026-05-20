@@ -118,9 +118,10 @@ void setup() {
 
 #ifdef HIL_BUILD
     // HIL harness — JSONL command channel for the host bridge. Registered
-    // last so all the plugins it can poke (Watchdog, etc.) are already in
-    // the manager's vector. setup() runs the same way as any other plugin.
-    auto* hil = pm.add<HilHarnessPlugin>(watchdog);
+    // last so all the plugins it can poke (Watchdog, Recipe, etc.) are
+    // already in the manager's vector. setup() runs the same way as any
+    // other plugin.
+    auto* hil = pm.add<HilHarnessPlugin>(watchdog, recipe);
     (void)hil;
 #endif
 
