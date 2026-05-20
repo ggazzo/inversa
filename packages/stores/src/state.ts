@@ -123,6 +123,39 @@ export const watchdogCoolMinMs       = signal(300000);
 // UI to know whether to render any watchdog indicator at all.
 export const watchdogSupported     = signal(false);
 
+// ─── Ambient (effective + source) ───────────────────────────
+// `ambientEffectiveC` is what every consumer on the firmware actually
+// uses — sensor when ambientSource==SENSOR and reading is fresh, else
+// the manual value. The UI shows the badge based on `ambientSource` +
+// `ambientSensorOk` so the user knows whether their fit is anchored to
+// a real sensor or a typed-in value.
+export const ambientEffectiveC = signal(25.0);
+export const ambientSource     = signal<'manual' | 'sensor'>('manual');
+export const ambientSensorOk   = signal(false);
+export const lidState          = signal<'lidOn' | 'lidOff'>('lidOn');
+
+// ─── LossTune state ─────────────────────────────────────────
+// Mirrors LossTunePlugin progress. `lossTuneSamples` is the live cooling
+// curve streamed during DECAY (capped at 600 = LOSSTUNE_BUFFER_SIZE).
+// `lossTuneFittedCoeff` + `lossTuneR2` + `lossTuneTau` are populated by
+// evt:losstune:result; UI uses these to render the accept/reject card.
+export type LossTunePhaseName =
+  'IDLE' | 'PREFLIGHT' | 'HEAT' | 'SOAK' | 'DECAY' | 'FIT' | 'RESULT' | 'ERROR';
+
+export const lossTuneActive         = signal(false);
+export const lossTunePhase          = signal<LossTunePhaseName>('IDLE');
+export const lossTuneProgress       = signal(0);
+export const lossTuneTargetMode     = signal<'lidOn' | 'lidOff'>('lidOn');
+export const lossTuneAmbientStart   = signal(0);
+export const lossTuneAmbientEnd     = signal(0);
+export const lossTuneAmbientSource  = signal<'manual' | 'sensor'>('manual');
+export const lossTuneSampleCount    = signal(0);
+export const lossTuneFittedCoeff    = signal(0);
+export const lossTuneR2             = signal(0);
+export const lossTuneTau            = signal(0);
+export const lossTuneError          = signal('');
+export const lossTuneSamples        = signal<Array<{ t: number; T: number }>>([]);
+
 // ─── Brewing Step (UI visualization) ────────────────────────
 export const brewingStep = signal(0);
 export const brewingStepCustom = signal('');
@@ -404,6 +437,25 @@ export function updateFromTelemetry(data: Record<string, any>): void {
     if (wd.gw  !== undefined) watchdogGradWindow.value     = wd.gw;
     if (wd.sa  !== undefined) watchdogSafeAutoresetC.value = wd.sa;
     if (wd.cm  !== undefined) watchdogCoolMinMs.value      = wd.cm;
+  }
+
+  // Ambient + lid + LossTune in-flight (LossTune nested object only
+  // emitted while a tune is active; status/result come on dedicated
+  // events handled in ConnectionManager).
+  if (data.ambEff      !== undefined) ambientEffectiveC.value = data.ambEff;
+  if (data.ambSrc      !== undefined) ambientSource.value     = data.ambSrc;
+  if (data.ambSensorOk !== undefined) ambientSensorOk.value   = data.ambSensorOk;
+  if (data.lidState    !== undefined) lidState.value          = data.lidState;
+  if (data.lt !== undefined) {
+    const lt = data.lt;
+    if (lt.ph   !== undefined) lossTunePhase.value         = lt.ph;
+    if (lt.pct  !== undefined) lossTuneProgress.value      = lt.pct;
+    if (lt.mode !== undefined) lossTuneTargetMode.value    = lt.mode;
+    if (lt.r2   !== undefined) lossTuneR2.value            = lt.r2;
+    if (lt.h    !== undefined) lossTuneFittedCoeff.value   = lt.h;
+    if (lt.n    !== undefined) lossTuneSampleCount.value   = lt.n;
+    if (lt.err  !== undefined) lossTuneError.value         = lt.err;
+    lossTuneActive.value = lt.ph !== 'IDLE' && lt.ph !== 'RESULT' && lt.ph !== 'ERROR';
   }
 
   // Add to history

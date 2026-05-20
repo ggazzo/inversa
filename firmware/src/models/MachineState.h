@@ -38,6 +38,52 @@ enum class RecipeState : uint8_t {
     Completed
 };
 
+// ─── Ambient Source ─────────────────────────────────────────
+// Selects which ambient temperature reading feeds ThermalCalc /
+// PID feed-forward / LossTune fit. MANUAL = user-entered value
+// from req:settings:thermal (gState.ambientTemp). SENSOR = future
+// AmbientSensorPlugin writes gState.ambientSensorC. Setter that
+// accepts SENSOR while no plugin is compiled in falls back to
+// MANUAL behavior automatically via getEffectiveAmbient().
+enum class AmbientSource : uint8_t {
+    MANUAL = 0,
+    SENSOR = 1
+};
+
+// ─── Lid State (for dual loss coefficient) ──────────────────
+// User-asserted, no sensor today. Picks which heatLossCoeff_*
+// is active for PID feed-forward / Scheduler / LossTune writes.
+enum class LidState : uint8_t {
+    ON  = 0,
+    OFF = 1
+};
+
+// ─── LossTune Phase ─────────────────────────────────────────
+// Lifecycle of the loss-coefficient auto-tune state machine.
+enum class LossTunePhase : uint8_t {
+    IDLE      = 0,
+    PREFLIGHT = 1,
+    HEAT      = 2,
+    SOAK      = 3,
+    DECAY     = 4,
+    FIT       = 5,
+    RESULT    = 6,  // fit done, awaiting user accept/reject
+    ERROR     = 7
+};
+
+inline const char* getLossTunePhaseName(LossTunePhase p) {
+    switch (p) {
+        case LossTunePhase::PREFLIGHT: return "PREFLIGHT";
+        case LossTunePhase::HEAT:      return "HEAT";
+        case LossTunePhase::SOAK:      return "SOAK";
+        case LossTunePhase::DECAY:     return "DECAY";
+        case LossTunePhase::FIT:       return "FIT";
+        case LossTunePhase::RESULT:    return "RESULT";
+        case LossTunePhase::ERROR:     return "ERROR";
+        default:                       return "IDLE";
+    }
+}
+
 // ─── Watchdog Cause ─────────────────────────────────────────
 // Last trigger reason for the thermal watchdog latch. NONE means
 // either never tripped or just reset.
@@ -212,9 +258,40 @@ struct MachineState {
     // Thermal parameters (for heat loss calculation)
     float    volumeLiters       = 20.0f;  // Water/wort volume
     float    heaterPowerWatts   = 3000.0f; // Heater power
-    float    ambientTemp        = 25.0f;  // Ambient temperature
+    float    ambientTemp        = 25.0f;  // Manual ambient (°C), used when ambientSource==MANUAL or sensor stale.
     float    vesselDiameter     = 0.35f;  // Vessel diameter in meters (~35cm)
-    float    heatLossCoeff      = 10.0f;  // Heat transfer coefficient (W/m²K)
+    // Dual heat-transfer coefficient (W/m²K). Lid-on is more insulating
+    // (smaller). Per-mode because convection differs significantly with
+    // an open vs covered vessel. Selected at runtime by lidState.
+    float    heatLossCoeffLidOn  = 8.0f;
+    float    heatLossCoeffLidOff = 12.0f;
+    LidState lidState            = LidState::ON;
+
+    // ── Ambient source (sensor-ready, manual today) ─────────
+    // ambientSource = MANUAL → consumers read gState.ambientTemp.
+    // ambientSource = SENSOR → consumers read gState.ambientSensorC
+    //   if ambientSensorOk and reading is fresh; else fall back to
+    //   ambientTemp. Sensor plugin is a stub today (no hardware);
+    //   wire shape is locked so consumers don't move when plugin lands.
+    AmbientSource ambientSource     = AmbientSource::MANUAL;
+    float         ambientSensorC    = 0.0f;
+    bool          ambientSensorOk   = false;
+    uint32_t      ambientSensorLastMs = 0;
+
+    // ── LossTune (auto-tune of heatLossCoeff_*) ─────────────
+    // State machine fields, not persisted. lossTuneTargetMode says
+    // which slot the RESULT will write to on accept.
+    bool          lossTuneActive       = false;
+    LossTunePhase lossTunePhase        = LossTunePhase::IDLE;
+    uint8_t       lossTuneProgressPct  = 0;
+    float         lossTuneR2           = 0.0f;
+    float         lossTuneFittedCoeff  = 0.0f;
+    LidState      lossTuneTargetMode   = LidState::ON;
+    uint16_t      lossTuneSampleCount  = 0;
+    float         lossTuneAmbientStart = 0.0f;
+    float         lossTuneAmbientEnd   = 0.0f;
+    AmbientSource lossTuneAmbientSrc   = AmbientSource::MANUAL;
+    char          lossTuneError[32]    = {0};
 
     // Temperature calibration: T_real = slope · T_medido + offset.
     // Default is identity (no correction). Set via req:settings:cal:set,
@@ -245,3 +322,39 @@ struct MachineState {
 
 // Global state — accessible by all plugins
 extern MachineState gState;
+
+// ─── Effective Ambient & Loss Coefficient Accessors ─────────
+// All consumers (PID feed-forward, Scheduler heating time, LossTune,
+// Watchdog grad envelope) MUST go through these instead of reading
+// gState.ambientTemp / gState.heatLossCoeff directly. This is what
+// lets us drop in AmbientSensorPlugin later without touching every
+// call site, and keeps the lid-state coefficient pick centralized.
+
+// Sensor reading older than this is treated as stale → fall back to
+// manual ambient. 60 s covers slow ambient drift while rejecting a
+// dead sensor stream.
+constexpr uint32_t AMBIENT_SENSOR_FRESH_MS = 60000;
+
+inline float getEffectiveAmbient() {
+    if (gState.ambientSource == AmbientSource::SENSOR
+        && gState.ambientSensorOk
+        && (millis() - gState.ambientSensorLastMs) < AMBIENT_SENSOR_FRESH_MS) {
+        return gState.ambientSensorC;
+    }
+    return gState.ambientTemp;
+}
+
+// Pick coefficient slot for an explicit lid state — used by LossTune
+// (writes to whichever slot the user is tuning) and by the watchdog
+// gradient envelope (always uses LidState::ON because lid-on
+// represents the steeper-ramp regime the envelope must accommodate).
+inline float chooseLossCoeff(LidState lid) {
+    return (lid == LidState::ON) ? gState.heatLossCoeffLidOn
+                                 : gState.heatLossCoeffLidOff;
+}
+
+// Current effective coefficient — runtime lid selection. Used by
+// PID feed-forward and Scheduler.
+inline float getEffectiveLossCoeff() {
+    return chooseLossCoeff(gState.lidState);
+}

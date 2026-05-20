@@ -102,11 +102,12 @@ public:
 
         // Feed-forward: compensate for heat loss
         float ffTerm = 0;
-        if (_feedForwardEnabled && _setpoint > gState.ambientTemp) {
+        float amb = getEffectiveAmbient();
+        if (_feedForwardEnabled && _setpoint > amb) {
             float ffOutput = ThermalCalc::calculateFeedForward(
                 _setpoint, _input, gState.heaterPowerWatts,
-                gState.volumeLiters, gState.ambientTemp, surfaceArea(),
-                gState.heatLossCoeff);
+                gState.volumeLiters, amb, surfaceArea(),
+                getEffectiveLossCoeff());
             ffTerm = ffOutput * _outputMax;
         }
 

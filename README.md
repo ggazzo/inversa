@@ -285,6 +285,17 @@ The `STEP` command accepts:
 4. Start the process (takes 15-30 minutes)
 5. Parameters are saved automatically
 
+### Heat-Loss Auto-Tune (LossTune)
+
+Measures the pot's heat-transfer coefficient `h` (W/m²·K) by fitting a
+Newton-cooling decay. Two coefficients are stored — one for lid-on and
+one for lid-off — and feed the PID feed-forward + scheduler.
+
+Open **Equipment wizard** → "Auto-tune do coef. de perda" and pick the
+lid mode. Takes ~10-15 min per mode. See [docs/losstune.md](docs/losstune.md)
+for the physics, acceptance gates, failure modes, BLE protocol, and
+bench-validation checklist.
+
 ### OTA (Over-the-Air Updates)
 
 1. Connect the ESP32 to WiFi in **Settings**

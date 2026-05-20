@@ -188,16 +188,16 @@ private:
     // Now uses ThermalCalc with heat loss compensation
     uint32_t calculateHeatingTime(float targetTemp, float volumeLiters) {
         // Get current temperature
+        float ambient = getEffectiveAmbient();
         float currentTemp = _state.currentTemp;
-        if (currentTemp < 5.0f) currentTemp = _state.ambientTemp;  // Use ambient if sensor error
-        
+        if (currentTemp < 5.0f) currentTemp = ambient;  // Use ambient if sensor error
+
         if (targetTemp <= currentTemp) return 0;  // Already at or above target
 
         // Use thermal parameters from state (can be configured)
         float power = _state.heaterPowerWatts;
-        float ambient = _state.ambientTemp;
         float diameter = _state.vesselDiameter;
-        float heatCoeff = _state.heatLossCoeff;
+        float heatCoeff = getEffectiveLossCoeff();
 
         // Calculate surface area from volume and diameter
         float surfaceArea = ThermalCalc::cylinderSurfaceArea(volumeLiters, diameter);

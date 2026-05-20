@@ -7,6 +7,7 @@ import { XStack, YStack } from 'tamagui';
 import {
     isConnected, hasRecovery, mode, manualIntent,
     recipeState, autoTuneActive, boilActive,
+    lossTuneActive, lossTunePhase,
 } from '@inversa/stores';
 import { TempInstrument } from '../components/TempInstrument';
 import { RecipeTimeline } from '../components/RecipeTimeline';
@@ -21,6 +22,7 @@ import { BoilActive }     from './states/BoilActive';
 import { Paused }         from './states/Paused';
 import { Manual }         from './states/Manual';
 import { AutoTune }       from './states/AutoTune';
+import { LossTune }       from './states/LossTune';
 import type { MenuId } from '../components/TopBar';
 
 const RECIPE_SUBS = new Set([
@@ -28,7 +30,7 @@ const RECIPE_SUBS = new Set([
 ]);
 
 type Sub =
-    | 'disconnected' | 'recovery' | 'autotune' | 'manual'
+    | 'disconnected' | 'recovery' | 'autotune' | 'losstune' | 'manual'
     | 'paused' | 'waitconfirm' | 'boil' | 'waittemp' | 'waittimer' | 'mash'
     | 'idle';
 
@@ -36,6 +38,12 @@ function deriveSubState(): Sub {
     if (!isConnected.value)              return 'disconnected';
     if (hasRecovery.value)               return 'recovery';
     if (autoTuneActive.value)            return 'autotune';
+    // LossTune view also handles the post-run RESULT / ERROR states so
+    // the user can accept/reject the fit. Once RESULT is acked we drop
+    // out of this branch (lossTuneActive==false && phase=='IDLE').
+    if (lossTuneActive.value
+        || lossTunePhase.value === 'RESULT'
+        || lossTunePhase.value === 'ERROR') return 'losstune';
     // UI-side intent: user tapped "Modo Manual" from Idle. Firmware
     // only flips to Manual after req:set-temp / req:heater:on (which
     // the user sends *from* the Manual view), so without this the
@@ -104,6 +112,7 @@ function ContextPanel({ sub, onMenuSelect, onStartManual }:
     switch (sub) {
         case 'recovery':    return <RecoveryPrompt />;
         case 'autotune':    return <AutoTune />;
+        case 'losstune':    return <LossTune />;
         case 'manual':      return <Manual />;
         case 'paused':      return <Paused />;
         case 'waitconfirm': return <WaitConfirm />;

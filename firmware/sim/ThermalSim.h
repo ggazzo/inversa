@@ -21,13 +21,20 @@
 // the inverse of the Steinhart-Hart B-equation TemperaturePlugin uses.
 
 struct ThermalSimParams {
-    float volumeLiters    = 25.0f;
-    float heaterPowerW    = 3000.0f;
-    float efficiency      = 0.90f;
-    float ambientTempC    = 22.0f;
-    float diameterM       = 0.35f;
-    float heatLossCoeff   = 10.0f;
-    float initialTempC    = 22.0f;
+    float volumeLiters       = 25.0f;
+    float heaterPowerW       = 3000.0f;
+    float efficiency         = 0.90f;
+    float ambientTempC       = 22.0f;
+    float diameterM          = 0.35f;
+    // Dual coefficient so the sim can validate LossTune against a known
+    // truth in either lid mode. Single-coeff callers can set both fields
+    // to the same value.
+    float heatLossCoeffLidOn  = 8.0f;
+    float heatLossCoeffLidOff = 12.0f;
+    // Selects which coefficient drives the cooling term. Default ON to
+    // match historical sim defaults (insulated kettle).
+    bool  lidOn               = true;
+    float initialTempC        = 22.0f;
 };
 
 class ThermalSim {
@@ -50,12 +57,17 @@ public:
     static void setPump(bool on)   { _pumpOn.store(on); }
     static bool pumpOn()           { return _pumpOn.load(); }
 
+    // Runtime lid toggle — bench code / tests can flip mid-simulation.
+    static void setLid(bool lidOn) { _p.lidOn = lidOn; }
+    static bool lidOn()            { return _p.lidOn; }
+
     // ── ODE integration ─────────────────────────────────────────────
     // dt in seconds (sim driver passes 0.1 for a 100 ms tick).
     static void tick(float dt) {
         const float T = _tempC.load();
         const float P_in  = _heaterOn.load() ? (_p.heaterPowerW * _p.efficiency) : 0.0f;
-        const float P_out = _p.heatLossCoeff * _surfaceArea * (T - _p.ambientTempC);
+        const float h     = _p.lidOn ? _p.heatLossCoeffLidOn : _p.heatLossCoeffLidOff;
+        const float P_out = h * _surfaceArea * (T - _p.ambientTempC);
         const float massKg = _p.volumeLiters;  // density 1 kg/L
         const float C_WATER = 4186.0f;
         const float dT = (P_in - P_out) / (massKg * C_WATER) * dt;

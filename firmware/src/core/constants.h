@@ -139,3 +139,30 @@
 #define WATCHDOG_SAFE_AUTORESET_MAX_C      80.0f
 #define WATCHDOG_COOL_MIN_MIN_MS           60000
 #define WATCHDOG_COOL_MIN_MAX_MS           1800000
+
+// ─── Loss-Coefficient Auto-Tune (LossTune) ──────────────────
+// Drives pot to T_amb + LOSSTUNE_TARGET_DELTA_C (capped at HARDSTOP - margin),
+// soaks LOSSTUNE_SOAK_MS, then opens SSR and samples cooling at 1 Hz until
+// (T - T_amb) ≤ LOSSTUNE_STOP_DELTA_C or LOSSTUNE_MAX_MS. Fits exponential
+// decay τ = -1/slope of ln(T-T_amb) vs time. Acceptance gates: R² ≥
+// LOSSTUNE_MIN_R2, τ ∈ [LOSSTUNE_TAU_MIN_S, LOSSTUNE_TAU_MAX_S], coeff in
+// [LOSSTUNE_COEFF_MIN, LOSSTUNE_COEFF_MAX], usable samples ≥
+// LOSSTUNE_MIN_SAMPLES, ambient drift (sensor mode only) ≤
+// LOSSTUNE_AMBIENT_DRIFT_C.
+#define LOSSTUNE_TARGET_DELTA_C            50.0f
+#define LOSSTUNE_TARGET_MAX_C              85.0f     // Hard ceiling for heat phase target
+#define LOSSTUNE_SOAK_MS                   30000
+#define LOSSTUNE_MAX_MS                    600000    // 10 min decay cap
+#define LOSSTUNE_STOP_DELTA_C              5.0f      // Stop decay when T - T_amb ≤ this
+#define LOSSTUNE_SAMPLE_INTERVAL_MS        1000      // 1 Hz
+#define LOSSTUNE_DROP_HEAD_S               20        // Drop first 20 s of decay (mixing transient)
+#define LOSSTUNE_MIN_SAMPLES               120       // Min usable samples after head-drop
+#define LOSSTUNE_MIN_R2                    0.98f
+#define LOSSTUNE_TAU_MIN_S                 60.0f
+#define LOSSTUNE_TAU_MAX_S                 7200.0f
+#define LOSSTUNE_COEFF_MIN                 1.0f
+#define LOSSTUNE_COEFF_MAX                 50.0f
+#define LOSSTUNE_AMBIENT_DRIFT_C           1.0f
+#define LOSSTUNE_HEAT_SETTLE_BAND_C        0.5f      // ±band for "at target" during SOAK entry
+#define LOSSTUNE_SAMPLE_EMIT_BATCH         5         // Stream every N samples (5 s @ 1 Hz)
+#define LOSSTUNE_BUFFER_SIZE               600       // Ring capacity = LOSSTUNE_MAX_MS / interval
