@@ -29,11 +29,11 @@ struct LcdPins {
     static constexpr int cs    = 10;
     static constexpr int rst   = 9;
     static constexpr int bl    = 7;   // backlight
-    // Touch (I2C, AXS5106L)
-    static constexpr int sda   = 4;
-    static constexpr int scl   = 5;
-    static constexpr int tirq  = 16;
-    static constexpr int trst  = 15;
+    // Touch (I2C, AXS5106L) — Waveshare ESP32-S3-Touch-LCD-1.47 wiring.
+    static constexpr int sda   = 1;
+    static constexpr int scl   = 3;
+    static constexpr int tirq  = 4;
+    static constexpr int trst  = -1;  // shared with LCD_RST on this board
 };
 
 constexpr int LCD_W = 172;
