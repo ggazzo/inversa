@@ -80,7 +80,9 @@ export async function runScenario(opts: RunnerOptions): Promise<RunResult> {
   sendQueue.length = 0;
 
   // Subscribe to state at the requested rate.
-  const hz = opts.stateHz ?? 20;
+  // Default to 10 Hz to match the firmware-side cap and avoid starving
+  // the NimBLE host task on the shared USB CDC pipe.
+  const hz = opts.stateHz ?? 10;
   transport.send({ cmd: "sub", topic: "state", hz });
   transport.send({ cmd: "sub", topic: "ssr", enable: true });
   transport.send({ cmd: "sub", topic: "events", enable: true });
@@ -102,6 +104,20 @@ export async function runScenario(opts: RunnerOptions): Promise<RunResult> {
   await new Promise((r) => setTimeout(r, opts.durationMs));
   stopped = true;
   clearInterval(tickHandle);
+
+  // Best-effort: silence the firmware-side streams before closing. The
+  // ESP keeps subs in RAM until reboot, so leaving them on at 10 Hz
+  // starves the NimBLE host task for the next user that just wants the
+  // BLE app. Failing to send (port already closed, etc) is ignored.
+  try {
+    transport.send({ cmd: "sub", topic: "state", hz: 0 });
+    transport.send({ cmd: "sub", topic: "ssr", enable: false });
+    transport.send({ cmd: "sub", topic: "events", enable: false });
+    // Give the writes a chance to drain before we close.
+    await new Promise((r) => setTimeout(r, 50));
+  } catch {
+    // ignore
+  }
 
   // Collect reports.
   const reports: Report[] = [];

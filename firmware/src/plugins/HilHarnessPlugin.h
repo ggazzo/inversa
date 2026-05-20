@@ -218,7 +218,11 @@ private:
             if (!strcmp(topic, "state")) {
                 _stateHz = doc["hz"].as<int>();
                 if (_stateHz < 0)  _stateHz = 0;
-                if (_stateHz > 50) _stateHz = 50;
+                // Cap at 10 Hz. Higher rates saturate the shared USB CDC
+                // transport and starve the NimBLE host task on the dual-
+                // role build, breaking BLE notifies to the PWA. 10 Hz is
+                // plenty for cenarios that care about <100 ms latencies.
+                if (_stateHz > 10) _stateHz = 10;
                 _lastStateMs = 0;  // emit immediately on next loop
             } else if (!strcmp(topic, "events")) {
                 _eventStream = doc["enable"] | true;
