@@ -593,6 +593,28 @@ private:
         wd[Protocol::WD_FIELD_SAFE_AUTORESET_C] = round2(gState.watchdogSafeAutoresetC);
         wd[Protocol::WD_FIELD_COOL_MIN_MS]      = gState.watchdogCoolMinMs;
 
+        // Ambient (effective + raw source state) — UI uses these to render
+        // the badge "Manual" / "Sensor (ok)" / "Sensor (stale → manual)".
+        doc["ambEff"]      = round2(getEffectiveAmbient());
+        doc["ambSrc"]      = gState.ambientSource == AmbientSource::SENSOR ? "sensor" : "manual";
+        doc["ambSensorOk"] = gState.ambientSensorOk;
+        doc["lidState"]    = gState.lidState == LidState::ON ? "lidOn" : "lidOff";
+
+        // LossTune progress — emitted only when active so steady-state
+        // status payload stays compact.
+        if (gState.lossTuneActive
+            || gState.lossTunePhase == LossTunePhase::RESULT
+            || gState.lossTunePhase == LossTunePhase::ERROR) {
+            auto lt = doc["lt"].to<JsonObject>();
+            lt["ph"]   = getLossTunePhaseName(gState.lossTunePhase);
+            lt["pct"]  = gState.lossTuneProgressPct;
+            lt["mode"] = gState.lossTuneTargetMode == LidState::ON ? "lidOn" : "lidOff";
+            lt["r2"]   = round2(gState.lossTuneR2);
+            lt["h"]    = round2(gState.lossTuneFittedCoeff);
+            lt["n"]    = gState.lossTuneSampleCount;
+            if (gState.lossTuneError[0]) lt["err"] = gState.lossTuneError;
+        }
+
         sendJson(doc);
     }
 

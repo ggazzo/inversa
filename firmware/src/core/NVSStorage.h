@@ -77,28 +77,66 @@ public:
         DEBUG_PRINTLN("[NVS] WiFi credentials cleared");
     }
 
-    // ── Thermal Parameters (P13) ────────────────────────────
+    // ── Thermal Parameters (P13 + LossTune dual-coeff) ──────
     // Persist vessel thermal params so feed-forward survives reboot.
     // Keys ≤15 chars (NVS limit).
+    //
+    // Schema evolution: legacy single `therm_loss_c` was split into
+    // per-lid-state coefficients `therm_loss_on` (lid closed, lower h)
+    // and `therm_loss_off` (lid open, higher h). On boot the migration
+    // helper migrateLegacyLossCoeff() copies legacy value into both
+    // slots if either is missing.
     void saveThermalParams(float volumeL, float powerW, float ambientC,
-                           float diameterM, float lossCoeff) {
-        _prefs.putFloat("therm_vol_l",  volumeL);
-        _prefs.putFloat("therm_pwr_w",  powerW);
-        _prefs.putFloat("therm_amb_c",  ambientC);
-        _prefs.putFloat("therm_diam_m", diameterM);
-        _prefs.putFloat("therm_loss_c", lossCoeff);
-        DEBUG_PRINTF("[NVS] Saved thermal: V=%.1fL P=%.0fW Tamb=%.1f D=%.2fm h=%.1f\n",
-                     volumeL, powerW, ambientC, diameterM, lossCoeff);
+                           float diameterM,
+                           float lossCoeffLidOn, float lossCoeffLidOff,
+                           uint8_t ambientSource) {
+        _prefs.putFloat("therm_vol_l",   volumeL);
+        _prefs.putFloat("therm_pwr_w",   powerW);
+        _prefs.putFloat("therm_amb_c",   ambientC);
+        _prefs.putFloat("therm_diam_m",  diameterM);
+        _prefs.putFloat("therm_loss_on", lossCoeffLidOn);
+        _prefs.putFloat("therm_loss_off", lossCoeffLidOff);
+        _prefs.putUChar("therm_amb_src", ambientSource);
+        DEBUG_PRINTF("[NVS] Saved thermal: V=%.1fL P=%.0fW Tamb=%.1f D=%.2fm h_on=%.1f h_off=%.1f src=%u\n",
+                     volumeL, powerW, ambientC, diameterM,
+                     lossCoeffLidOn, lossCoeffLidOff, (unsigned)ambientSource);
     }
 
-    float loadThermalVolumeL(float defaultVal)    { return _prefs.getFloat("therm_vol_l",  defaultVal); }
-    float loadThermalPowerW(float defaultVal)     { return _prefs.getFloat("therm_pwr_w",  defaultVal); }
-    float loadThermalAmbientC(float defaultVal)   { return _prefs.getFloat("therm_amb_c",  defaultVal); }
-    float loadThermalDiameterM(float defaultVal)  { return _prefs.getFloat("therm_diam_m", defaultVal); }
-    float loadThermalLossCoeff(float defaultVal)  { return _prefs.getFloat("therm_loss_c", defaultVal); }
+    // Persist a single lid-mode coefficient (used by LossTune accept path).
+    void saveThermalLossCoeff(uint8_t lidState, float lossCoeff) {
+        if (lidState == 0) _prefs.putFloat("therm_loss_on",  lossCoeff);
+        else               _prefs.putFloat("therm_loss_off", lossCoeff);
+        DEBUG_PRINTF("[NVS] Saved loss coeff: lid=%s h=%.2f\n",
+                     lidState == 0 ? "ON" : "OFF", lossCoeff);
+    }
+
+    float loadThermalVolumeL(float defaultVal)        { return _prefs.getFloat("therm_vol_l",   defaultVal); }
+    float loadThermalPowerW(float defaultVal)         { return _prefs.getFloat("therm_pwr_w",   defaultVal); }
+    float loadThermalAmbientC(float defaultVal)       { return _prefs.getFloat("therm_amb_c",   defaultVal); }
+    float loadThermalDiameterM(float defaultVal)      { return _prefs.getFloat("therm_diam_m",  defaultVal); }
+    float loadThermalLossCoeffLidOn(float defaultVal) { return _prefs.getFloat("therm_loss_on", defaultVal); }
+    float loadThermalLossCoeffLidOff(float defaultVal){ return _prefs.getFloat("therm_loss_off", defaultVal); }
+    uint8_t loadThermalAmbientSource(uint8_t defaultVal) { return _prefs.getUChar("therm_amb_src", defaultVal); }
 
     bool hasThermalParams() {
         return _prefs.isKey("therm_vol_l");
+    }
+
+    // Migrate legacy single `therm_loss_c` into the dual-coeff slots if
+    // either new key is missing. Idempotent. Called once from main.cpp
+    // setup before plugins read state. Legacy key is left in place for
+    // forensic purposes; nothing else reads it.
+    void migrateLegacyLossCoeff(float defaultCoeff) {
+        bool haveOn  = _prefs.isKey("therm_loss_on");
+        bool haveOff = _prefs.isKey("therm_loss_off");
+        if (haveOn && haveOff) return;
+        float legacy = _prefs.isKey("therm_loss_c")
+                       ? _prefs.getFloat("therm_loss_c", defaultCoeff)
+                       : defaultCoeff;
+        if (!haveOn)  _prefs.putFloat("therm_loss_on",  legacy);
+        if (!haveOff) _prefs.putFloat("therm_loss_off", legacy);
+        DEBUG_PRINTF("[NVS] Migrated loss coeff: legacy=%.1f → on=off=%.1f\n",
+                     legacy, legacy);
     }
 
     // ── Temperature Calibration ─────────────────────────────

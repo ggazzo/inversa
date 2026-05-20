@@ -22,6 +22,7 @@
 #include "AutoTunePlugin.h"
 #include "SchedulerPlugin.h"
 #include "ThermalWatchdogPlugin.h"
+#include "LossTunePlugin.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -35,7 +36,8 @@ public:
               BoilTimerPlugin* boilTimer = nullptr, RTCPlugin* rtc = nullptr,
               TimerPlugin* timer = nullptr, AutoTunePlugin* autoTune = nullptr,
               SchedulerPlugin* scheduler = nullptr,
-              ThermalWatchdogPlugin* watchdog = nullptr) {
+              ThermalWatchdogPlugin* watchdog = nullptr,
+              LossTunePlugin* lossTune = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
@@ -50,6 +52,7 @@ public:
         _autoTune = autoTune;
         _scheduler = scheduler;
         _watchdog = watchdog;
+        _lossTune = lossTune;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             // Reuse the same JsonDocument for every inbound command. BLE
@@ -622,40 +625,90 @@ public:
             _scheduler->cancel();
             sendOk(rid);
         }
-        // ── Thermal Settings: Get (P13) ─────────────────────
+        // ── Thermal Settings: Get (P13 + dual-coeff) ────────
         else if (strcmp(type, Protocol::REQ_SETTINGS_THERMAL_GET) == 0) {
             JsonDocument res;
             res[Protocol::FIELD_TYPE] = Protocol::RES_SETTINGS_THERMAL;
             res[Protocol::FIELD_REQUEST_ID] = rid;
-            res["volumeL"]   = gState.volumeLiters;
-            res["powerW"]    = gState.heaterPowerWatts;
-            res["ambientC"]  = gState.ambientTemp;
-            res["diameterM"] = gState.vesselDiameter;
-            res["lossCoeff"] = gState.heatLossCoeff;
-            res["persisted"] = NVSStorage::instance().hasThermalParams();
+            res["volumeL"]        = gState.volumeLiters;
+            res["powerW"]         = gState.heaterPowerWatts;
+            res["ambientC"]       = gState.ambientTemp;
+            res["diameterM"]      = gState.vesselDiameter;
+            res["lossCoeffLidOn"] = gState.heatLossCoeffLidOn;
+            res["lossCoeffLidOff"]= gState.heatLossCoeffLidOff;
+            res["lidState"]       = gState.lidState == LidState::ON ? "lidOn" : "lidOff";
+            res["ambientSource"]  = gState.ambientSource == AmbientSource::SENSOR ? "sensor" : "manual";
+            res["ambientSensorOk"]= gState.ambientSensorOk;
+            res["ambientSensorC"] = gState.ambientSensorC;
+            res["ambientEffectiveC"] = getEffectiveAmbient();
+            res["persisted"]      = NVSStorage::instance().hasThermalParams();
             _ble->sendJson(res);
         }
-        // ── Thermal Settings: Set + persist (P13) ───────────
+        // ── Thermal Settings: Set + persist (P13 + dual-coeff) ───
         else if (strcmp(type, Protocol::REQ_SETTINGS_THERMAL_SET) == 0) {
-            float volumeL   = doc["volumeL"]   | gState.volumeLiters;
-            float powerW    = doc["powerW"]    | gState.heaterPowerWatts;
-            float ambientC  = doc["ambientC"]  | gState.ambientTemp;
-            float diameterM = doc["diameterM"] | gState.vesselDiameter;
-            float lossCoeff = doc["lossCoeff"] | gState.heatLossCoeff;
+            float volumeL    = doc["volumeL"]         | gState.volumeLiters;
+            float powerW     = doc["powerW"]          | gState.heaterPowerWatts;
+            float ambientC   = doc["ambientC"]        | gState.ambientTemp;
+            float diameterM  = doc["diameterM"]       | gState.vesselDiameter;
+            float lossOn     = doc["lossCoeffLidOn"]  | gState.heatLossCoeffLidOn;
+            float lossOff    = doc["lossCoeffLidOff"] | gState.heatLossCoeffLidOff;
+            const char* srcStr = doc["ambientSource"] | (gState.ambientSource == AmbientSource::SENSOR ? "sensor" : "manual");
+            const char* lidStr = doc["lidState"]      | (gState.lidState == LidState::ON ? "lidOn" : "lidOff");
 
-            // Physical ranges — defensive against typos in the app.
-            if (volumeL   < 1.0f   || volumeL   > 200.0f) { sendError(rid, "volumeL must be 1-200L"); return; }
+            if (volumeL   < 1.0f   || volumeL   > 200.0f)   { sendError(rid, "volumeL must be 1-200L"); return; }
             if (powerW    < 500.0f || powerW    > 10000.0f) { sendError(rid, "powerW must be 500-10000W"); return; }
-            if (ambientC  < -10.0f || ambientC  > 50.0f)  { sendError(rid, "ambientC must be -10..50C"); return; }
-            if (diameterM < 0.1f   || diameterM > 1.0f)   { sendError(rid, "diameterM must be 0.1-1.0m"); return; }
-            if (lossCoeff < 1.0f   || lossCoeff > 50.0f)  { sendError(rid, "lossCoeff must be 1-50 W/m²K"); return; }
+            if (ambientC  < -10.0f || ambientC  > 50.0f)    { sendError(rid, "ambientC must be -10..50C"); return; }
+            if (diameterM < 0.1f   || diameterM > 1.0f)     { sendError(rid, "diameterM must be 0.1-1.0m"); return; }
+            if (lossOn  < LOSSTUNE_COEFF_MIN || lossOn  > LOSSTUNE_COEFF_MAX) { sendError(rid, "lossCoeffLidOn must be 1-50 W/m²K"); return; }
+            if (lossOff < LOSSTUNE_COEFF_MIN || lossOff > LOSSTUNE_COEFF_MAX) { sendError(rid, "lossCoeffLidOff must be 1-50 W/m²K"); return; }
 
-            gState.volumeLiters     = volumeL;
-            gState.heaterPowerWatts = powerW;
-            gState.ambientTemp      = ambientC;
-            gState.vesselDiameter   = diameterM;
-            gState.heatLossCoeff    = lossCoeff;
-            NVSStorage::instance().saveThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff);
+            AmbientSource src = (strcmp(srcStr, "sensor") == 0) ? AmbientSource::SENSOR : AmbientSource::MANUAL;
+            LidState lid     = (strcmp(lidStr, "lidOff") == 0) ? LidState::OFF : LidState::ON;
+
+            gState.volumeLiters        = volumeL;
+            gState.heaterPowerWatts    = powerW;
+            gState.ambientTemp         = ambientC;
+            gState.vesselDiameter      = diameterM;
+            gState.heatLossCoeffLidOn  = lossOn;
+            gState.heatLossCoeffLidOff = lossOff;
+            gState.ambientSource       = src;
+            gState.lidState            = lid;
+            NVSStorage::instance().saveThermalParams(
+                volumeL, powerW, ambientC, diameterM,
+                lossOn, lossOff, (uint8_t)src);
+            sendOk(rid);
+        }
+        // ── Lid State: runtime selector ─────────────────────
+        else if (strcmp(type, Protocol::REQ_LID_STATE_SET) == 0) {
+            const char* mode = doc["mode"] | "";
+            if      (strcmp(mode, "lidOn")  == 0) gState.lidState = LidState::ON;
+            else if (strcmp(mode, "lidOff") == 0) gState.lidState = LidState::OFF;
+            else { sendError(rid, "mode must be lidOn or lidOff"); return; }
+            sendOk(rid);
+        }
+        // ── LossTune ────────────────────────────────────────
+        else if (strcmp(type, Protocol::REQ_LOSSTUNE_START) == 0) {
+            if (!_lossTune) { sendError(rid, "losstune_unavailable"); return; }
+            const char* mode = doc["mode"] | "lidOn";
+            LidState targetMode = (strcmp(mode, "lidOff") == 0)
+                                  ? LidState::OFF : LidState::ON;
+            const char* err = _lossTune->start(targetMode);
+            if (err) { sendError(rid, err); return; }
+            sendOk(rid);
+        }
+        else if (strcmp(type, Protocol::REQ_LOSSTUNE_CANCEL) == 0) {
+            if (!_lossTune) { sendError(rid, "losstune_unavailable"); return; }
+            _lossTune->cancel();
+            sendOk(rid);
+        }
+        else if (strcmp(type, Protocol::REQ_LOSSTUNE_ACCEPT) == 0) {
+            if (!_lossTune) { sendError(rid, "losstune_unavailable"); return; }
+            if (!_lossTune->accept()) { sendError(rid, "not_in_result"); return; }
+            sendOk(rid);
+        }
+        else if (strcmp(type, Protocol::REQ_LOSSTUNE_REJECT) == 0) {
+            if (!_lossTune) { sendError(rid, "losstune_unavailable"); return; }
+            if (!_lossTune->reject()) { sendError(rid, "not_in_result"); return; }
             sendOk(rid);
         }
         // ── Temperature Calibration: Get ────────────────────
@@ -749,6 +802,7 @@ private:
     AutoTunePlugin* _autoTune = nullptr;
     SchedulerPlugin* _scheduler = nullptr;
     ThermalWatchdogPlugin* _watchdog = nullptr;
+    LossTunePlugin* _lossTune = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;

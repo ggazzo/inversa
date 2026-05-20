@@ -107,13 +107,15 @@ int main(int argc, char** argv) {
 
     // ── Configure ThermalSim from CLI ──────────────────────────────
     ThermalSim::configure({
-        .volumeLiters  = args.volumeLiters,
-        .heaterPowerW  = args.heaterPowerW,
-        .efficiency    = 0.90f,
-        .ambientTempC  = args.ambientC,
-        .diameterM     = args.diameterM,
-        .heatLossCoeff = args.lossCoeff,
-        .initialTempC  = args.ambientC,
+        .volumeLiters       = args.volumeLiters,
+        .heaterPowerW       = args.heaterPowerW,
+        .efficiency         = 0.90f,
+        .ambientTempC       = args.ambientC,
+        .diameterM          = args.diameterM,
+        .heatLossCoeffLidOn  = args.lossCoeff,
+        .heatLossCoeffLidOff = args.lossCoeff,
+        .lidOn               = true,
+        .initialTempC       = args.ambientC,
     });
 
     // Bind GPIO pins the sim cares about. Values come from the production
@@ -126,14 +128,18 @@ int main(int argc, char** argv) {
     NVSStorage::instance().begin();
     NVSStorage::instance().saveThermalParams(
         args.volumeLiters, args.heaterPowerW, args.ambientC,
-        args.diameterM, args.lossCoeff);
+        args.diameterM, args.lossCoeff, args.lossCoeff,
+        /*ambientSource=*/0 /*MANUAL*/);
 
     // Mirror to gState so feed-forward in PID has values before NVS read.
-    gState.volumeLiters     = args.volumeLiters;
-    gState.heaterPowerWatts = args.heaterPowerW;
-    gState.ambientTemp      = args.ambientC;
-    gState.vesselDiameter   = args.diameterM;
-    gState.heatLossCoeff    = args.lossCoeff;
+    gState.volumeLiters         = args.volumeLiters;
+    gState.heaterPowerWatts     = args.heaterPowerW;
+    gState.ambientTemp          = args.ambientC;
+    gState.vesselDiameter       = args.diameterM;
+    gState.heatLossCoeffLidOn   = args.lossCoeff;
+    gState.heatLossCoeffLidOff  = args.lossCoeff;
+    gState.ambientSource        = AmbientSource::MANUAL;
+    gState.lidState             = LidState::ON;
 
     // ── Register plugins ──────────────────────────────────────────
     auto& pm = PluginManager::instance();

@@ -108,6 +108,15 @@ namespace Protocol {
     constexpr const char* REQ_WATCHDOG_RESET  = "req:watchdog:reset";   // no args
     constexpr const char* REQ_WATCHDOG_CONFIG = "req:watchdog:config";  // partial config object
 
+    // LossTune — auto-tune of heat-loss coefficient
+    constexpr const char* REQ_LOSSTUNE_START  = "req:losstune:start";   // {mode:"lidOn"|"lidOff"}
+    constexpr const char* REQ_LOSSTUNE_CANCEL = "req:losstune:cancel";
+    constexpr const char* REQ_LOSSTUNE_ACCEPT = "req:losstune:accept";  // persist fitted coeff
+    constexpr const char* REQ_LOSSTUNE_REJECT = "req:losstune:reject";  // discard fit, back to IDLE
+
+    // Lid state runtime selector — picks which lossCoeff_* drives PID/Scheduler
+    constexpr const char* REQ_LID_STATE_SET   = "req:lid:set";          // {mode:"lidOn"|"lidOff"}
+
     // WiFi Events (device → app)
     constexpr const char* EVT_WIFI_STATUS     = "evt:wifi:status";
 
@@ -145,6 +154,11 @@ namespace Protocol {
     // Thermal Watchdog Events (device → app) — 001-thermal-watchdog
     constexpr const char* EVT_WATCHDOG_TRIPPED = "evt:watchdog:tripped"; // {cause, temp, unix}
     constexpr const char* EVT_WATCHDOG_RESET   = "evt:watchdog:reset";   // {auto, prev_cause}
+
+    // LossTune Events (device → app)
+    constexpr const char* EVT_LOSSTUNE_STATUS  = "evt:losstune:status";  // phase + progress + R²
+    constexpr const char* EVT_LOSSTUNE_SAMPLE  = "evt:losstune:sample";  // batched (t,T) during DECAY
+    constexpr const char* EVT_LOSSTUNE_RESULT  = "evt:losstune:result";  // fit done, awaiting accept
 
     // Responses (device → app)
     constexpr const char* RES_OK            = "res:ok";

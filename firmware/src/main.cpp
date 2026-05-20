@@ -28,6 +28,8 @@
 #include "plugins/AutoTunePlugin.h"
 #include "plugins/SchedulerPlugin.h"
 #include "plugins/ThermalWatchdogPlugin.h"
+#include "plugins/AmbientSensorPlugin.h"
+#include "plugins/LossTunePlugin.h"
 #include "plugins/CommandHandler.h"
 
 // ─── Global State ───────────────────────────────────────────
@@ -63,10 +65,15 @@ void setup() {
             gState.heaterPowerWatts = nvs.loadThermalPowerW(gState.heaterPowerWatts);
             gState.ambientTemp      = nvs.loadThermalAmbientC(gState.ambientTemp);
             gState.vesselDiameter   = nvs.loadThermalDiameterM(gState.vesselDiameter);
-            gState.heatLossCoeff    = nvs.loadThermalLossCoeff(gState.heatLossCoeff);
-            DEBUG_PRINTF("[System] Thermal params loaded: V=%.1fL P=%.0fW Tamb=%.1f D=%.2fm h=%.1f\n",
+            // Migrate legacy single-coeff key into dual-coeff slots if either is missing.
+            nvs.migrateLegacyLossCoeff(gState.heatLossCoeffLidOn);
+            gState.heatLossCoeffLidOn  = nvs.loadThermalLossCoeffLidOn (gState.heatLossCoeffLidOn);
+            gState.heatLossCoeffLidOff = nvs.loadThermalLossCoeffLidOff(gState.heatLossCoeffLidOff);
+            gState.ambientSource = (AmbientSource)nvs.loadThermalAmbientSource((uint8_t)gState.ambientSource);
+            DEBUG_PRINTF("[System] Thermal params loaded: V=%.1fL P=%.0fW Tamb=%.1f D=%.2fm h_on=%.1f h_off=%.1f src=%u\n",
                          gState.volumeLiters, gState.heaterPowerWatts, gState.ambientTemp,
-                         gState.vesselDiameter, gState.heatLossCoeff);
+                         gState.vesselDiameter, gState.heatLossCoeffLidOn,
+                         gState.heatLossCoeffLidOff, (unsigned)gState.ambientSource);
         }
         if (nvs.hasTempCalibration()) {
             gState.tempCalSlope  = nvs.loadTempCalSlope(gState.tempCalSlope);
@@ -102,6 +109,9 @@ void setup() {
     auto* timer     = pm.add<TimerPlugin>(gState, rtc);
     auto* autoTune  = pm.add<AutoTunePlugin>(gState, *pid);
     auto* scheduler = pm.add<SchedulerPlugin>(gState, *rtc);
+    auto* ambient   = pm.add<AmbientSensorPlugin>();
+    (void)ambient;
+    auto* lossTune  = pm.add<LossTunePlugin>();
 
     // Initialize all plugins
     pm.setup();
@@ -116,7 +126,7 @@ void setup() {
     RecoveryManager::instance().noteBootAttempt();
 
     // Wire up command handler (routes BLE commands to plugins)
-    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler, watchdog);
+    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler, watchdog, lossTune);
 
     // Check for power loss recovery
     if (RecoveryManager::instance().hasValidRecovery()) {

@@ -1,8 +1,13 @@
 // WizardEquipment.tsx — P13 thermal params editor.
 import { useEffect, useState } from 'react';
-import { Button, Input, Label, Paragraph, Text, XStack, YStack } from 'tamagui';
+import { Button, Card, Input, Label, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { ConnectionManager } from '@inversa/services';
-import { showToast } from '@inversa/stores';
+import {
+    showToast,
+    ambientEffectiveC, ambientSource, ambientSensorOk,
+    lidState, lossTuneActive,
+} from '@inversa/stores';
+import { useSignals } from '@preact/signals-react/runtime';
 import { WizardSheet } from './WizardSheet';
 
 // Stored as strings so partial entries ("-", "0.", ".5") survive a
@@ -11,21 +16,20 @@ import { WizardSheet } from './WizardSheet';
 // value (so a blank ambient field doesn't silently send NaN).
 interface FormState {
     volumeL: string; powerW: string; ambientC: string;
-    diameterM: string; lossCoeff: string;
-    // Temperature calibration "fast path": this wizard only exposes the
-    // additive offset. The slope is held in `currentSlope` (state below)
-    // and preserved across saves — to recompute it from multiple
-    // calibration points the user opens the dedicated Calibration sheet.
+    diameterM: string;
+    lossCoeffLidOn: string;
+    lossCoeffLidOff: string;
     tempOffsetC: string;
 }
 
 const FIELDS: Array<{ key: keyof FormState; label: string; min: number; max: number; step: number; hint: string }> = [
-    { key: 'volumeL',     label: 'Volume (L)',          min: 1,    max: 200,   step: 0.5,  hint: '1 - 200' },
-    { key: 'powerW',      label: 'Potência (W)',        min: 500,  max: 10000, step: 50,   hint: '500 - 10000' },
-    { key: 'ambientC',    label: 'Ambiente (°C)',       min: -10,  max: 50,    step: 1,    hint: '-10 - 50' },
-    { key: 'diameterM',   label: 'Diâmetro (m)',        min: 0.1,  max: 1.0,   step: 0.01, hint: '0.1 - 1.0' },
-    { key: 'lossCoeff',   label: 'Coef. perda (W/m²K)', min: 1,    max: 50,    step: 0.5,  hint: '1 - 50' },
-    { key: 'tempOffsetC', label: 'Offset sensor (°C)',  min: -10,  max: 10,    step: 0.1,  hint: '-10 - 10  •  ajuste rápido; para calibração com pontos múltiplos use "Calibrar sensor"' },
+    { key: 'volumeL',         label: 'Volume (L)',                  min: 1,    max: 200,   step: 0.5,  hint: '1 - 200' },
+    { key: 'powerW',          label: 'Potência (W)',                min: 500,  max: 10000, step: 50,   hint: '500 - 10000' },
+    { key: 'ambientC',        label: 'Ambiente (°C)',               min: -10,  max: 50,    step: 1,    hint: '-10 - 50' },
+    { key: 'diameterM',       label: 'Diâmetro (m)',                min: 0.1,  max: 1.0,   step: 0.01, hint: '0.1 - 1.0' },
+    { key: 'lossCoeffLidOn',  label: 'Coef. perda — tampa fechada', min: 1,    max: 50,    step: 0.5,  hint: '1 - 50 W/m²K' },
+    { key: 'lossCoeffLidOff', label: 'Coef. perda — tampa aberta',  min: 1,    max: 50,    step: 0.5,  hint: '1 - 50 W/m²K' },
+    { key: 'tempOffsetC',     label: 'Offset sensor (°C)',          min: -10,  max: 10,    step: 0.1,  hint: '-10 - 10  •  ajuste rápido; para calibração com pontos múltiplos use "Calibrar sensor"' },
 ];
 
 function num(s: string, fallback: number): number {
@@ -36,13 +40,15 @@ function num(s: string, fallback: number): number {
 interface Props { open: boolean; onClose: () => void }
 
 export function WizardEquipment({ open, onClose }: Props) {
+    useSignals();
     const [form, setForm]               = useState<FormState | null>(null);
-    // The slope is held in a hidden state alongside the form (this
-    // wizard only edits the offset). The persisted snapshot lets save()
-    // fall back to the last good number when a string fails to parse.
     const [persistedForm, setPersistedForm] = useState<{
         volumeL: number; powerW: number; ambientC: number;
-        diameterM: number; lossCoeff: number; offset: number; slope: number;
+        diameterM: number;
+        lossCoeffLidOn: number; lossCoeffLidOff: number;
+        offset: number; slope: number;
+        ambientSource: 'manual' | 'sensor';
+        lidState: 'lidOn' | 'lidOff';
     } | null>(null);
     const [persisted, setPersisted]     = useState(false);
     const [calPersisted, setCalPersisted] = useState(false);
@@ -60,18 +66,25 @@ export function WizardEquipment({ open, onClose }: Props) {
             .then(([thermal, cal]: any[]) => {
                 const offset = typeof cal?.offset === 'number' ? cal.offset : 0;
                 const slope  = typeof cal?.slope  === 'number' ? cal.slope  : 1.0;
+                const lossOn  = thermal.lossCoeffLidOn  ?? thermal.lossCoeff ?? 10;
+                const lossOff = thermal.lossCoeffLidOff ?? thermal.lossCoeff ?? 10;
+                const ambSrc  = (thermal.ambientSource as 'manual' | 'sensor') ?? 'manual';
+                const lid     = (thermal.lidState as 'lidOn' | 'lidOff') ?? 'lidOn';
                 setForm({
-                    volumeL:     String(thermal.volumeL),
-                    powerW:      String(thermal.powerW),
-                    ambientC:    String(thermal.ambientC),
-                    diameterM:   String(thermal.diameterM),
-                    lossCoeff:   String(thermal.lossCoeff),
-                    tempOffsetC: String(offset),
+                    volumeL:         String(thermal.volumeL),
+                    powerW:          String(thermal.powerW),
+                    ambientC:        String(thermal.ambientC),
+                    diameterM:       String(thermal.diameterM),
+                    lossCoeffLidOn:  String(lossOn),
+                    lossCoeffLidOff: String(lossOff),
+                    tempOffsetC:     String(offset),
                 });
                 setPersistedForm({
                     volumeL: thermal.volumeL, powerW: thermal.powerW,
                     ambientC: thermal.ambientC, diameterM: thermal.diameterM,
-                    lossCoeff: thermal.lossCoeff, offset, slope,
+                    lossCoeffLidOn: lossOn, lossCoeffLidOff: lossOff,
+                    offset, slope,
+                    ambientSource: ambSrc, lidState: lid,
                 });
                 setPersisted(!!thermal.persisted);
                 setCalPersisted(!!cal?.persisted);
@@ -82,19 +95,20 @@ export function WizardEquipment({ open, onClose }: Props) {
 
     function save() {
         if (!form || !persistedForm) return;
-        const volumeL   = num(form.volumeL,   persistedForm.volumeL);
-        const powerW    = num(form.powerW,    persistedForm.powerW);
-        const ambientC  = num(form.ambientC,  persistedForm.ambientC);
-        const diameterM = num(form.diameterM, persistedForm.diameterM);
-        const lossCoeff = num(form.lossCoeff, persistedForm.lossCoeff);
-        const offset    = num(form.tempOffsetC, persistedForm.offset);
-        // Send both writes in parallel. Thermal params + the calibration
-        // pair are persisted in independent NVS keys; ordering doesn't
-        // matter, and either failing surfaces as a toast without rolling
-        // the other back (firmware state stays consistent because each
-        // SET handler validates on its own).
+        const volumeL   = num(form.volumeL,         persistedForm.volumeL);
+        const powerW    = num(form.powerW,          persistedForm.powerW);
+        const ambientC  = num(form.ambientC,        persistedForm.ambientC);
+        const diameterM = num(form.diameterM,       persistedForm.diameterM);
+        const lossOn    = num(form.lossCoeffLidOn,  persistedForm.lossCoeffLidOn);
+        const lossOff   = num(form.lossCoeffLidOff, persistedForm.lossCoeffLidOff);
+        const offset    = num(form.tempOffsetC,     persistedForm.offset);
         Promise.all([
-            ConnectionManager.setThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff),
+            ConnectionManager.setThermalParams({
+                volumeL, powerW, ambientC, diameterM,
+                lossCoeffLidOn: lossOn, lossCoeffLidOff: lossOff,
+                ambientSource: persistedForm.ambientSource,
+                lidState: persistedForm.lidState,
+            }),
             ConnectionManager.setTempCalibration(persistedForm.slope, offset),
         ])
             .then(() => {
@@ -104,6 +118,22 @@ export function WizardEquipment({ open, onClose }: Props) {
             })
             .catch((e: any) => showToast(e?.message || 'Falha', 'error'));
     }
+
+    function startTune(mode: 'lidOn' | 'lidOff') {
+        ConnectionManager.startLossTune(mode)
+            .then(() => { showToast('Auto-tune iniciado', 'success'); onClose(); })
+            .catch((e: any) => showToast(e?.message || 'Falha ao iniciar', 'error'));
+    }
+
+    function setLid(mode: 'lidOn' | 'lidOff') {
+        ConnectionManager.setLidState(mode)
+            .then(() => showToast(`Tampa: ${mode === 'lidOn' ? 'fechada' : 'aberta'}`, 'success'))
+            .catch((e: any) => showToast(e?.message || 'Falha', 'error'));
+    }
+
+    const ambBadge = ambientSource.value === 'sensor'
+        ? (ambientSensorOk.value ? 'Sensor (ok)' : 'Sensor (stale → manual)')
+        : 'Manual';
 
     return (
         <WizardSheet title="Equipamento" open={open} onClose={onClose}
@@ -127,9 +157,18 @@ export function WizardEquipment({ open, onClose }: Props) {
 
             {form && FIELDS.map((f) => (
                 <YStack key={f.key}>
-                    <XStack jc="space-between" paddingVertical={2}>
+                    <XStack jc="space-between" paddingVertical={2} ai="center">
                         <Label htmlFor={`fld-${f.key}`}>{f.label}</Label>
-                        <Text fontSize="$1" opacity={0.4}>{f.hint}</Text>
+                        <XStack ai="center" gap="$2">
+                            {f.key === 'ambientC' && (
+                                <Text fontSize="$1" fontWeight="700"
+                                    color={ambientSource.value === 'sensor' && ambientSensorOk.value
+                                            ? '$holding' : '$paused'}>
+                                    ● {ambBadge}
+                                </Text>
+                            )}
+                            <Text fontSize="$1" opacity={0.4}>{f.hint}</Text>
+                        </XStack>
                     </XStack>
                     <Input
                         id={`fld-${f.key}`}
@@ -141,6 +180,57 @@ export function WizardEquipment({ open, onClose }: Props) {
                     />
                 </YStack>
             ))}
+
+            {form && (
+                <Card bordered padded marginTop="$2">
+                    <YStack gap="$2">
+                        <Text fontWeight="700">Tampa em uso</Text>
+                        <XStack gap="$2">
+                            <Button size="$3"
+                                theme={lidState.value === 'lidOn' ? 'active' : undefined}
+                                variant={lidState.value === 'lidOn' ? undefined : 'outlined'}
+                                onPress={() => setLid('lidOn')}>
+                                Fechada
+                            </Button>
+                            <Button size="$3"
+                                theme={lidState.value === 'lidOff' ? 'active' : undefined}
+                                variant={lidState.value === 'lidOff' ? undefined : 'outlined'}
+                                onPress={() => setLid('lidOff')}>
+                                Aberta
+                            </Button>
+                        </XStack>
+                        <Paragraph fontSize="$1" theme="alt2">
+                            Define qual coeficiente o PID e o agendador usam agora.
+                        </Paragraph>
+                    </YStack>
+                </Card>
+            )}
+
+            {form && (
+                <Card bordered padded>
+                    <YStack gap="$2">
+                        <Text fontWeight="700">Auto-tune do coef. de perda</Text>
+                        <Paragraph fontSize="$1" theme="alt2">
+                            Aquece o líquido ~50°C acima do ambiente, desliga a SSR,
+                            mede a curva de resfriamento e calcula h via Newton.
+                            Duração tipica: 10-15 min. Faça em ambiente estável.
+                        </Paragraph>
+                        <XStack gap="$2">
+                            <Button size="$3" disabled={lossTuneActive.value}
+                                onPress={() => startTune('lidOn')}>
+                                Calibrar tampa fechada
+                            </Button>
+                            <Button size="$3" disabled={lossTuneActive.value}
+                                onPress={() => startTune('lidOff')}>
+                                Calibrar tampa aberta
+                            </Button>
+                        </XStack>
+                        {lossTuneActive.value && (
+                            <Text fontSize="$1" opacity={0.7}>Auto-tune já em execução.</Text>
+                        )}
+                    </YStack>
+                </Card>
+            )}
         </WizardSheet>
     );
 }

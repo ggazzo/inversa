@@ -27,7 +27,11 @@ import {
   schedulerActive, schedulerStatus,
   autoTuneActive, autoTuneProgress,
   waitingForConfirm, confirmMessage,
-  watchdogTripped, watchdogLastCause, watchdogTripCount
+  watchdogTripped, watchdogLastCause, watchdogTripCount,
+  lossTuneActive, lossTunePhase, lossTuneProgress, lossTuneTargetMode,
+  lossTuneAmbientStart, lossTuneAmbientEnd, lossTuneAmbientSource,
+  lossTuneSampleCount, lossTuneFittedCoeff, lossTuneR2, lossTuneTau,
+  lossTuneError, lossTuneSamples,
 } from '@inversa/stores';
 
 class ConnectionManagerClass {
@@ -254,9 +258,45 @@ class ConnectionManagerClass {
   async getThermalParams() {
     return BleClient.request('req:settings:thermal:get');
   }
-  async setThermalParams(volumeL, powerW, ambientC, diameterM, lossCoeff) {
-    return BleClient.request('req:settings:thermal:set',
-      { volumeL, powerW, ambientC, diameterM, lossCoeff });
+  // Dual loss-coefficient (lid-on / lid-off) replaces the legacy single
+  // `lossCoeff`. `ambientSource` is "manual" or "sensor"; sensor is
+  // honored only when the device-side AmbientSensorPlugin reports fresh
+  // OK samples (otherwise firmware falls back to manual via
+  // getEffectiveAmbient()). `lidState` is the runtime selector for
+  // which coefficient drives PID feed-forward and Scheduler.
+  async setThermalParams({
+    volumeL, powerW, ambientC, diameterM,
+    lossCoeffLidOn, lossCoeffLidOff,
+    ambientSource, lidState,
+  }) {
+    return BleClient.request('req:settings:thermal:set', {
+      volumeL, powerW, ambientC, diameterM,
+      lossCoeffLidOn, lossCoeffLidOff,
+      ambientSource, lidState,
+    });
+  }
+
+  // Runtime lid selector — picks which lossCoeff_* feeds PID/Scheduler.
+  async setLidState(mode /* "lidOn" | "lidOff" */) {
+    return BleClient.request('req:lid:set', { mode });
+  }
+
+  // LossTune — auto-tune of the heat-loss coefficient for the chosen
+  // lid mode. Runs the full HEAT → SOAK → DECAY → FIT state machine on
+  // device; UI gets evt:losstune:status (phase + R²), evt:losstune:sample
+  // (batched samples during DECAY), and evt:losstune:result on completion.
+  // The fit is NOT persisted until acceptLossTune() is called.
+  async startLossTune(mode /* "lidOn" | "lidOff" */) {
+    return BleClient.request('req:losstune:start', { mode });
+  }
+  async cancelLossTune() {
+    return BleClient.request('req:losstune:cancel');
+  }
+  async acceptLossTune() {
+    return BleClient.request('req:losstune:accept');
+  }
+  async rejectLossTune() {
+    return BleClient.request('req:losstune:reject');
   }
 
   // Temperature calibration (T_real = slope · T_medido + offset).
@@ -556,6 +596,45 @@ class ConnectionManagerClass {
         watchdogLastCause.value = '';
         const auto = data.auto === true;
         showToast(auto ? 'Watchdog: auto-reset por resfriamento' : 'Watchdog: rearmado', 'success');
+        break;
+
+      // LossTune (auto-tune heat-loss coefficient)
+      case 'evt:losstune:status':
+        lossTunePhase.value          = data.ph || 'IDLE';
+        lossTuneProgress.value       = data.pct ?? 0;
+        lossTuneTargetMode.value     = data.mode || 'lidOn';
+        lossTuneAmbientStart.value   = data.amb0 ?? 0;
+        lossTuneAmbientEnd.value     = data.ambE ?? 0;
+        lossTuneAmbientSource.value  = data.src || 'manual';
+        lossTuneSampleCount.value    = data.n ?? 0;
+        lossTuneError.value          = data.err || '';
+        lossTuneActive.value         = data.ph !== 'IDLE' && data.ph !== 'RESULT' && data.ph !== 'ERROR';
+        if (data.err) {
+          showToast(`LossTune falhou: ${data.err}`, 'error', 8000);
+        }
+        break;
+
+      case 'evt:losstune:sample':
+        if (Array.isArray(data.T)) {
+          const t0 = data.t0 ?? 0;
+          const next = lossTuneSamples.value.slice();
+          for (let i = 0; i < data.T.length; i++) {
+            next.push({ t: t0 + i, T: data.T[i] });
+          }
+          // Cap buffer at LOSSTUNE_BUFFER_SIZE (600 samples).
+          if (next.length > 600) next.splice(0, next.length - 600);
+          lossTuneSamples.value = next;
+        }
+        break;
+
+      case 'evt:losstune:result':
+        lossTuneFittedCoeff.value   = data.h ?? 0;
+        lossTuneR2.value            = data.r2 ?? 0;
+        lossTuneTau.value           = data.tau ?? 0;
+        lossTuneTargetMode.value    = data.mode || 'lidOn';
+        lossTuneAmbientSource.value = data.src || 'manual';
+        showToast(`LossTune concluído: h=${data.h?.toFixed(2)} W/m²K (R²=${data.r2?.toFixed(3)})`,
+                  'success', 10000);
         break;
     }
 
