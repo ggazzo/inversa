@@ -123,10 +123,24 @@ public:
 
     // Get DateTime object
     DateTime getDateTime() {
+#ifdef HIL_BUILD
+        // Under HIL the virtual epoch is the source of truth — both
+        // now() and getDateTime() have to agree, otherwise consumers
+        // that mix the two (e.g. SchedulerPlugin computing "today at
+        // HH:MM" from getDateTime() while comparing against now())
+        // see inconsistent timelines and compute nonsense waits.
+        //
+        // RTClib's DateTime(uint32_t) takes seconds since 2000-01-01,
+        // not unix epoch. Convert before constructing.
+        if (hil::g_hil.rtcActive) {
+            uint32_t unix = now();
+            return DateTime(unix - 946684800UL);
+        }
+#endif
         if (_rtcAvailable) {
             return _rtc.now();
         }
-        return DateTime(now());
+        return DateTime(now() - 946684800UL);
     }
 
     // Set time from unix timestamp
