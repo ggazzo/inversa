@@ -85,6 +85,12 @@ export type SubCmd =
   | { cmd: "sub"; topic: "events"; enable: boolean }
   | { cmd: "sub"; topic: "ssr"; enable: boolean };
 
+export type WatchdogCmd = {
+  cmd: "watchdog";
+  op: "detections";
+  enable: boolean;
+};
+
 export type RecipeCmd =
   | { cmd: "recipe"; op: "load"; name: string; content: string }
   | { cmd: "recipe"; op: "start" }
@@ -92,7 +98,7 @@ export type RecipeCmd =
   | { cmd: "recipe"; op: "pause" }
   | { cmd: "recipe"; op: "resume" };
 
-export type CommandMsg = SetCmd | ClockCmd | ForceCmd | GetCmd | SubCmd | RecipeCmd;
+export type CommandMsg = SetCmd | ClockCmd | ForceCmd | GetCmd | SubCmd | RecipeCmd | WatchdogCmd;
 
 // ── Plugin contract ─────────────────────────────────────────
 //

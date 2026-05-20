@@ -137,6 +137,29 @@ public:
     // bridge exercise the same code path that runs in production without
     // having to manipulate sensor inputs precisely.
     void hilForceTrip(WatchdogCause cause) { trip(cause); }
+
+    // HIL-only: suspend automatic detection. When disabled, neither the
+    // sampling loop nor the esp_timer ISR will trip on overtemp, sensor
+    // fault, gradient, or loop-stuck conditions. `force watchdog.trip`
+    // still works — the harness can always invoke an explicit trip.
+    //
+    // Why this exists: virtual-clock advances (`clock advance N`) and
+    // synthetic NTC steps (`set ntc.c X`) routinely violate the gradient
+    // and loop-stuck heuristics, even though the system is fine. Cenarios
+    // that want to script time-warps without those false positives turn
+    // detection off; cenarios that want to assert the watchdog's natural
+    // behavior leave it on (the default).
+    void hilSetDetections(bool on) { _detectionsEnabled = on; }
+    bool hilDetectionsEnabled() const { return _detectionsEnabled; }
+
+    // HIL-only: bump the heartbeat marker by `deltaMs` to absorb a
+    // virtual-clock advance. The main loop will catch up on its next
+    // iteration, but the ISR runs at real cadence and would otherwise see
+    // an artificial gap. Safe to call even with detections suspended.
+    void hilAbsorbClockAdvance(uint32_t deltaMs) {
+        _heartbeatMs += deltaMs;
+        _lastSampleMs += deltaMs;
+    }
 #endif
 
     // ── Plugin interface ────────────────────────────────────
@@ -221,8 +244,21 @@ public:
         // ── Drain any ISR-pending trip (loop-stuck) ─────────
         if (_isrTripPending) {
             _isrTripPending = false;
+#ifdef HIL_BUILD
+            if (_detectionsEnabled) trip(WatchdogCause::LOOP_STUCK);
+#else
             trip(WatchdogCause::LOOP_STUCK);
+#endif
         }
+
+#ifdef HIL_BUILD
+        // HIL: when detections are suspended, skip the sampling loop too.
+        // `force` paths still work via hilForceTrip.
+        if (!_detectionsEnabled) {
+            _lastSampleMs = now;
+            return;
+        }
+#endif
 
         // ── Sample at 5 Hz ──────────────────────────────────
         if (now - _lastSampleMs < WATCHDOG_SAMPLE_INTERVAL_MS) return;
@@ -364,6 +400,10 @@ private:
             gpio_set_level((gpio_num_t)PIN_HEATER_SSR, 0);
             return;
         }
+#ifdef HIL_BUILD
+        // HIL: detection suspended → ISR is observation-only.
+        if (!_detectionsEnabled) return;
+#endif
         // Compare against the last main-loop kick. Use millis() snapshot
         // — millis() is safe to call from the esp_timer task.
         uint32_t now = millis();
@@ -390,6 +430,9 @@ private:
     volatile bool       _isrTripPending    = false;
     uint32_t            _lastSampleMs      = 0;
     bool                _gradTrippedThisTick = false;
+#ifdef HIL_BUILD
+    volatile bool       _detectionsEnabled = true;
+#endif
 
     static ThermalWatchdogPlugin* _instance;
 };

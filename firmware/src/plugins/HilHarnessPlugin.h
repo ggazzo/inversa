@@ -164,6 +164,11 @@ private:
                 // resumes from the advanced point.
                 hil::g_clock.offsetMs += add;
                 if (hil::g_clock.frozen) hil::g_clock.freezeAt += add;
+                // Absorb the advance on the watchdog heartbeat too — the
+                // main loop kicks every iteration, but its kicks measure
+                // virtual time. Without this, a large advance would look
+                // like a stuck loop to the watchdog and trip LOOP_STUCK.
+                if (_watchdog && add > 0) _watchdog->hilAbsorbClockAdvance((uint32_t)add);
             } else if (!strcmp(op, "freeze")) {
                 hil::g_clock.freezeAt = hil_clock_now();
                 hil::g_clock.frozen   = true;
@@ -211,6 +216,23 @@ private:
                 return;
             }
             emitErr("unknown_force_path", path);
+            return;
+        }
+
+        if (!strcmp(cmd, "watchdog")) {
+            if (!_watchdog) { emitErr("no_watchdog", ""); return; }
+            const char* op = doc["op"] | "";
+            if (!strcmp(op, "detections")) {
+                // `{"cmd":"watchdog","op":"detections","enable":bool}`
+                // Suspend or re-enable the four automatic detectors
+                // (overtemp / sensor_fault / gradient / loop_stuck). Force
+                // trips via `force watchdog.trip` still work either way.
+                bool en = doc["enable"] | true;
+                _watchdog->hilSetDetections(en);
+                ack(cmd);
+                return;
+            }
+            emitErr("unknown_watchdog_op", op);
             return;
         }
 
