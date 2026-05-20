@@ -1,0 +1,9 @@
+.pio/
+.vscode/
+.cache/
+compile_commands.json
+.DS_Store
+# SquareLine project / export dirs — set explicit policy in README:
+# commit the LVGL .c/.h exports (src/ui/sq/) but keep the .spj file out.
+src/ui/sq/.cache/
+*.spj.bak
