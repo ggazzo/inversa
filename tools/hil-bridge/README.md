@@ -37,10 +37,16 @@ error.
 
 ```bash
 npm run hil-bridge -- run \
-  --sim ThermalSim \
-  --analyzer SafetyInvariants,PIDQuality \
+  --sim thermal \
+  --analyzer safety,pid \
   --port /dev/cu.usbmodem<XXX> \
   --duration 30s
+```
+
+List available plugins and cenarios:
+
+```bash
+npm run hil-bridge -- list
 ```
 
 ## Trace a session for repro
