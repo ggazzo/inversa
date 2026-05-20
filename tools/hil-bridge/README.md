@@ -89,3 +89,30 @@ initial command sequence, and waits for events. See
 `src/scenarios/overtemp.ts` as the reference.
 
 Wire it into `src/scenarios/index.ts` so `run scenario <name>` finds it.
+
+## Bench suite
+
+End-to-end checks against a real ESP running the HIL firmware. One
+command, one PASS/FAIL line per test, exit code reflects the result.
+
+```bash
+npm run bench -- --port /dev/cu.usbmodem<XXX>
+```
+
+Filter to a group or a name substring:
+
+```bash
+npm run bench -- --port /dev/cu.usbmodem<XXX> --group recipe
+npm run bench -- --port /dev/cu.usbmodem<XXX> --only WAIT_CONFIRM
+```
+
+Coverage today (14 cases):
+
+- **connection**: hello + state shape
+- **sensors**: NTC override, ambient override
+- **clock**: advance, freeze, virtual RTC epoch
+- **watchdog**: force OVERTEMP, force reset, detections off bypasses
+  gradient, clock advance does not trip LOOP_STUCK
+- **errors**: unknown cmd, unknown force path
+- **recipe**: load + start + step + completed, WAIT_CONFIRM blocks
+  until confirm

@@ -12,7 +12,8 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit",
     "start": "tsx src/cli.ts",
-    "hil-bridge": "tsx src/cli.ts"
+    "hil-bridge": "tsx src/cli.ts",
+    "bench": "tsx src/bench.ts"
   },
   "dependencies": {
     "serialport": "^12.0.0",
