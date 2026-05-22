@@ -1,5 +1,7 @@
 #include "ZeroCrossDetector.h"
 
+#ifndef NATIVE_BUILD
+
 ZeroCrossDetector& ZeroCrossDetector::instance() {
     static ZeroCrossDetector inst;
     return inst;
@@ -34,3 +36,5 @@ void IRAM_ATTR ZeroCrossDetector::isrThunk(void* arg) {
     self->_lastIsrUs      = now;
     self->_halfCycleCount = self->_halfCycleCount + 1;
 }
+
+#endif  // NATIVE_BUILD

@@ -250,10 +250,10 @@ public:
     // Persists mains frequency and burst-fire window so the same firmware
     // image can serve 50 Hz and 60 Hz markets without a rebuild.
     void saveHeaterMainsFreqHz(uint16_t freq) {
-        _prefs.putUShort("htr_freq", freq);
+        _prefs.putUInt("htr_freq", (uint32_t)freq);
     }
     uint16_t loadHeaterMainsFreqHz(uint16_t defaultVal) {
-        return _prefs.getUShort("htr_freq", defaultVal);
+        return (uint16_t)_prefs.getUInt("htr_freq", (uint32_t)defaultVal);
     }
 
     void saveHeaterBurstWindow(uint8_t halfCycles) {

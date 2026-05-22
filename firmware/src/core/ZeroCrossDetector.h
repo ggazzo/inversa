@@ -1,5 +1,7 @@
 #pragma once
 
+#ifndef NATIVE_BUILD  // ZC detector requires Arduino interrupt APIs
+
 #include <Arduino.h>
 
 // Zero-cross detector singleton. Reads pulses from an opto-isolated ZC
@@ -39,3 +41,5 @@ private:
     volatile uint32_t _lastIsrUs      = 0;
     volatile uint32_t _halfCycleCount = 0;
 };
+
+#endif  // NATIVE_BUILD
