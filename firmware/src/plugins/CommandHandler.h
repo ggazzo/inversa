@@ -23,6 +23,7 @@
 #include "SchedulerPlugin.h"
 #include "ThermalWatchdogPlugin.h"
 #include "LossTunePlugin.h"
+#include "../core/IHeaterDriver.h"
 
 // ─── Command Handler ────────────────────────────────────────
 // Routes incoming BLE JSON commands to the appropriate plugins.
@@ -37,7 +38,8 @@ public:
               TimerPlugin* timer = nullptr, AutoTunePlugin* autoTune = nullptr,
               SchedulerPlugin* scheduler = nullptr,
               ThermalWatchdogPlugin* watchdog = nullptr,
-              LossTunePlugin* lossTune = nullptr) {
+              LossTunePlugin* lossTune = nullptr,
+              IHeaterDriver* heater = nullptr) {
         _ble = ble;
         _sd = sd;
         _recipe = recipe;
@@ -53,6 +55,7 @@ public:
         _scheduler = scheduler;
         _watchdog = watchdog;
         _lossTune = lossTune;
+        _heater = heater;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             // Reuse the same JsonDocument for every inbound command. BLE
@@ -771,6 +774,35 @@ public:
             _watchdog->setConfig(cfg);
             sendOk(rid);
         }
+        // ── Heater driver config (burst-fire / ZC) ──────────
+        // Partial update: { freq?: 50|60, burst_window?: uint8 }.
+        // Both fields are validated and persisted to NVS. burst_window
+        // applies at runtime; freq requires reboot to take effect (it
+        // recomputes ZeroCrossDetector timings only at begin()).
+        else if (strcmp(type, Protocol::REQ_HEATER_CONFIG) == 0) {
+            bool hasFreq   = doc["freq"].is<int>();
+            bool hasWindow = doc["burst_window"].is<int>();
+            if (!hasFreq && !hasWindow) { sendError(rid, "empty_config"); return; }
+
+            uint16_t freq   = hasFreq   ? (uint16_t)doc["freq"].as<int>()         : 0;
+            uint8_t  window = hasWindow ? (uint8_t) doc["burst_window"].as<int>() : 0;
+
+            if (hasFreq && freq != 50 && freq != 60) {
+                sendError(rid, "freq_range"); return;
+            }
+            if (hasWindow && window < 10) {
+                sendError(rid, "burst_window_range"); return;
+            }
+
+            auto& nvs = NVSStorage::instance();
+            if (hasFreq)   nvs.saveHeaterMainsFreqHz(freq);
+            if (hasWindow) nvs.saveHeaterBurstWindow(window);
+
+            // Runtime apply for burst_window (no-op on soft-PWM driver).
+            if (hasWindow && _heater) _heater->setBurstWindow(window);
+
+            sendOk(rid);
+        }
         // ── Factory Reset (P7, guarded) ─────────────────────
         // Requires {confirm: "ERASE_ALL"} to wipe the NVS namespace.
         else if (strcmp(type, Protocol::REQ_FACTORY_RESET) == 0) {
@@ -803,6 +835,7 @@ private:
     SchedulerPlugin* _scheduler = nullptr;
     ThermalWatchdogPlugin* _watchdog = nullptr;
     LossTunePlugin* _lossTune = nullptr;
+    IHeaterDriver* _heater = nullptr;
 
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;

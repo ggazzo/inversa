@@ -54,6 +54,7 @@ Inversa is a complete system for brewing automation, featuring ESP32 firmware an
 - Relay module for pump (optional)
 - DS1307 RTC module (optional, for scheduling)
 - SD Card module (optional, for recipes and logs)
+- Opto-isolated zero-cross detector (optional, enables the burst-fire heater driver — see [Zero-Cross Burst-Fire Driver](#zero-cross-burst-fire-driver-optional))
 
 ### Wiring Diagram
 
@@ -135,6 +136,67 @@ Inversa is a complete system for brewing automation, featuring ESP32 firmware an
 | SD Card SCK  | SCK (default) | GPIO1         | SPI clock                |
 | SD Card MISO | MISO (default)| GPIO0         | SPI data in              |
 | SD Card MOSI | MOSI (default)| GPIO4         | SPI data out             |
+| Zero-Cross   | GPIO17        | GPIO9         | Opto detector input, burst-fire driver only |
+
+### Zero-Cross Burst-Fire Driver (optional)
+
+By default the heater is driven by **soft PWM** — a 1-second time-proportional
+window where the SSR is toggled on/off without any reference to the mains
+waveform. This works on any hardware but commutates the SSR mid-cycle, which
+generates RFI, stresses the SSR junction, and limits resolution.
+
+When an **opto-isolated zero-cross detector** is wired to `PIN_HEATER_ZC`, the
+firmware can switch to a **burst-fire** driver synced to the AC zero-cross:
+
+- Switching always happens at zero-cross (no RFI, longer SSR life).
+- Energy delivery is **linear by construction** (X / N full cycles = X / N power).
+- Default window: 120 half-cycles ≈ 1 s @60 Hz, resolution 0.83 %.
+- Pattern spreading (Bresenham) distributes ON pulses across the window to
+  suppress sub-50 Hz flicker on lights sharing the same AC phase.
+- If the ZC signal is lost, the driver fails safe (SSR forced LOW).
+- The thermal watchdog still cuts the SSR independently — safety unchanged.
+
+#### Suggested circuit
+
+A common detector uses an opto-coupler bridge across the AC line (post-fuse,
+pre-load) with the optocoupler output pulled up to 3.3 V on the ESP32 side.
+Each AC zero-cross produces one falling pulse on the GPIO.
+
+```
+   AC Live ──┬── 220 kΩ ──┬── H11AA1 ──┬── 3.3V (opto cathode pull-up via 10kΩ)
+             │             │            │
+   AC Neut ──┴── 220 kΩ ──┘            ├── GPIO17 (S3) / GPIO9 (C3) — PIN_HEATER_ZC
+                                        │
+                                        └── GND (opto emitter)
+```
+
+(Use a part rated for line voltage; the H11AA1 has back-to-back input LEDs so
+it pulses on both polarities — the firmware debounces at 70 % of the half-
+period to ignore double edges.)
+
+#### Enabling
+
+The burst-fire driver is opt-in at compile time. Existing hardware keeps the
+default soft-PWM path:
+
+```bash
+# Soft PWM (default — works without any extra hardware)
+pio run -e wemos_s3_mini
+
+# Burst-fire (requires the opto ZC detector wired to PIN_HEATER_ZC)
+PLATFORMIO_BUILD_FLAGS="-DHEATER_DRIVER=HEATER_DRIVER_BURST_FIRE" \
+  pio run -e wemos_s3_mini
+```
+
+Mains frequency and burst window can be tuned at runtime via the BLE command
+`req:heater:config` (partial update, persisted to NVS):
+
+```json
+{ "tp": "req:heater:config", "freq": 60, "burst_window": 120 }
+```
+
+`freq` accepts 50 or 60 and requires a reboot to take effect.
+`burst_window` is a uint8 ≥ 10 and applies immediately.
 
 ## Installation
 

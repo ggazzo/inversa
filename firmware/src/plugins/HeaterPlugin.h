@@ -2,10 +2,11 @@
 
 #include <Arduino.h>
 #include "../core/Plugin.h"
+#include "../core/IHeaterDriver.h"
 #include "../core/constants.h"
 #include "../models/MachineState.h"
 
-class HeaterPlugin : public Plugin {
+class HeaterPlugin : public Plugin, public IHeaterDriver {
 public:
     const char* getName() const override { return "Heater"; }
 
@@ -17,7 +18,7 @@ public:
         // Listen for PID output changes
         bus().subscribe(EventType::PIDOutputChanged, [this](const Event& e) {
             if (gState.mode != OperatingMode::Idle) {
-                _dutyCycle = (uint8_t)constrain(e.floatValue, 0.0f, 255.0f);
+                setDuty((uint8_t)constrain(e.floatValue, 0.0f, 255.0f));
             }
         });
 
@@ -73,16 +74,18 @@ public:
         }
     }
 
-    void enable() { _active = true; }
-    void disable() {
+    void enable() override { _active = true; }
+    void disable() override {
         _active = false;
         _dutyCycle = 0;
         digitalWrite(PIN_HEATER_SSR, LOW);
         gState.heaterOn = false;
     }
 
-    bool isActive() const { return _active; }
-    uint8_t getDutyCycle() const { return _dutyCycle; }
+    void setDuty(uint8_t duty) override { _dutyCycle = duty; }
+
+    bool isActive() const override { return _active; }
+    uint8_t getDutyCycle() const override { return _dutyCycle; }
 
 private:
     bool _active = false;
