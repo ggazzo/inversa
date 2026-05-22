@@ -152,7 +152,8 @@
 #define WATCHDOG_DEFAULT_SENSOR_FAULT_MS   10000
 #define WATCHDOG_DEFAULT_LOOP_STUCK_MS     5000
 #define WATCHDOG_DEFAULT_GRAD_FACTOR       5         // Trip when |dT| > factor * median(window)
-#define WATCHDOG_DEFAULT_GRAD_WINDOW       20        // Ring buffer length (samples @5Hz = 4s)
+#define WATCHDOG_DEFAULT_GRAD_WINDOW       20        // Ring buffer length (unique samples = ~20s @1Hz temp updates)
+#define WATCHDOG_DEFAULT_GRAD_FLOOR_C      0.25f     // Absolute floor for the gradient threshold (°C between samples)
 #define WATCHDOG_DEFAULT_SAFE_AUTORESET_C  40.0f
 #define WATCHDOG_DEFAULT_COOL_MIN_MS       300000    // 5 minutes contiguous below T_SAFE
 #define WATCHDOG_SAMPLE_INTERVAL_MS        200       // 5 Hz
@@ -170,6 +171,8 @@
 #define WATCHDOG_GRAD_FACTOR_MAX           20
 #define WATCHDOG_GRAD_WINDOW_MIN           5
 #define WATCHDOG_GRAD_WINDOW_MAX           100
+#define WATCHDOG_GRAD_FLOOR_MIN_C          0.05f
+#define WATCHDOG_GRAD_FLOOR_MAX_C          5.0f
 #define WATCHDOG_SAFE_AUTORESET_MIN_C      20.0f
 #define WATCHDOG_SAFE_AUTORESET_MAX_C      80.0f
 #define WATCHDOG_COOL_MIN_MIN_MS           60000

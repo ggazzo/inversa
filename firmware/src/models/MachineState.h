@@ -316,6 +316,7 @@ struct MachineState {
     uint32_t      watchdogLoopStuckMs       = 5000;       // WATCHDOG_DEFAULT_LOOP_STUCK_MS
     uint8_t       watchdogGradFactor        = 5;          // WATCHDOG_DEFAULT_GRAD_FACTOR
     uint8_t       watchdogGradWindow        = 20;         // WATCHDOG_DEFAULT_GRAD_WINDOW
+    float         watchdogGradFloorC        = 0.25f;      // WATCHDOG_DEFAULT_GRAD_FLOOR_C
     float         watchdogSafeAutoresetC    = 40.0f;      // WATCHDOG_DEFAULT_SAFE_AUTORESET_C
     uint32_t      watchdogCoolMinMs         = 300000;     // WATCHDOG_DEFAULT_COOL_MIN_MS
 };

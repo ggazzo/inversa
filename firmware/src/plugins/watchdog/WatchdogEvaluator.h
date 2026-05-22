@@ -58,9 +58,10 @@ private:
 template <size_t MAX_WINDOW>
 class GradientDetector {
 public:
-    void configure(uint8_t window, uint8_t factor) {
+    void configure(uint8_t window, uint8_t factor, float floorC) {
         _window = (window > MAX_WINDOW) ? MAX_WINDOW : window;
         _factor = factor;
+        _floorC = floorC;
         reset();
     }
 
@@ -79,6 +80,14 @@ public:
             _hasLast = true;
             return false;
         }
+        // Skip repeated reads of the same filtered value. The watchdog
+        // polls at 5 Hz but TemperaturePlugin only refreshes gState at
+        // ~1 Hz, so without this guard 4 out of every 5 samples land in
+        // the buffer with dT = 0, dragging the median down to zero and
+        // collapsing the threshold onto the floor on every real update.
+        if (temp == _lastTemp) {
+            return false;
+        }
         float dT = temp - _lastTemp;
         _lastTemp = temp;
         float absDt = dT < 0 ? -dT : dT;
@@ -88,13 +97,12 @@ public:
         bool trip = false;
         if (_filled >= _window && _window > 0) {
             float median = computeMedian();
-            // Guard against zero median (steady state with no noise):
-            // require an absolute floor so a stable plant does not trip
-            // on the first wiggle. Floor = 0.05 °C between samples (5 Hz
-            // = 0.25 °C/s), well below the smallest legitimate transient.
+            // Floor guards against zero/near-zero median (steady plant):
+            // a stable system has tiny dT noise, but the multiplier still
+            // needs an absolute lower bound so the first real transient
+            // doesn't trip. Floor is tunable via NVS (wd_cfg_grad_floor).
             float threshold = static_cast<float>(_factor) * median;
-            const float FLOOR = 0.05f;
-            if (threshold < FLOOR) threshold = FLOOR;
+            if (threshold < _floorC) threshold = _floorC;
             if (absDt > threshold) trip = true;
         }
 
@@ -122,6 +130,7 @@ private:
     size_t  _filled  = 0;
     uint8_t _window  = 0;
     uint8_t _factor  = 5;
+    float   _floorC  = 0.25f;
     float   _lastTemp = 0.0f;
     bool    _hasLast = false;
 };

@@ -106,7 +106,7 @@ void test_sensor_fault_resets_when_sensor_recovers() {
 
 void test_gradient_does_not_trip_until_window_full() {
     watchdog::GradientDetector<100> g;
-    g.configure(20, 5);
+    g.configure(20, 5, 0.05f);
     // Feed a huge outlier as the very first delta — must not trip yet.
     g.addSample(20.0f);
     bool trip = g.addSample(80.0f);   // dT = +60 °C (huge!)
@@ -116,7 +116,7 @@ void test_gradient_does_not_trip_until_window_full() {
 
 void test_gradient_does_not_trip_on_steady_warmup() {
     watchdog::GradientDetector<100> g;
-    g.configure(20, 5);
+    g.configure(20, 5, 0.05f);
     // Linear ramp 0.04 °C/sample = 0.2 °C/s @5Hz (~12 °C/min). Normal mash.
     float t = 25.0f;
     bool tripped = false;
@@ -130,7 +130,7 @@ void test_gradient_does_not_trip_on_steady_warmup() {
 
 void test_gradient_trips_on_outlier_after_warmup() {
     watchdog::GradientDetector<100> g;
-    g.configure(20, 5);
+    g.configure(20, 5, 0.05f);
     // Fill window with quiet baseline (0.02 °C between samples).
     float t = 25.0f;
     for (int i = 0; i < 25; ++i) { t += 0.02f; g.addSample(t); }
@@ -142,19 +142,34 @@ void test_gradient_trips_on_outlier_after_warmup() {
 
 void test_gradient_respects_floor_in_steady_state() {
     watchdog::GradientDetector<100> g;
-    g.configure(20, 5);
-    // Perfectly flat plant: every dT = 0. Median = 0. Without floor,
-    // even 0.01 °C jitter would trip. Floor (0.05 °C absolute) must
-    // suppress small wiggles.
+    g.configure(20, 5, 0.05f);
+    // Very quiet plant: every dT = 0.005 °C. Median = 0.005, so the
+    // multiplier alone would set threshold to 0.025 (still below floor).
+    // Floor (0.05 °C absolute) must suppress small wiggles even when the
+    // baseline noise is tiny.
     float t = 50.0f;
-    for (int i = 0; i < 30; ++i) g.addSample(t);  // all zeros
-    bool tripped = g.addSample(50.02f);            // dT = 0.02 < floor
+    for (int i = 0; i < 30; ++i) { t += 0.005f; g.addSample(t); }
+    TEST_ASSERT_TRUE(g.windowFull());
+    bool tripped = g.addSample(t + 0.03f);  // dT = 0.03 < floor (0.05)
     TEST_ASSERT_FALSE(tripped);
+}
+
+void test_gradient_skips_identical_samples() {
+    // Bug fix: when the polling rate exceeds the source-of-truth refresh
+    // rate (watchdog polls 5 Hz, TemperaturePlugin updates gState @1 Hz),
+    // identical reads must not pollute the median with dT = 0 entries.
+    watchdog::GradientDetector<100> g;
+    g.configure(20, 5, 0.05f);
+    g.addSample(25.0f);
+    // 30 repeats: all should be skipped, window must NOT fill on them.
+    for (int i = 0; i < 30; ++i) g.addSample(25.0f);
+    TEST_ASSERT_FALSE(g.windowFull());
+    TEST_ASSERT_EQUAL_size_t(0, g.filledCount());
 }
 
 void test_gradient_reset_clears_state() {
     watchdog::GradientDetector<100> g;
-    g.configure(20, 5);
+    g.configure(20, 5, 0.05f);
     for (int i = 0; i < 25; ++i) g.addSample(25.0f + 0.02f * i);
     TEST_ASSERT_TRUE(g.windowFull());
     g.reset();
@@ -326,6 +341,7 @@ int main() {
     RUN_TEST(test_gradient_trips_on_outlier_after_warmup);
     RUN_TEST(test_gradient_respects_floor_in_steady_state);
     RUN_TEST(test_gradient_reset_clears_state);
+    RUN_TEST(test_gradient_skips_identical_samples);
 
     // T009 — latch reset + cooldown
     RUN_TEST(test_reset_rejected_when_temp_near_hardstop);
