@@ -211,6 +211,31 @@ cd inversa/firmware
 pio run -e wemos_s3_mini -t upload
 ```
 
+#### Dev OTA (flash over WiFi)
+
+For the development cycle, you can push new builds over WiFi instead of
+plugging the USB cable each time. This uses `ArduinoOTA` / `espota.py` —
+**unsigned**, **dev-only**, and gated behind a separate build env. **Never
+ship binaries built with this env to end users**; the production OTA path
+in `OTAPlugin` is the only signed path.
+
+```bash
+# 1. First flash via USB once so the device has the dev-OTA listener
+pio run -e wemos_s3_mini_devota -t upload
+
+# 2. Find the hostname from the serial log:
+#    [ArduinoOTA] Listening as inversa-XXXX.local
+#    (suffix is derived from the chip MAC so multiple devices coexist)
+
+# 3. Subsequent uploads over WiFi
+pio run -e wemos_s3_mini_devota -t upload --upload-port inversa-XXXX.local
+```
+
+The password is set at build time via `-DDEV_OTA_PASSWORD=\"...\"` and must
+match `upload_flags = --auth=...` in `platformio.ini`. Change the default
+`changeme` before flashing — anyone on the LAN with the password can push
+arbitrary firmware.
+
 ### Web App
 
 ```bash

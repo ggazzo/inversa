@@ -35,6 +35,9 @@
 #include "plugins/AmbientSensorPlugin.h"
 #include "plugins/LossTunePlugin.h"
 #include "plugins/CommandHandler.h"
+#ifdef DEV_OTA_ENABLED
+#include "plugins/ArduinoOTAPlugin.h"
+#endif
 #ifdef HIL_BUILD
 #include "plugins/HilHarnessPlugin.h"
 #endif
@@ -130,6 +133,9 @@ void setup() {
     auto* ambient   = pm.add<AmbientSensorPlugin>();
     (void)ambient;
     auto* lossTune  = pm.add<LossTunePlugin>();
+#ifdef DEV_OTA_ENABLED
+    pm.add<ArduinoOTAPlugin>();
+#endif
 
 #ifdef HIL_BUILD
     // HIL harness — JSONL command channel for the host bridge. Registered
