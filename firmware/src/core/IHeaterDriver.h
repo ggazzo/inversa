@@ -23,4 +23,9 @@ public:
     // True when the driver detected a hardware fault that prevents safe operation
     // (e.g. zero-cross signal lost). Default: never faulted.
     virtual bool isFaulted() const { return false; }
+
+    // Burst-fire window in half-cycles. No-op on drivers that don't use a
+    // mains-synced window (e.g. soft PWM). Driver enforces a sane minimum.
+    virtual void setBurstWindow(uint8_t /*halfCycles*/) {}
+    virtual uint8_t getBurstWindow() const { return 0; }
 };

@@ -108,6 +108,11 @@ namespace Protocol {
     constexpr const char* REQ_WATCHDOG_RESET  = "req:watchdog:reset";   // no args
     constexpr const char* REQ_WATCHDOG_CONFIG = "req:watchdog:config";  // partial config object
 
+    // Heater driver config (burst-fire / zero-cross) — partial update.
+    // { "freq": 50|60, "burst_window": uint8 }. Persisted to NVS.
+    // burst_window applies at runtime; freq requires reboot.
+    constexpr const char* REQ_HEATER_CONFIG   = "req:heater:config";
+
     // LossTune — auto-tune of heat-loss coefficient
     constexpr const char* REQ_LOSSTUNE_START  = "req:losstune:start";   // {mode:"lidOn"|"lidOff"}
     constexpr const char* REQ_LOSSTUNE_CANCEL = "req:losstune:cancel";

@@ -118,9 +118,11 @@ public:
     uint8_t getDutyCycle() const override { return _dutyCycle; }
     bool isFaulted() const override { return _faulted; }
 
-    // Tunable at runtime (e.g. via NVS load in main.cpp).
-    void setBurstWindow(uint8_t halfCycles) { if (halfCycles > 0) _burstWindow = halfCycles; }
-    uint8_t getBurstWindow() const { return _burstWindow; }
+    // Tunable at runtime (NVS-backed; CommandHandler::REQ_HEATER_CONFIG also writes here).
+    void setBurstWindow(uint8_t halfCycles) override {
+        if (halfCycles >= 10) _burstWindow = halfCycles;
+    }
+    uint8_t getBurstWindow() const override { return _burstWindow; }
 
 private:
     uint8_t  _ssrPin;

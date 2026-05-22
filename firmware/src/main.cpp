@@ -153,7 +153,7 @@ void setup() {
     RecoveryManager::instance().noteBootAttempt();
 
     // Wire up command handler (routes BLE commands to plugins)
-    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler, watchdog, lossTune);
+    commandHandler.init(ble, sd, recipe, pid, wifi, ota, ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler, watchdog, lossTune, heater);
 
     // Check for power loss recovery
     if (RecoveryManager::instance().hasValidRecovery()) {
