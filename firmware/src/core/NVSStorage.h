@@ -246,6 +246,23 @@ public:
         return true;
     }
 
+    // ── Heater Driver Config (burst-fire / zero-cross) ──────
+    // Persists mains frequency and burst-fire window so the same firmware
+    // image can serve 50 Hz and 60 Hz markets without a rebuild.
+    void saveHeaterMainsFreqHz(uint16_t freq) {
+        _prefs.putUShort("htr_freq", freq);
+    }
+    uint16_t loadHeaterMainsFreqHz(uint16_t defaultVal) {
+        return _prefs.getUShort("htr_freq", defaultVal);
+    }
+
+    void saveHeaterBurstWindow(uint8_t halfCycles) {
+        _prefs.putUChar("htr_burst", halfCycles);
+    }
+    uint8_t loadHeaterBurstWindow(uint8_t defaultVal) {
+        return _prefs.getUChar("htr_burst", defaultVal);
+    }
+
     // ── Generic Methods ─────────────────────────────────────
     void putFloat(const char* key, float value) {
         _prefs.putFloat(key, value);

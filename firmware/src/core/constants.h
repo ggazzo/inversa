@@ -35,6 +35,28 @@
     #error "No board defined. Use -D BOARD_S3_MINI or -D BOARD_C3_MINI"
 #endif
 
+// ─── Heater Driver Selection ────────────────────────────────
+// Soft PWM = time-proportional control over a 1 s window (no extra HW).
+// Burst-fire = synced to mains zero-cross, requires an opto ZC detector
+// wired to PIN_HEATER_ZC. Each board header may set HEATER_DRIVER
+// explicitly; default is soft PWM so existing hardware keeps working.
+#define HEATER_DRIVER_SOFT_PWM    0
+#define HEATER_DRIVER_BURST_FIRE  1
+
+#ifndef HEATER_DRIVER
+#define HEATER_DRIVER HEATER_DRIVER_SOFT_PWM
+#endif
+
+// Burst-fire window in half-cycles. 120 ≈ 1 s @60 Hz → 0.83 % resolution.
+#ifndef HEATER_BURST_WINDOW
+#define HEATER_BURST_WINDOW       120
+#endif
+
+// Default mains frequency. Persisted in NVS as `mains_freq` (override at boot).
+#ifndef MAINS_FREQ_HZ
+#define MAINS_FREQ_HZ             60
+#endif
+
 // ─── Firmware Info ──────────────────────────────────────────
 #ifndef BUILD_GIT_VERSION
     #define BUILD_GIT_VERSION "dev"

@@ -18,6 +18,10 @@
 #define PIN_PUMP_RELAY    16
 #define PIN_NEOPIXEL      47
 
+// Zero-cross detector input (only used when HEATER_DRIVER == HEATER_DRIVER_BURST_FIRE).
+// Placeholder GPIO: revise once the opto ZC circuit is wired on the production board.
+#define PIN_HEATER_ZC     17
+
 // SD Card (default SPI)
 #define PIN_SD_CS         SS
 #define PIN_SD_SCK        SCK

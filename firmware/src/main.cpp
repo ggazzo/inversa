@@ -13,7 +13,11 @@
 // Plugins
 #include "plugins/TemperaturePlugin.h"
 #include "plugins/PIDPlugin.h"
+#include "core/IHeaterDriver.h"
 #include "plugins/HeaterPlugin.h"
+#if HEATER_DRIVER == HEATER_DRIVER_BURST_FIRE
+#include "plugins/HeaterPluginZC.h"
+#endif
 #include "plugins/PumpPlugin.h"
 #include "plugins/SDCardPlugin.h"
 #include "plugins/RecipePlugin.h"
@@ -96,7 +100,18 @@ void setup() {
     // direct gpio_set_level inside Watchdog::trip().
     auto* temp     = pm.add<TemperaturePlugin>();
     auto* pid      = pm.add<PIDPlugin>();
-    auto* heater   = pm.add<HeaterPlugin>();
+#if HEATER_DRIVER == HEATER_DRIVER_BURST_FIRE
+    uint16_t zcMainsFreqHz = NVSStorage::instance().loadHeaterMainsFreqHz((uint16_t)MAINS_FREQ_HZ);
+    uint8_t  zcBurstWindow = NVSStorage::instance().loadHeaterBurstWindow((uint8_t)HEATER_BURST_WINDOW);
+    IHeaterDriver* heater = pm.add<HeaterPluginZC>(
+        (uint8_t)PIN_HEATER_SSR,
+        (uint8_t)PIN_HEATER_ZC,
+        zcMainsFreqHz,
+        zcBurstWindow);
+#else
+    IHeaterDriver* heater = pm.add<HeaterPlugin>();
+#endif
+    (void)heater;
     auto* watchdog = pm.add<ThermalWatchdogPlugin>();
     g_watchdog     = watchdog;
     auto* pump     = pm.add<PumpPlugin>();
