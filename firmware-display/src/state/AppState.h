@@ -34,6 +34,8 @@ struct AppState {
     char                recipeStepName[32] = "";
     std::atomic<int>    recipeStep{0};
     std::atomic<int>    recipeTotal{0};
+    std::atomic<bool>   waitingForConfirm{false};   // controller's `wc`
+    char                confirmMessage[40] = "";    // controller's `cm`
 
     // ── Boil ──────────────────────────────────────────────────
     std::atomic<bool>   boilActive{false};

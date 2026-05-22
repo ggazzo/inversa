@@ -1,105 +1,148 @@
-// LvglBridge — owns the current LVGL screen + writes AppState values
-// into its labels. Coarse-grained: rebuilt on connection-state edges,
-// individual labels updated every tick when `generation` moved.
+// LvglBridge — picks the active screen by AppState mode/state and pushes
+// values into widget trees every tick when `generation` advances.
+//
+// Dispatch rules (top-most wins):
+//   1. BLE not connected            → Scanning
+//   2. wdTripped                    → Watchdog overlay over current screen
+//   3. schedActive && mode==idle    → Scheduled
+//   4. mode == recipe               → Recipe (boil sub-state handled inside)
+//   5. mode == manual               → Manual
+//   6. default                      → Home
+//   Hop alerts: shown as a modal overlay on top of any non-Scanning view
+//   when there's at least one pending alert in the AppState ring.
 
 #include "LvglBridge.h"
+#include <Arduino.h>
 #include "../state/AppState.h"
 #include "../screens/Scanning.h"
-#include <cstdio>
+#include "../screens/Home.h"
+#include "../screens/Recipe.h"
+#include "../screens/Manual.h"
+#include "../screens/Scheduled.h"
+#include "../screens/Watchdog.h"
+#include "../screens/HopAlert.h"
+#ifdef USE_SQUARELINE_UI
+#include "../ui/sq/sq_ui.h"
+#endif
+#include <cstring>
 
 namespace inversa { namespace display {
 
 namespace {
 
-enum class View { Scanning, Home };
+enum class View { None, Scanning, Home, Recipe, Manual, Scheduled };
 
-View       s_view = View::Scanning;
-uint32_t   s_lastGen = 0;
+// s_view starts as None so bridge_init's first switch_to(Scanning) is
+// guaranteed to fall through the early-out (s_view == v) and actually
+// call lv_screen_load. Otherwise LVGL would keep its auto-allocated
+// default screen as active and render its empty theme bg forever.
+View      s_view = View::None;
+uint32_t  s_lastGen = 0;
 
-lv_obj_t* s_home_scr  = nullptr;
-lv_obj_t* s_lbl_temp  = nullptr;
-lv_obj_t* s_lbl_mode  = nullptr;
-lv_obj_t* s_lbl_target = nullptr;
-lv_obj_t* s_bar_temp  = nullptr;
+lv_obj_t* s_scrScanning = nullptr;
+lv_obj_t* s_scrHome     = nullptr;
+lv_obj_t* s_scrRecipe   = nullptr;
+lv_obj_t* s_scrManual   = nullptr;
+lv_obj_t* s_scrSched    = nullptr;
 
-lv_obj_t* home_screen_create() {
-    lv_obj_t* scr = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
+// Tracks the last hop tail we showed an overlay for, so we re-trigger
+// the modal whenever a new alert lands.
+size_t    s_lastHopTail = 0;
 
-    s_lbl_temp = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_lbl_temp, &lv_font_montserrat_48, 0);
-    lv_obj_set_style_text_color(s_lbl_temp, lv_color_white(), 0);
-    lv_obj_align(s_lbl_temp, LV_ALIGN_TOP_MID, 0, 30);
-    lv_label_set_text(s_lbl_temp, "--.- °C");
+lv_obj_t* screen_for(View v) {
+    switch (v) {
+        case View::None:      return nullptr;
+        case View::Scanning:
+            return s_scrScanning ? s_scrScanning
+                                 : (s_scrScanning = scanning_screen_create());
+        case View::Home:
+            return s_scrHome     ? s_scrHome
+                                 : (s_scrHome     = home_screen_create());
+        case View::Recipe:
+            return s_scrRecipe   ? s_scrRecipe
+                                 : (s_scrRecipe   = recipe_screen_create());
+        case View::Manual:
+            return s_scrManual   ? s_scrManual
+                                 : (s_scrManual   = manual_screen_create());
+        case View::Scheduled:
+            return s_scrSched    ? s_scrSched
+                                 : (s_scrSched    = scheduled_screen_create());
+    }
+    return nullptr;
+}
 
-    s_lbl_target = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_lbl_target, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(s_lbl_target,
-        lv_color_make(0xA0, 0xA0, 0xA0), 0);
-    lv_obj_align(s_lbl_target, LV_ALIGN_TOP_MID, 0, 100);
-    lv_label_set_text(s_lbl_target, "→ --.-");
+View pick_view(const AppState& s) {
+    if (!s.bleConnected.load())   return View::Scanning;
+    if (s.schedActive.load() && strcmp(s.mode, "idle") == 0)
+                                   return View::Scheduled;
+    if (strcmp(s.mode, "recipe") == 0)   return View::Recipe;
+    if (strcmp(s.mode, "manual") == 0)   return View::Manual;
+    return View::Home;
+}
 
-    s_bar_temp = lv_bar_create(scr);
-    lv_obj_set_size(s_bar_temp, 140, 10);
-    lv_obj_align(s_bar_temp, LV_ALIGN_TOP_MID, 0, 150);
-    lv_bar_set_range(s_bar_temp, 0, 100);
-    lv_bar_set_value(s_bar_temp, 0, LV_ANIM_OFF);
-
-    s_lbl_mode = lv_label_create(scr);
-    lv_obj_set_style_text_font(s_lbl_mode, &lv_font_montserrat_24, 0);
-    lv_obj_set_style_text_color(s_lbl_mode, lv_color_white(), 0);
-    lv_obj_align(s_lbl_mode, LV_ALIGN_BOTTOM_MID, 0, -40);
-    lv_label_set_text(s_lbl_mode, "Idle");
-
-    return scr;
+void update_active() {
+    switch (s_view) {
+        case View::None:                                break;
+        case View::Scanning:                       break;  // static
+        case View::Home:      home_screen_update();     break;
+        case View::Recipe:    recipe_screen_update();   break;
+        case View::Manual:    manual_screen_update();   break;
+        case View::Scheduled: scheduled_screen_update();break;
+    }
 }
 
 void switch_to(View v) {
     if (s_view == v) return;
-    lv_obj_t* scr = nullptr;
-    if (v == View::Scanning) scr = scanning_screen_create();
-    else                     scr = s_home_scr ? s_home_scr : (s_home_scr = home_screen_create());
-    lv_scr_load(scr);
+    lv_obj_t* scr = screen_for(v);
+    lv_screen_load(scr);  // v9 canonical name; lv_scr_load is the legacy alias
+    Serial.printf("[BRIDGE] loaded screen %p\n", (void*)scr);
     s_view = v;
-}
-
-void apply_state() {
-    auto& s = app_state();
-    char buf[32];
-
-    snprintf(buf, sizeof(buf), "%.1f °C", s.currentTemp.load());
-    lv_label_set_text(s_lbl_temp, buf);
-
-    snprintf(buf, sizeof(buf), "→ %.1f °C", s.targetTemp.load());
-    lv_label_set_text(s_lbl_target, buf);
-
-    float cur = s.currentTemp.load();
-    float tgt = s.targetTemp.load();
-    if (tgt > 22.0f) {
-        int pct = int(((cur - 22.0f) / (tgt - 22.0f)) * 100.0f);
-        if (pct < 0) pct = 0;
-        if (pct > 100) pct = 100;
-        lv_bar_set_value(s_bar_temp, pct, LV_ANIM_OFF);
-    }
-
-    lv_label_set_text(s_lbl_mode, s.mode);
 }
 
 }  // namespace
 
 void bridge_init() {
+#ifdef USE_SQUARELINE_UI
+    // SquareLine's ui_init() allocates every screen as static globals.
+    // Must run before any screen_create() reaches for those globals.
+    ui_init();
+#endif
     switch_to(View::Scanning);
 }
 
 void bridge_tick() {
     auto& s = app_state();
-    bool connected = s.bleConnected.load();
-    switch_to(connected ? View::Home : View::Scanning);
+
+    View v = pick_view(s);
+    switch_to(v);
 
     uint32_t gen = s.generation.load();
-    if (s_view == View::Home && gen != s_lastGen) {
+    if (gen != s_lastGen) {
         s_lastGen = gen;
-        apply_state();
+        update_active();
+
+        // Watchdog overlay — top priority. Show whenever tripped, hide
+        // automatically when controller reports it cleared.
+        if (s.wdTripped.load()) {
+            watchdog_overlay_show();
+            watchdog_overlay_update();
+        } else if (watchdog_overlay_visible()) {
+            watchdog_overlay_hide();
+        }
+
+        // Hop alert overlay — only when a new addition arrives. Cleared
+        // by the user via Confirmar (handled inside HopAlert).
+        size_t head = s.hopHead.load();
+        size_t tail = s.hopTail.load();
+        if (head != tail && tail != s_lastHopTail) {
+            const auto& h = s.hops[head];
+            Serial.printf("[BRIDGE] hop_alert_show head=%u tail=%u name=\"%s\"\n",
+                          (unsigned)head, (unsigned)tail, h.name);
+            hop_alert_show(h.name, h.minMark);
+            s_lastHopTail = tail;
+        } else if (head == tail && hop_alert_visible()) {
+            hop_alert_hide();
+        }
     }
 }
 

@@ -1,13 +1,17 @@
-// AXS5106L touch — I2C poll-based driver feeding LVGL.
+// AXS5106L touch driver — I2C register read feeding LVGL.
 //
-// Datasheet behavior used here:
-//   - Single 8-byte status packet per read
-//   - Byte 0 high nibble = touch count (0 or 1 for our needs)
-//   - Bytes 4-5 = X (big-endian, 12-bit)
-//   - Bytes 6-7 = Y (big-endian, 12-bit)
+// Protocol (taken from VolosR/Waveshare147Touch and the Espressif
+// esp_lcd_touch_axs5106l component):
+//   1. After power-up, hold TP_RST LOW 200 ms, then HIGH 300 ms.
+//   2. To read touch data: write the single byte 0x01 (the
+//      TOUCH_DATA_REG address), STOP, then requestFrom 14 bytes.
+//   3. Layout: data[1] = touch count, data[2..5] = first touch
+//      coordinates (x_hi nibble | x_lo, y_hi nibble | y_lo).
 //
-// We hold the last reported point and feed it to LVGL via the indev
-// callback so a press-drag works correctly.
+// Earlier this file sent an 8-byte "magic" sequence that doesn't exist
+// in any known datasheet — the chip just NACK'd, and arduino-esp32's
+// hal-ng I2C driver returned the TX buffer back as if it were the
+// response (the "b5 ab a5 5a ..." echo we saw).
 
 #include "Touch.h"
 #include "LCD.h"
@@ -17,79 +21,67 @@
 namespace inversa { namespace display {
 
 namespace {
-// AXS5106L is configurable to 0x3B or 0x63 via strap; the Waveshare
-// ESP32-S3-Touch-LCD-1.47 ships it at 0x63. We auto-detect both so a
-// future board revision with the alternate strap keeps working.
 constexpr uint8_t I2C_ADDR_PRIMARY = 0x63;
 constexpr uint8_t I2C_ADDR_ALT     = 0x3B;
-uint8_t s_addr = I2C_ADDR_PRIMARY;
+constexpr uint8_t REG_TOUCH_DATA   = 0x01;
+constexpr uint8_t REG_ID           = 0x08;
+constexpr size_t  READ_LEN         = 14;
 
+uint8_t s_addr = I2C_ADDR_PRIMARY;
 uint16_t s_x = 0;
 uint16_t s_y = 0;
 bool     s_pressed = false;
 bool     s_detected = false;
+volatile bool s_intFlag = false;
 
 bool probe(uint8_t addr) {
     Wire.beginTransmission(addr);
     return Wire.endTransmission() == 0;
 }
 
-// AXS5106L proper read protocol (mirrors Espressif's
-// esp_lcd_touch_axs5106l component): write an 8-byte read-touch command,
-// then read 14 bytes containing up to 1 point. A naive register read
-// (write addr, read N) NACKs every time — the chip ignores anything
-// that's not the magic command sequence.
+bool i2c_read_reg(uint8_t addr, uint8_t reg, uint8_t* buf, size_t len) {
+    Wire.beginTransmission(addr);
+    Wire.write(reg);
+    if (Wire.endTransmission() != 0) return false;
+    size_t got = Wire.requestFrom(addr, (uint8_t)len);
+    if (got != len) return false;
+    for (size_t i = 0; i < len; ++i) buf[i] = Wire.read();
+    return true;
+}
+
+void IRAM_ATTR on_tp_int() { s_intFlag = true; }
+
 void readPoint() {
     if (!s_detected) return;
+    // Honor the INT line. AXS5106L pulls it LOW only while a finger is
+    // on the glass; in that case our ISR sets s_intFlag. Polling I2C
+    // when no touch is present just wastes bus time.
+    if (!s_intFlag) { s_pressed = false; return; }
+    s_intFlag = false;
 
-    // The AXS5106L drives TP_INT LOW only while a finger is on the
-    // glass. Polling without honoring this returns stale/spurious bytes
-    // (we saw 1370,0 looping). Gate the I2C read on the INT line so
-    // we only ask the chip for coords when it actually has them.
-    if (LcdPins::tirq >= 0 && digitalRead(LcdPins::tirq) == HIGH) {
+    uint8_t buf[READ_LEN] = {0};
+    if (!i2c_read_reg(s_addr, REG_TOUCH_DATA, buf, READ_LEN)) {
         s_pressed = false;
         return;
     }
 
-    static const uint8_t READ_CMD[8] = {
-        0xB5, 0xAB, 0xA5, 0x5A, 0x00, 0x00, 0x00, 0x08
-    };
-
-    Wire.beginTransmission(s_addr);
-    Wire.write(READ_CMD, sizeof(READ_CMD));
-    if (Wire.endTransmission() != 0) {
-        s_pressed = false;
-        return;
-    }
-
-    uint8_t buf[14] = {0};
-    size_t got = Wire.requestFrom(s_addr, uint8_t(sizeof(buf)));
-    for (size_t i = 0; i < got && Wire.available(); ++i) buf[i] = Wire.read();
-    if (got < 6) { s_pressed = false; return; }
-
-    // Layout from the BSP driver:
-    //   buf[1] high nibble = touch count (0 / 1)
-    //   buf[2] high nibble | buf[3] = X (12 bit)
-    //   buf[4] high nibble | buf[5] = Y (12 bit)
-    uint8_t count = (buf[1] & 0x0F);
+    uint8_t count = buf[1] & 0x0F;
     if (count == 0) { s_pressed = false; return; }
 
-    // The AXS5106L reports 12-bit raw coordinates over the chip's
-    // internal sensor grid (~0..4095). Scale to the LCD's pixel
-    // dimensions before handing to LVGL, otherwise indev_pointer_proc
-    // complains the point is outside hor/ver resolution.
-    constexpr uint16_t MAX_RAW = 4095;
     uint16_t raw_x = (uint16_t(buf[2] & 0x0F) << 8) | buf[3];
     uint16_t raw_y = (uint16_t(buf[4] & 0x0F) << 8) | buf[5];
-    s_x = uint16_t((uint32_t)raw_x * (LCD_W - 1) / MAX_RAW);
-    s_y = uint16_t((uint32_t)raw_y * (LCD_H - 1) / MAX_RAW);
+    // Volos's example rotates per LCD rotation; we run portrait
+    // (rotation 0) and the chip's native frame already matches the
+    // panel orientation. Flip x if a future rotation flag changes
+    // this.
+    s_x = (raw_x >= LCD_W) ? (LCD_W - 1) : raw_x;
+    s_y = (raw_y >= LCD_H) ? (LCD_H - 1) : raw_y;
     s_pressed = true;
 
-    // Diagnostic: print the first few touches so the operator can
-    // verify orientation (corner-tap test). Throttled to ~5 prints.
     static uint8_t logged = 0;
     if (logged < 5) {
-        Serial.printf("[Touch] raw=(%u,%u) scaled=(%u,%u)\n", raw_x, raw_y, s_x, s_y);
+        Serial.printf("[Touch] count=%u raw=(%u,%u) → (%u,%u)\n",
+                      count, raw_x, raw_y, s_x, s_y);
         ++logged;
     }
 }
@@ -106,9 +98,6 @@ void indev_read_cb(lv_indev_t* /*indev*/, lv_indev_data_t* data) {
 }
 }  // namespace
 
-// Scan the bus and print every responder so we can see at boot which
-// chip is actually wired. Useful when the silkscreen documentation
-// disagrees with the board revision in front of us.
 static void scan_i2c() {
     Serial.printf("[Touch] I2C scan (SDA=%d SCL=%d):", LcdPins::sda, LcdPins::scl);
     int found = 0;
@@ -119,42 +108,47 @@ static void scan_i2c() {
             ++found;
         }
     }
-    if (found == 0) Serial.print(" (no responders)");
+    if (!found) Serial.print(" (none)");
     Serial.println();
 }
 
 void touch_init() {
-    // INT line is open-drain low-active on AXS5106L. Pull-up needed
-    // so HIGH reads as no-touch.
-    if (LcdPins::tirq >= 0) {
-        pinMode(LcdPins::tirq, INPUT_PULLUP);
-    }
-
+    // Reset the touch chip per the AXS5106L datasheet + Volos's example:
+    // pulse TP_RST LOW for 200 ms then HIGH for 300 ms before any I2C.
+    // The pin map now uses 47 again because the previous "tela escura"
+    // failure was actually our wrong read protocol confusing the chip
+    // and locking the bus, not a shared-reset issue.
     if (LcdPins::trst >= 0) {
         pinMode(LcdPins::trst, OUTPUT);
         digitalWrite(LcdPins::trst, LOW);
-        delay(10);
+        delay(200);
         digitalWrite(LcdPins::trst, HIGH);
-        delay(50);
+        delay(300);
+    }
+    if (LcdPins::tirq >= 0) {
+        pinMode(LcdPins::tirq, INPUT_PULLUP);
+        attachInterrupt(digitalPinToInterrupt(LcdPins::tirq), on_tp_int, FALLING);
     }
 
-    Wire.begin(LcdPins::sda, LcdPins::scl, 100000);
+    Wire.begin(LcdPins::sda, LcdPins::scl, 400000);
     delay(50);
 
-    scan_i2c();  // logs all chips on the bus regardless of expected addr
+    scan_i2c();
 
-    if (probe(I2C_ADDR_PRIMARY)) {
-        s_addr = I2C_ADDR_PRIMARY;
-        s_detected = true;
-    } else if (probe(I2C_ADDR_ALT)) {
-        s_addr = I2C_ADDR_ALT;
-        s_detected = true;
-    } else {
-        Serial.println("[Touch] AXS5106L not found at 0x63 or 0x3B — touch disabled");
+    if (probe(I2C_ADDR_PRIMARY))      { s_addr = I2C_ADDR_PRIMARY; s_detected = true; }
+    else if (probe(I2C_ADDR_ALT))     { s_addr = I2C_ADDR_ALT;     s_detected = true; }
+    else {
+        Serial.println("[Touch] AXS5106L not found — touch disabled");
         return;
     }
-    Wire.setClock(400000);
     Serial.printf("[Touch] AXS5106L detected at 0x%02X\n", s_addr);
+
+    // Optional: read the ID register so we can confirm the chip is
+    // really alive (anything past NACK echoes would print zero/garbage).
+    uint8_t id[3] = {0};
+    if (i2c_read_reg(s_addr, REG_ID, id, 3)) {
+        Serial.printf("[Touch] ID bytes: %02X %02X %02X\n", id[0], id[1], id[2]);
+    }
 
     lv_indev_t* indev = lv_indev_create();
     lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER);

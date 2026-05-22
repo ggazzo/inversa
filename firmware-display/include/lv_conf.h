@@ -12,7 +12,12 @@
 #define LV_CONF_INCLUDE_SIMPLE 1
 
 #define LV_COLOR_DEPTH 16
-#define LV_COLOR_16_SWAP 1
+// Arduino_GFX's draw16bitRGBBitmap() expects native-byte-order RGB565
+// (high byte first when sent over SPI). LVGL's LV_COLOR_16_SWAP=1 emits
+// pre-swapped bytes; with Arduino_GFX adding its own swap on send, the
+// result is double-swapped and pixels render as garbage colors (we saw
+// 0xA310 plum for what should have been 0xF800 red). Leave swap OFF.
+#define LV_COLOR_16_SWAP 0
 
 #define LV_USE_OS LV_OS_FREERTOS
 #define LV_TICK_CUSTOM 0  // We feed lv_tick_inc from a FreeRTOS task.

@@ -4,7 +4,11 @@ namespace inversa { namespace display {
 
 lv_obj_t* scanning_screen_create() {
     lv_obj_t* scr = lv_obj_create(NULL);
-    lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
+    lv_obj_set_style_bg_color(scr, lv_color_hex(0x0B0B0F), 0);
+    lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(scr, 0, 0);
+    lv_obj_set_style_pad_all(scr, 0, 0);
+    lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* col = lv_obj_create(scr);
     lv_obj_remove_style_all(col);
@@ -28,10 +32,8 @@ lv_obj_t* scanning_screen_create() {
     lv_obj_t* hint = lv_label_create(col);
     lv_label_set_text(hint, "Inversa BLE");
     lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(hint,
-        lv_color_make(0x90, 0x90, 0x90), 0);
+    lv_obj_set_style_text_color(hint, lv_color_hex(0x6B7280), 0);
 
-    // Animated spinner — three dots that walk.
     lv_obj_t* spinner = lv_spinner_create(col);
     lv_obj_set_size(spinner, 48, 48);
 
