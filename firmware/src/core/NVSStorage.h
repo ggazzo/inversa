@@ -197,6 +197,8 @@ public:
     uint32_t loadWatchdogLoopStuckMs     (uint32_t defaultVal) { return _prefs.getUInt ("wd_cfg_lsm", defaultVal); }
     uint8_t  loadWatchdogGradFactor      (uint8_t  defaultVal) { return _prefs.getUChar("wd_cfg_gf",  defaultVal); }
     uint8_t  loadWatchdogGradWindow      (uint8_t  defaultVal) { return _prefs.getUChar("wd_cfg_gw",  defaultVal); }
+    void     saveWatchdogGradFloor       (float    floorC)     { _prefs.putFloat("wd_cfg_gflr", floorC); }
+    float    loadWatchdogGradFloor       (float    defaultVal) { return _prefs.getFloat("wd_cfg_gflr", defaultVal); }
     float    loadWatchdogSafeAutoresetC  (float    defaultVal) { return _prefs.getFloat("wd_cfg_sa",  defaultVal); }
     uint32_t loadWatchdogCoolMinMs       (uint32_t defaultVal) { return _prefs.getUInt ("wd_cfg_cm",  defaultVal); }
     bool     loadWatchdogAutoResetEnabled(bool     defaultVal) { return _prefs.getBool ("wd_cfg_are", defaultVal); }

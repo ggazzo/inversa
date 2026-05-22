@@ -762,6 +762,7 @@ public:
             if (doc["loop_stuck_ms"].is<uint32_t>())   cfg.loopStuckMs     = doc["loop_stuck_ms"].as<uint32_t>();
             if (doc["grad_factor"].is<int>())          cfg.gradFactor      = (uint8_t)doc["grad_factor"].as<int>();
             if (doc["grad_window"].is<int>())          cfg.gradWindow      = (uint8_t)doc["grad_window"].as<int>();
+            if (doc["grad_floor"].is<float>())         cfg.gradFloorC      = doc["grad_floor"].as<float>();
             if (doc["safe_autoreset_c"].is<float>())   cfg.safeAutoresetC  = doc["safe_autoreset_c"].as<float>();
             if (doc["cool_min_ms"].is<uint32_t>())     cfg.coolMinMs       = doc["cool_min_ms"].as<uint32_t>();
             if (doc["auto_reset_enabled"].is<bool>())  cfg.autoResetEnabled= doc["auto_reset_enabled"].as<bool>();

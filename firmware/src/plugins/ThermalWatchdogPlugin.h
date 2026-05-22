@@ -61,6 +61,7 @@ public:
         uint32_t loopStuckMs;
         uint8_t  gradFactor;
         uint8_t  gradWindow;
+        float    gradFloorC;
         float    safeAutoresetC;
         uint32_t coolMinMs;
         bool     autoResetEnabled;
@@ -73,6 +74,7 @@ public:
         if (c.loopStuckMs     < WATCHDOG_LOOP_STUCK_MIN_MS    || c.loopStuckMs     > WATCHDOG_LOOP_STUCK_MAX_MS)    return fail("loop_stuck_ms");
         if (c.gradFactor      < WATCHDOG_GRAD_FACTOR_MIN      || c.gradFactor      > WATCHDOG_GRAD_FACTOR_MAX)      return fail("grad_factor");
         if (c.gradWindow      < WATCHDOG_GRAD_WINDOW_MIN      || c.gradWindow      > WATCHDOG_GRAD_WINDOW_MAX)      return fail("grad_window");
+        if (c.gradFloorC      < WATCHDOG_GRAD_FLOOR_MIN_C     || c.gradFloorC      > WATCHDOG_GRAD_FLOOR_MAX_C)     return fail("grad_floor");
         if (c.safeAutoresetC  < WATCHDOG_SAFE_AUTORESET_MIN_C || c.safeAutoresetC  > WATCHDOG_SAFE_AUTORESET_MAX_C) return fail("safe_autoreset_c");
         if (c.coolMinMs       < WATCHDOG_COOL_MIN_MIN_MS      || c.coolMinMs       > WATCHDOG_COOL_MIN_MAX_MS)      return fail("cool_min_ms");
         return true;
@@ -85,6 +87,7 @@ public:
         gState.watchdogLoopStuckMs      = c.loopStuckMs;
         gState.watchdogGradFactor       = c.gradFactor;
         gState.watchdogGradWindow       = c.gradWindow;
+        gState.watchdogGradFloorC       = c.gradFloorC;
         gState.watchdogSafeAutoresetC   = c.safeAutoresetC;
         gState.watchdogCoolMinMs        = c.coolMinMs;
         gState.watchdogAutoResetEnabled = c.autoResetEnabled;
@@ -92,8 +95,9 @@ public:
         NVSStorage::instance().saveWatchdogConfig(
             c.hardStopC, c.sensorFaultMs, c.loopStuckMs, c.gradFactor,
             c.gradWindow, c.safeAutoresetC, c.coolMinMs, c.autoResetEnabled);
+        NVSStorage::instance().saveWatchdogGradFloor(c.gradFloorC);
 
-        _gradient.configure(c.gradWindow, c.gradFactor);
+        _gradient.configure(c.gradWindow, c.gradFactor, c.gradFloorC);
         bus().publish(EventType::WatchdogConfigChanged);
     }
 
@@ -101,7 +105,8 @@ public:
         return Config{
             gState.watchdogHardStopC, gState.watchdogSensorFaultMs,
             gState.watchdogLoopStuckMs, gState.watchdogGradFactor,
-            gState.watchdogGradWindow, gState.watchdogSafeAutoresetC,
+            gState.watchdogGradWindow, gState.watchdogGradFloorC,
+            gState.watchdogSafeAutoresetC,
             gState.watchdogCoolMinMs, gState.watchdogAutoResetEnabled
         };
     }
@@ -172,6 +177,7 @@ public:
             nvs.loadWatchdogLoopStuckMs    (WATCHDOG_DEFAULT_LOOP_STUCK_MS),
             nvs.loadWatchdogGradFactor     (WATCHDOG_DEFAULT_GRAD_FACTOR),
             nvs.loadWatchdogGradWindow     (WATCHDOG_DEFAULT_GRAD_WINDOW),
+            nvs.loadWatchdogGradFloor      (WATCHDOG_DEFAULT_GRAD_FLOOR_C),
             nvs.loadWatchdogSafeAutoresetC (WATCHDOG_DEFAULT_SAFE_AUTORESET_C),
             nvs.loadWatchdogCoolMinMs      (WATCHDOG_DEFAULT_COOL_MIN_MS),
             nvs.loadWatchdogAutoResetEnabled(true)
@@ -182,10 +188,11 @@ public:
         gState.watchdogLoopStuckMs      = cfg.loopStuckMs;
         gState.watchdogGradFactor       = cfg.gradFactor;
         gState.watchdogGradWindow       = cfg.gradWindow;
+        gState.watchdogGradFloorC       = cfg.gradFloorC;
         gState.watchdogSafeAutoresetC   = cfg.safeAutoresetC;
         gState.watchdogCoolMinMs        = cfg.coolMinMs;
         gState.watchdogAutoResetEnabled = cfg.autoResetEnabled;
-        _gradient.configure(cfg.gradWindow, cfg.gradFactor);
+        _gradient.configure(cfg.gradWindow, cfg.gradFactor, cfg.gradFloorC);
 
         // 2. Restore trip stats
         gState.watchdogTripCount    = nvs.loadWatchdogTripCount(0);
