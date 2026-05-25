@@ -93,6 +93,7 @@ private:
 
     float readNTC() {
         int adcValue = analogRead(PIN_NTC);
+        gState.ntcAdcLast = adcValue;
         if (adcValue <= 0 || adcValue >= NTC_ADC_RESOLUTION) {
             return TEMP_ERROR_VALUE;
         }

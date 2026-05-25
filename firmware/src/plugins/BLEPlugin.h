@@ -453,6 +453,8 @@ private:
         doc.clear();
         doc[Protocol::FIELD_TYPE]         = Protocol::EVT_STATUS;
         doc[Protocol::FIELD_CURRENT_TEMP] = round2(gState.currentTemp);
+        doc["adc"]                        = gState.ntcAdcLast;
+        doc["tso"]                        = gState.tempSensorOk;
         doc[Protocol::FIELD_TARGET_TEMP]  = round2(gState.targetTemp);
         doc[Protocol::FIELD_PID_OUTPUT]   = (int)gState.pidOutput;
         doc[Protocol::FIELD_HEATER_ON]    = gState.heaterOn;
