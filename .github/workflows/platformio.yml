@@ -87,6 +87,13 @@ jobs:
       - name: Build firmware
         run: pio run -e ${{ matrix.env }}
 
+      # Copy boot_app0.bin out of the arduino-esp32 framework tools dir so the
+      # release job can run esptool merge_bin without pulling the full toolchain.
+      - name: Stage boot_app0 partition
+        run: |
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+             firmware/.pio/build/${{ matrix.env }}/boot_app0.bin
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -95,6 +102,7 @@ jobs:
             firmware/.pio/build/${{ matrix.env }}/firmware.bin
             firmware/.pio/build/${{ matrix.env }}/bootloader.bin
             firmware/.pio/build/${{ matrix.env }}/partitions.bin
+            firmware/.pio/build/${{ matrix.env }}/boot_app0.bin
 
   release:
     name: Create Release
@@ -127,6 +135,31 @@ jobs:
           cp release/s3/firmware.bin release/wemos_s3_mini.bin
           cp release/c3/firmware.bin release/wemos_c3_mini.bin
 
+      # Factory bins consumed by docs/ ESP Web Tools installer. esptool's
+      # merge_bin produces a single image to flash at offset 0; the chip
+      # family flag is set per board because S3 and C3 share the same layout
+      # but esptool expects an explicit `--chip`.
+      - name: Install esptool
+        run: pip install esptool
+
+      - name: Merge factory bins for web installer
+        run: |
+          esptool.py --chip esp32s3 merge_bin \
+            -o release/wemos_s3_mini.factory.bin \
+            --flash_mode dio --flash_freq 80m --flash_size 4MB \
+            0x0     release/s3/bootloader.bin \
+            0x8000  release/s3/partitions.bin \
+            0xe000  release/s3/boot_app0.bin \
+            0x10000 release/s3/firmware.bin
+
+          esptool.py --chip esp32c3 merge_bin \
+            -o release/wemos_c3_mini.factory.bin \
+            --flash_mode dio --flash_freq 80m --flash_size 4MB \
+            0x0     release/c3/bootloader.bin \
+            0x8000  release/c3/partitions.bin \
+            0xe000  release/c3/boot_app0.bin \
+            0x10000 release/c3/firmware.bin
+
       # P8 — ECDSA P-256 signature over the OTA assets. Firmware refuses
       # an update without a matching `.sig` (see core/OtaVerify.h).
       # OTA_SIGNING_KEY repo secret holds the PEM-encoded private key.
@@ -154,4 +187,6 @@ jobs:
             release/wemos_s3_mini.bin.sig
             release/wemos_c3_mini.bin
             release/wemos_c3_mini.bin.sig
+            release/wemos_s3_mini.factory.bin
+            release/wemos_c3_mini.factory.bin
           generate_release_notes: true

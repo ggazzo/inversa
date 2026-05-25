@@ -200,7 +200,17 @@ Mains frequency and burst window can be tuned at runtime via the BLE command
 
 ## Installation
 
-### Firmware
+### Firmware (web installer, no tools required)
+
+The easiest path is the web installer — flashes the latest signed
+release directly from Chrome or Edge over USB-C. No PlatformIO needed:
+
+**[ggazzo.github.io/inversa](https://ggazzo.github.io/inversa/)**
+
+After flashing, configure WiFi from the web app via Bluetooth, or
+through the post-flash provisioning wizard.
+
+### Firmware (from source)
 
 ```bash
 # Clone the repository
