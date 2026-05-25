@@ -9,7 +9,7 @@
       "improv": false,
       "parts": [
         {
-          "path": "https://github.com/ggazzo/inversa/releases/latest/download/wemos_s3_mini.factory.bin",
+          "path": "firmware/wemos_s3_mini.factory.bin",
           "offset": 0
         }
       ]
