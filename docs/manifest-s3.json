@@ -1,0 +1,18 @@
+{
+  "name": "Inversa S3",
+  "version": "latest",
+  "new_install_prompt_erase": true,
+  "new_install_improv_wait_time": 10,
+  "builds": [
+    {
+      "chipFamily": "ESP32-S3",
+      "improv": false,
+      "parts": [
+        {
+          "path": "https://github.com/ggazzo/inversa/releases/latest/download/wemos_s3_mini.factory.bin",
+          "offset": 0
+        }
+      ]
+    }
+  ]
+}

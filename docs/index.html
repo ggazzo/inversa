@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Inversa Installer</title>
+    <meta name="description" content="Install the Inversa firmware straight from your browser over USB." />
+    <meta property="og:title" content="Inversa Installer" />
+    <meta property="og:description" content="Flash the ESP32 firmware with nothing to install." />
+    <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fafafa;
+        --fg: #1a1a1a;
+        --muted: #6b6b6b;
+        --card: #ffffff;
+        --border: #e5e5e5;
+        --accent: #d97706;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1115;
+          --fg: #f4f4f5;
+          --muted: #a1a1aa;
+          --card: #18181b;
+          --border: #27272a;
+          --accent: #f59e0b;
+        }
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+        line-height: 1.5;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 3rem 1.5rem;
+      }
+      h1 {
+        margin: 0 0 0.25rem;
+        font-size: 2.25rem;
+        letter-spacing: -0.02em;
+      }
+      .lede {
+        color: var(--muted);
+        margin: 0 0 2.5rem;
+        font-size: 1.05rem;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+      }
+      .card h2 { margin: 0 0 0.5rem; font-size: 1.25rem; }
+      .card p  { margin: 0 0 1rem; color: var(--muted); }
+      .row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+      .pill {
+        display: inline-block;
+        padding: 0.15rem 0.6rem;
+        border-radius: 999px;
+        background: var(--accent);
+        color: #fff;
+        font-size: 0.75rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+      .secondary {
+        display: inline-block;
+        padding: 0.6rem 1.1rem;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: var(--fg);
+        text-decoration: none;
+        font-weight: 500;
+      }
+      .secondary:hover { border-color: var(--accent); }
+      footer {
+        margin-top: 3rem;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+      footer a { color: var(--muted); }
+      code {
+        background: var(--card);
+        padding: 0.1rem 0.4rem;
+        border-radius: 4px;
+        font-size: 0.9em;
+      }
+      ul { padding-left: 1.25rem; }
+      esp-web-install-button { --esp-tools-button-color: var(--fg); }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Inversa Installer</h1>
+      <p class="lede">
+        Flash the Inversa controller firmware straight from your browser over USB.
+        Requires desktop Chrome or Edge — Safari and Firefox don't support Web Serial.
+      </p>
+
+      <section class="card">
+        <h2>ESP32-S3 Mini <span class="pill">recommended</span></h2>
+        <p>Production build. Pulls the latest signed release.</p>
+        <esp-web-install-button manifest="manifest-s3.json">
+          <button slot="activate" class="secondary">Install firmware</button>
+          <span slot="unsupported">This browser does not support Web Serial.</span>
+          <span slot="not-allowed">Serial port access was denied.</span>
+        </esp-web-install-button>
+      </section>
+
+      <section class="card">
+        <h2>ESP32-C3 Mini</h2>
+        <p>Alternative build for older hardware.</p>
+        <esp-web-install-button manifest="manifest-c3.json">
+          <button slot="activate" class="secondary">Install firmware</button>
+          <span slot="unsupported">This browser does not support Web Serial.</span>
+          <span slot="not-allowed">Serial port access was denied.</span>
+        </esp-web-install-button>
+      </section>
+
+      <section class="card">
+        <h2>Already flashed?</h2>
+        <p>Connect to the controller over Bluetooth to configure WiFi, run recipes and stream telemetry in real time.</p>
+        <div class="row">
+          <a class="secondary" href="https://ggazzo.github.io/inversa-app/">Open web app</a>
+          <a class="secondary" href="https://github.com/ggazzo/inversa#installation">Documentation</a>
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>Before you install</h2>
+        <ul>
+          <li>Connect the ESP32 board to your computer with a USB-C <em>data</em> cable (charge-only cables won't enumerate).</li>
+          <li>Click <strong>Install firmware</strong> and pick the serial port matching the device.</li>
+          <li>Web Serial erases and flashes the bootloader, partition table and application in a single ~30 s step.</li>
+          <li>After installing, configure WiFi either through the post-install wizard or via the web app over Bluetooth.</li>
+        </ul>
+      </section>
+
+      <footer>
+        <p>
+          Inversa is open source — <a href="https://github.com/ggazzo/inversa">github.com/ggazzo/inversa</a>.
+          Binaries live in the <a href="https://github.com/ggazzo/inversa/releases/latest">latest release</a>,
+          signed with ECDSA P-256.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>
