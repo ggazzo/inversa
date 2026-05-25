@@ -3,7 +3,7 @@
 
 // ─── ESP32-S3 Mini Pin Definitions ──────────────────────────
 // Pin layout:
-//   NTC: A1 (GPIO1)
+//   NTC: A1 (GPIO2)
 //   SSR: GPIO4
 //   Pump: GPIO16
 //   SD:  Default SPI (SS, SCK, MISO, MOSI)
@@ -11,7 +11,11 @@
 //   NeoPixel: GPIO47
 
 // Analog
-#define PIN_NTC           1       // A1
+// `A1` is the silkscreen label on the Lolin S3 Mini; per the
+// arduino-esp32 lolin_s3_mini variant that maps to GPIO 2 (ADC1_CH1),
+// not GPIO 1. Older firmware hardcoded `1`, which read a floating
+// neighbouring pin and tripped the watchdog with SENSOR_FAULT in ~10 s.
+#define PIN_NTC           2       // A1 → GPIO2 (ADC1_CH1)
 
 // Outputs
 #define PIN_HEATER_SSR    4
