@@ -47,14 +47,40 @@ jobs:
       - name: Build web app with Pages base path
         run: npm run web:build:pages
 
+      # GitHub release assets are served without CORS headers, so the
+      # ESP Web Tools <esp-web-install-button> can't fetch them from
+      # the cross-origin Pages site. Pull the factory bins server-side
+      # here and bundle them inside the Pages artifact so the manifest
+      # points at same-origin URLs. The step is best-effort: if the
+      # current release predates the factory.bin asset, we still ship
+      # the installer page (the button just won't flash until a fresh
+      # tag uploads a working factory bin).
+      - name: Stage factory bins from latest release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euxo pipefail
+          mkdir -p docs/firmware
+          for board in wemos_s3_mini wemos_c3_mini; do
+            if gh release download --repo ${{ github.repository }} \
+                 --pattern "${board}.factory.bin" \
+                 --dir docs/firmware --clobber; then
+              echo "✓ staged ${board}.factory.bin"
+            else
+              echo "::warning::No ${board}.factory.bin in latest release (older tag?); installer will 404 until a tag with merge_bin lands."
+            fi
+          done
+
       - name: Assemble site
         # docs/ already contains the installer index.html + manifests;
-        # the web app was just emitted into docs/app/. Upload docs/ as
-        # the Pages artifact root so installer lives at `/inversa/` and
-        # the PWA lives at `/inversa/app/`.
+        # the web app was just emitted into docs/app/, and the factory
+        # bins (if any) landed in docs/firmware/. Upload docs/ as the
+        # Pages artifact root so the installer lives at `/inversa/`,
+        # the PWA at `/inversa/app/`, and bins at `/inversa/firmware/`.
         run: |
           test -f docs/index.html
           test -f docs/app/index.html
+          ls -la docs/firmware/ || echo "no firmware bins yet"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
