@@ -140,6 +140,7 @@ inline const char* getStepName(BrewingStep step) {
 struct MachineState {
     // Temperature
     float currentTemp       = 0.0f;
+    int   ntcAdcLast        = -1;       // raw ADC reading from PIN_NTC, -1 if never sampled
     float targetTemp        = 0.0f;
     bool  tempSensorOk      = false;
 
