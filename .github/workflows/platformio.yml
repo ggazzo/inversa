@@ -90,9 +90,11 @@ jobs:
       # Copy boot_app0.bin out of the arduino-esp32 framework tools dir so the
       # release job can run esptool merge_bin without pulling the full toolchain.
       - name: Stage boot_app0 partition
+        # `working-directory: firmware` is already set on the job, so the
+        # destination path must be relative to that — not `firmware/...`.
         run: |
           cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
-             firmware/.pio/build/${{ matrix.env }}/boot_app0.bin
+             .pio/build/${{ matrix.env }}/boot_app0.bin
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
