@@ -1,0 +1,77 @@
+name: Deploy GitHub Pages
+
+# Publishes the firmware installer (static `docs/`) together with the
+# Tamagui web app (`apps/web` built with `VITE_BASE=/inversa/app/`).
+# Replaces the previous "deploy from branch" Pages source so we never
+# have to commit built assets.
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "docs/**"
+      - "apps/web/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Newer pushes supersede in-flight deploys; never tear down a deploy
+# that is mid-flight because that would leave the site in a half state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install workspace
+        run: npm ci
+
+      - name: Build web app with Pages base path
+        run: npm run web:build:pages
+
+      - name: Assemble site
+        # docs/ already contains the installer index.html + manifests;
+        # the web app was just emitted into docs/app/. Upload docs/ as
+        # the Pages artifact root so installer lives at `/inversa/` and
+        # the PWA lives at `/inversa/app/`.
+        run: |
+          test -f docs/index.html
+          test -f docs/app/index.html
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

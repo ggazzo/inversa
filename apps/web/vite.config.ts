@@ -16,7 +16,15 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { tamaguiPlugin } from '@tamagui/vite-plugin';
 
+// `base` is overridable so the same Vite build serves both the
+// SPIFFS-hosted PWA (root path on the controller's own HTTP server)
+// and the GitHub Pages mirror at `/inversa/app/`. Set `VITE_BASE`
+// before `vite build` to target Pages; the default ('/') is what the
+// firmware HTTP server expects.
+const baseUrl = process.env.VITE_BASE || '/';
+
 export default defineConfig({
+    base: baseUrl,
     plugins: [
         react({
             babel: {

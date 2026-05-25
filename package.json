@@ -12,6 +12,7 @@
     "web:build": "npm run build --workspace apps/web",
     "web:typecheck": "npm run typecheck --workspace apps/web",
     "web:build:firmware": "npm run build:firmware --workspace apps/web",
+    "web:build:pages": "npm run build:pages --workspace apps/web",
     "native:start": "npm run start --workspace apps/native",
     "native:ios": "npm run ios --workspace apps/native",
     "native:android": "npm run android --workspace apps/native",

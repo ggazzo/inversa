@@ -8,6 +8,8 @@
         "build": "tsc -b && vite build",
         "preview": "vite preview",
         "build:firmware": "tsc -b && vite build --outDir ../../firmware/data --emptyOutDir",
+        "build:pages": "tsc -b && cross-env VITE_BASE=/inversa/app/ vite build --outDir ../../docs/app --emptyOutDir",
+        "prebuild:pages": "node scripts/generate-icons.mjs",
         "icons": "node scripts/generate-icons.mjs",
         "prebuild": "node scripts/generate-icons.mjs",
         "prebuild:firmware": "node scripts/generate-icons.mjs",
@@ -28,6 +30,7 @@
     },
     "devDependencies": {
         "@preact/signals-react-transform": "^0.5.0",
+        "cross-env": "^7.0.3",
         "@tamagui/vite-plugin": "^1.121.0",
         "@types/react": "~19.2.0",
         "@types/react-dom": "~19.2.0",
