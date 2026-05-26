@@ -214,6 +214,15 @@ class ConnectionManagerClass {
     return BleClient.request('req:recovery:discard');
   }
 
+  // Device identity. Persists the user-chosen label that drives the
+  // BLE advertising name and the mDNS hostname. Firmware reboots after
+  // accepting the new name, so the BLE notify for `res:ok` may be the
+  // last message we hear on this connection — callers should expect a
+  // disconnect immediately after.
+  async renameDevice(name: string) {
+    return BleClient.request('req:device:rename', { name });
+  }
+
   // WiFi
   async configureWiFi(ssid, password) {
     return BleClient.request('req:wifi:config', { ssid, pwd: password });
