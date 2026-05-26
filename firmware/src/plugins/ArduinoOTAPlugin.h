@@ -3,7 +3,7 @@
 // Dev-only OTA via ArduinoOTA / espota. Lets PlatformIO push builds over WiFi
 // during development without USB:
 //
-//   pio run -e wemos_s3_mini_devota -t upload --upload-port inversa.local
+//   pio run -e wemos_s3_mini_devota -t upload --upload-port brewpilot.local
 //
 // Gated by -DDEV_OTA_ENABLED. NEVER ship this in release builds — it ignores
 // the ECDSA signature path that OTAPlugin enforces. A password is mandatory:
@@ -50,10 +50,10 @@ private:
         if (_running) return;
 
         // Hostname uses the chip MAC suffix so multiple devices on the same
-        // LAN don't collide on `inversa.local`.
+        // LAN don't collide on `brewpilot.local`.
         uint64_t mac = ESP.getEfuseMac();
         char host[32];
-        snprintf(host, sizeof(host), "inversa-%04x",
+        snprintf(host, sizeof(host), "brewpilot-%04x",
                  (uint16_t)((mac >> 32) & 0xFFFF));
         ArduinoOTA.setHostname(host);
         ArduinoOTA.setPassword(DEV_OTA_PASSWORD);

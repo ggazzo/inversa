@@ -242,7 +242,7 @@ And always:
 
 ## Persistence
 
-New NVS keys (namespace `inversa`):
+New NVS keys (namespace `inversa` (kept for backwards-compat across the BrewPilot rebrand)):
 
 | Key | Type | Content |
 |-----|------|---------|

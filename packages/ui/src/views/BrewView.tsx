@@ -9,7 +9,7 @@ import {
     recipeState, autoTuneActive, boilActive,
     lossTuneActive, lossTunePhase,
     schedulerActive,
-} from '@inversa/stores';
+} from '@brewpilot/stores';
 import { TempInstrument } from '../components/TempInstrument';
 import { RecipeTimeline } from '../components/RecipeTimeline';
 import { Disconnected }   from './states/Disconnected';

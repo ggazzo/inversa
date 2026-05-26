@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Input, Label, Paragraph, Separator, Text, XStack, YStack } from 'tamagui';
-import { pidKp, pidKi, pidKd, autoTuneActive, currentTemp, showToast } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { pidKp, pidKi, pidKd, autoTuneActive, currentTemp, showToast } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from './WizardSheet';
 
 interface Props { open: boolean; onClose: () => void }

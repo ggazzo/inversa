@@ -14,7 +14,7 @@ import { useSignals } from '@preact/signals-react/runtime';
 import Svg, { G, Line, Polyline, Text as SvgText } from 'react-native-svg';
 import {
     tempHistory, targetHistory, outputHistory,
-} from '@inversa/stores';
+} from '@brewpilot/stores';
 
 const HEIGHT = 192;
 const PAD_L  = 28;  // left margin for °C labels

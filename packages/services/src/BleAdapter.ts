@@ -8,7 +8,7 @@
 //                             puts `.web.ts` before `.ts`.
 //
 //   * BleAdapter.native.ts  — react-native-ble-plx + WebSocket sim path
-//                             (selected by `EXPO_PUBLIC_INVERSA_SIM_URL`).
+//                             (selected by `EXPO_PUBLIC_BREWPILOT_SIM_URL`).
 //                             Picked up by Metro automatically.
 //
 // Each adapter is responsible for the wire protocol (chunk re-assembly
@@ -52,7 +52,7 @@ export interface BleAdapter {
      *    when multiple devices may be in range. */
     connect(): Promise<void>;
 
-    /** Start scanning for nearby Inversa devices. Each discovery fires
+    /** Start scanning for nearby BrewPilot devices. Each discovery fires
      *  `onDevice`; transient scan failures fire `onError`. Returns a
      *  function that stops the scan. Safe to call multiple times — the
      *  adapter coalesces. */

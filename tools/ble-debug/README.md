@@ -1,6 +1,6 @@
 # ble-debug
 
-Python BLE CLI for poking the Inversa firmware over the Nordic UART Service
+Python BLE CLI for poking the BrewPilot firmware over the Nordic UART Service
 (NUS) characteristics it already exposes (same UUIDs the web/mobile app uses).
 Useful when:
 
@@ -30,7 +30,7 @@ first scan).
 ## Usage
 
 All commands auto-scan for the first peripheral whose name contains
-`Inversa`. Run `--help` after any subcommand for flags.
+`BrewPilot`. Run `--help` after any subcommand for flags.
 
 | Command | What it does |
 |---|---|
@@ -47,14 +47,14 @@ All commands auto-scan for the first peripheral whose name contains
 Examples:
 
 ```bash
-./inversa_ble.py scan
-./inversa_ble.py info
-./inversa_ble.py temp
-./inversa_ble.py wifi-config 'GZ_' 'hunter2'
-./inversa_ble.py wifi-reconnect
-./inversa_ble.py watchdog-reset
-./inversa_ble.py monitor --secs 90
-./inversa_ble.py adc-monitor --secs 30
+./brewpilot_ble.py scan
+./brewpilot_ble.py info
+./brewpilot_ble.py temp
+./brewpilot_ble.py wifi-config 'GZ_' 'hunter2'
+./brewpilot_ble.py wifi-reconnect
+./brewpilot_ble.py watchdog-reset
+./brewpilot_ble.py monitor --secs 90
+./brewpilot_ble.py adc-monitor --secs 30
 ```
 
 ## What the ADC value means
@@ -91,6 +91,6 @@ in `gState.currentTemp` and only overwrites it on a successful read. Trust
 
 ## Files
 
-- `inversa_ble.py` — the CLI (single file, no project layout).
+- `brewpilot_ble.py` — the CLI (single file, no project layout).
 - `requirements.txt` — pinned to `bleak`.
 - `README.md` — you are here.

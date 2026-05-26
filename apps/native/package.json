@@ -1,5 +1,5 @@
 {
-  "name": "@inversa/native",
+  "name": "@brewpilot/native",
   "version": "0.1.0",
   "private": true,
   "main": "index.js",
@@ -11,10 +11,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@inversa/services": "*",
-    "@inversa/stores": "*",
-    "@inversa/ui": "*",
-    "@inversa/utils": "*",
+    "@brewpilot/services": "*",
+    "@brewpilot/stores": "*",
+    "@brewpilot/ui": "*",
+    "@brewpilot/utils": "*",
     "@preact/signals-react": "^3.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@shopify/react-native-skia": "2.4.18",

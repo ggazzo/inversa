@@ -1,6 +1,6 @@
 # hil-bridge
 
-Host bridge for the Inversa Hardware-in-the-Loop firmware build. Drives
+Host bridge for the BrewPilot Hardware-in-the-Loop firmware build. Drives
 sensor inputs and the virtual clock of a firmware compiled with
 `HIL_BUILD=1` over USB CDC (JSONL), and runs analyzer plugins on the
 returned telemetry.

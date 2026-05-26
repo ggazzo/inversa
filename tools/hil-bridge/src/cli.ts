@@ -73,7 +73,7 @@ function parseArgs(argv: string[]): Args {
 function printHelp(): void {
   process.stdout.write(
     [
-      "hil-bridge — host bridge for Inversa HIL builds",
+      "hil-bridge — host bridge for BrewPilot HIL builds",
       "",
       "Usage:",
       "  hil-bridge run scenario <name> [--port <serial>] [--duration 30s]",

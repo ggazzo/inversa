@@ -1,4 +1,4 @@
-// main_sim.cpp — entry point for the Inversa brewing simulator.
+// main_sim.cpp — entry point for the BrewPilot brewing simulator.
 //
 // Builds in env `sim`, links the real firmware plugins against the
 // `sim/` HAL stubs, and drives a closed-loop ThermalSim while the

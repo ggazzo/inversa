@@ -1,18 +1,18 @@
 {
   "expo": {
-    "name": "Inversa",
-    "slug": "inversa",
+    "name": "BrewPilot",
+    "slug": "brewpilot",
     "version": "0.1.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
-    "scheme": "inversa",
+    "scheme": "brewpilot",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.inversa.controller",
+      "bundleIdentifier": "com.brewpilot.controller",
       "infoPlist": {
-        "NSBluetoothAlwaysUsageDescription": "Inversa precisa do Bluetooth para se conectar ao controlador de fermentação.",
-        "NSBluetoothPeripheralUsageDescription": "Inversa precisa do Bluetooth para se conectar ao controlador de fermentação."
+        "NSBluetoothAlwaysUsageDescription": "BrewPilot precisa do Bluetooth para se conectar ao controlador de fermentação.",
+        "NSBluetoothPeripheralUsageDescription": "BrewPilot precisa do Bluetooth para se conectar ao controlador de fermentação."
       }
     },
     "android": {
@@ -20,7 +20,7 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#1d232a"
       },
-      "package": "com.inversa.controller",
+      "package": "com.brewpilot.controller",
       "permissions": [
         "android.permission.BLUETOOTH_CONNECT",
         "android.permission.BLUETOOTH_SCAN",

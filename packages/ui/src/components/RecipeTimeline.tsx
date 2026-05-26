@@ -5,9 +5,9 @@ import { useSignals } from '@preact/signals-react/runtime';
 import { Card, ScrollView, Text, XStack, YStack } from 'tamagui';
 import {
     recipeName, recipeStep, recipeTotalSteps, loadedRecipeContent,
-} from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
-import { parseRecipe, KIND_ICON, type RecipeStep, type StepKind } from '@inversa/utils';
+} from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
+import { parseRecipe, KIND_ICON, type RecipeStep, type StepKind } from '@brewpilot/utils';
 
 function statusOf(idx: number, current: number): 'done' | 'current' | 'pending' {
     if (idx < current)   return 'done';

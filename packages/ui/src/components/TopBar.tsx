@@ -6,11 +6,11 @@ import { useState } from 'react';
 import { Platform } from '../platform';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Popover, Text, XStack, YStack, useTheme } from 'tamagui';
-import { isConnected, deviceName, mode, modeLabel, showToast, signalRssi } from '@inversa/stores';
-import { isStale } from '@inversa/stores';
-import { theme as themeSignal, toggleTheme } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
-import { BleClient } from '@inversa/services';
+import { isConnected, deviceName, mode, modeLabel, showToast, signalRssi } from '@brewpilot/stores';
+import { isStale } from '@brewpilot/stores';
+import { theme as themeSignal, toggleTheme } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
+import { BleClient } from '@brewpilot/services';
 import { WatchdogIndicator } from './WatchdogIndicator';
 import { RtcClock } from './RtcClock';
 
@@ -97,7 +97,7 @@ export function TopBar({ onMenuSelect }: Props) {
                 >
                     <Text color="white" fontWeight="700" fontSize="$3">I</Text>
                 </YStack>
-                <Text fontWeight="600" $sm={{ display: 'none' }}>Inversa</Text>
+                <Text fontWeight="600" $sm={{ display: 'none' }}>BrewPilot</Text>
             </XStack>
 
             {/* Connection chip */}

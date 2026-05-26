@@ -65,7 +65,7 @@
     #define BUILD_TIMESTAMP "unknown"
 #endif
 #ifndef FIRMWARE_NAME
-    #define FIRMWARE_NAME "inversa"
+    #define FIRMWARE_NAME "brewpilot"
 #endif
 
 // ─── NTC Thermistor Configuration ───────────────────────────
@@ -111,7 +111,7 @@
 #define KALMAN_PROCESS_NOISE      0.01f
 
 // ─── BLE Configuration ─────────────────────────────────────
-#define BLE_DEVICE_NAME           "Inversa"
+#define BLE_DEVICE_NAME           "BrewPilot"
 #define BLE_SERVICE_UUID          "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"  // Nordic UART
 #define BLE_CHAR_TX_UUID          "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  // Notify
 #define BLE_CHAR_RX_UUID          "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  // Write
@@ -129,7 +129,7 @@
 
 // ─── OTA Configuration ──────────────────────────────────────
 #define GITHUB_REPO_OWNER         "ggazzo"
-#define GITHUB_REPO_NAME          "inversa"
+#define GITHUB_REPO_NAME          "brewpilot"
 #define GITHUB_API_URL            "https://api.github.com"
 #define OTA_CHECK_TIMEOUT_MS      30000
 #define OTA_PROGRESS_INTERVAL_PCT 5  // Report progress every 5%

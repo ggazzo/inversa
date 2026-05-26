@@ -1,4 +1,4 @@
-// Inversa v3 — Homebrewing Temperature Controller
+// BrewPilot v3 — Homebrewing Temperature Controller
 // main.cpp — Entry point
 
 #include <Arduino.h>
@@ -57,7 +57,7 @@ void setup() {
     
     DEBUG_PRINTLN();
     DEBUG_PRINTLN("╔══════════════════════════════════════╗");
-    DEBUG_PRINTLN("║        Inversa v2 Brewing            ║");
+    DEBUG_PRINTLN("║        BrewPilot v2 Brewing            ║");
     DEBUG_PRINTF( "║  FW: %-32s║\n", BUILD_GIT_VERSION);
     DEBUG_PRINTLN("╚══════════════════════════════════════╝");
     DEBUG_PRINTLN();

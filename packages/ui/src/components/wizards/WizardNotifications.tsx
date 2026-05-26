@@ -4,9 +4,9 @@ import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Paragraph, Separator, Switch, Text, XStack, YStack } from 'tamagui';
 import {
     notificationsEnabled, notifyOnTempReached, notifyOnStepComplete, showToast,
-} from '@inversa/stores';
+} from '@brewpilot/stores';
 import type { Signal } from '@preact/signals-react';
-import { ConnectionManager } from '@inversa/services';
+import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from './WizardSheet';
 
 type Perm = 'default' | 'granted' | 'denied' | 'unsupported' | 'native';

@@ -1,9 +1,9 @@
 {
-    "name": "@inversa/ble-probe",
+    "name": "@brewpilot/ble-probe",
     "version": "0.0.0",
     "private": true,
     "type": "module",
-    "description": "Real-BLE end-to-end probe — pairs with the Inversa controller via macOS CoreBluetooth (noble), sends req:* commands, prints the matching res:*.",
+    "description": "Real-BLE end-to-end probe — pairs with the BrewPilot controller via macOS CoreBluetooth (noble), sends req:* commands, prints the matching res:*.",
     "bin": {
         "ble-probe": "./probe.mjs"
     },

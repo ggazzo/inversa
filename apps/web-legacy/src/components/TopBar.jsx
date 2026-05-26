@@ -33,7 +33,7 @@ export function TopBar({ onMenuSelect }) {
                 <div class="flex items-center gap-2 min-w-0">
                     <div class="w-7 h-7 rounded bg-primary text-primary-content
                                 grid place-items-center font-bold">I</div>
-                    <span class="font-semibold tracking-tight hidden xs:inline">Inversa</span>
+                    <span class="font-semibold tracking-tight hidden xs:inline">BrewPilot</span>
                 </div>
 
                 {/* Connection chip */}

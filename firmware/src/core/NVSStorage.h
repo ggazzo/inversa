@@ -15,7 +15,11 @@ public:
     }
 
     bool begin() {
-        bool ok = _prefs.begin("inversa", false);  // false = read/write mode
+        // NVS namespace stays "inversa" intentionally so existing devices keep
+// their persisted thermal/PID/watchdog config across the rebrand. A
+// future migration step can copy keys into "brewpilot" if we ever need
+// a clean break.
+bool ok = _prefs.begin("inversa", false);  // false = read/write mode
         if (ok) {
             DEBUG_PRINTLN("[NVS] Storage initialized");
         } else {

@@ -23,8 +23,8 @@ import {
     schedulerVolume,
     schedulerStatus,
     showToast,
-} from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+} from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 
 function pad(n: number): string { return String(n).padStart(2, '0'); }
 

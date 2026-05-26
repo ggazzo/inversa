@@ -1,4 +1,4 @@
-// Cross-platform Tamagui UI for the Inversa controller. The web app
+// Cross-platform Tamagui UI for the BrewPilot controller. The web app
 // (apps/web) and the future native app (apps/native) both consume
 // these. Anything that touches DOM-only APIs (Chart.js, position:fixed)
 // lives outside this package — see `apps/web/src/components.web/`.

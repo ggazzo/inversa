@@ -1,7 +1,7 @@
 {
-  "name": "inversa-sim-bridge",
+  "name": "brewpilot-sim-bridge",
   "version": "0.1.0",
-  "description": "WebSocket bridge between the Inversa firmware simulator (native) and the PWA.",
+  "description": "WebSocket bridge between the BrewPilot firmware simulator (native) and the PWA.",
   "private": true,
   "type": "module",
   "main": "server.js",

@@ -5,8 +5,8 @@ import { Button, Input, Label, Paragraph, Progress, Separator, Text, XStack, YSt
 import {
     wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
     otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion, showToast,
-} from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+} from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from './WizardSheet';
 import { confirm } from '../../platform';
 

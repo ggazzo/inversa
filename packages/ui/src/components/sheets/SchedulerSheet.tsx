@@ -24,8 +24,8 @@ import {
     rtcAvailable,
     rtcTimestamp,
     rtcNtpSynced,
-} from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+} from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from '../wizards/WizardSheet';
 
 interface Props { open: boolean; onClose: () => void }

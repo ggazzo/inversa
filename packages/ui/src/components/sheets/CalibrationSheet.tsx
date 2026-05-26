@@ -13,8 +13,8 @@
 import { useEffect, useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Input, Label, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { ConnectionManager } from '@inversa/services';
-import { currentTemp, showToast } from '@inversa/stores';
+import { ConnectionManager } from '@brewpilot/services';
+import { currentTemp, showToast } from '@brewpilot/stores';
 import { WizardSheet } from '../wizards/WizardSheet';
 
 interface Props { open: boolean; onClose: () => void }

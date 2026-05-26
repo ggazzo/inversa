@@ -1,8 +1,8 @@
 // BoilActive.tsx — big countdown + HopTimeline + pause/stop.
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { useSignals } from '@preact/signals-react/runtime';
-import { recipeName, brewingStepName, boilRemaining, recipeState } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { recipeName, brewingStepName, boilRemaining, recipeState } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { HopTimeline } from '../../components/HopTimeline';
 import { fmtMmSs } from '../../components/util';
 import { confirm } from '../../platform';

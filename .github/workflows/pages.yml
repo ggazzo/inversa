@@ -1,7 +1,7 @@
 name: Deploy GitHub Pages
 
 # Publishes the firmware installer (static `docs/`) together with the
-# Tamagui web app (`apps/web` built with `VITE_BASE=/inversa/app/`).
+# Tamagui web app (`apps/web` built with `VITE_BASE=/brewpilot/app/`).
 # Replaces the previous "deploy from branch" Pages source so we never
 # have to commit built assets.
 
@@ -75,8 +75,8 @@ jobs:
         # docs/ already contains the installer index.html + manifests;
         # the web app was just emitted into docs/app/, and the factory
         # bins (if any) landed in docs/firmware/. Upload docs/ as the
-        # Pages artifact root so the installer lives at `/inversa/`,
-        # the PWA at `/inversa/app/`, and bins at `/inversa/firmware/`.
+        # Pages artifact root so the installer lives at `/brewpilot/`,
+        # the PWA at `/brewpilot/app/`, and bins at `/brewpilot/firmware/`.
         run: |
           test -f docs/index.html
           test -f docs/app/index.html

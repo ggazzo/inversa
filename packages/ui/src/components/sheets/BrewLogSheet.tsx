@@ -3,8 +3,8 @@ import { useState } from 'react';
 import { Platform } from '../../platform';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, RadioGroup, Separator, Text, XStack, YStack } from 'tamagui';
-import { brewLogActive, brewLogEntries, showToast } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { brewLogActive, brewLogEntries, showToast } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from '../wizards/WizardSheet';
 
 interface Props { open: boolean; onClose: () => void }

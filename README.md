@@ -1,8 +1,8 @@
-# Inversa
+# BrewPilot
 
 **ESP32-based temperature controller for homebrewing**
 
-Inversa is a complete system for brewing automation, featuring ESP32 firmware and a web app that connects via Bluetooth. Control temperature, run automated recipes, schedule your brew sessions, and monitor everything from your phone — no app installation required.
+BrewPilot is a complete system for brewing automation, featuring ESP32 firmware and a web app that connects via Bluetooth. Control temperature, run automated recipes, schedule your brew sessions, and monitor everything from your phone — no app installation required.
 
 ## Features
 
@@ -60,7 +60,7 @@ Inversa is a complete system for brewing automation, featuring ESP32 firmware an
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           INVERSA WIRING DIAGRAM                            │
+│                           BREWPILOT WIRING DIAGRAM                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │   ESP32-S3 Mini                          ESP32-C3 Mini                      │
@@ -205,7 +205,7 @@ Mains frequency and burst window can be tuned at runtime via the BLE command
 The easiest path is the web installer — flashes the latest signed
 release directly from Chrome or Edge over USB-C. No PlatformIO needed:
 
-**[ggazzo.github.io/inversa](https://ggazzo.github.io/inversa/)**
+**[ggazzo.github.io/brewpilot](https://ggazzo.github.io/brewpilot/)**
 
 After flashing, configure WiFi from the web app via Bluetooth, or
 through the post-flash provisioning wizard.
@@ -214,8 +214,8 @@ through the post-flash provisioning wizard.
 
 ```bash
 # Clone the repository
-git clone https://github.com/ggazzo/inversa.git
-cd inversa/firmware
+git clone https://github.com/ggazzo/brewpilot.git
+cd brewpilot/firmware
 
 # Build and upload (requires PlatformIO)
 pio run -e wemos_s3_mini -t upload
@@ -234,11 +234,11 @@ in `OTAPlugin` is the only signed path.
 pio run -e wemos_s3_mini_devota -t upload
 
 # 2. Find the hostname from the serial log:
-#    [ArduinoOTA] Listening as inversa-XXXX.local
+#    [ArduinoOTA] Listening as brewpilot-XXXX.local
 #    (suffix is derived from the chip MAC so multiple devices coexist)
 
 # 3. Subsequent uploads over WiFi
-pio run -e wemos_s3_mini_devota -t upload --upload-port inversa-XXXX.local
+pio run -e wemos_s3_mini_devota -t upload --upload-port brewpilot-XXXX.local
 ```
 
 The password is set at build time via `-DDEV_OTA_PASSWORD=\"...\"` and must
@@ -269,7 +269,7 @@ The compiled web app can be hosted on any static server (GitHub Pages, Vercel, N
 
 1. Open the web app in your browser (Chrome, Edge, or any browser with Web Bluetooth support)
 2. Click "Connect"
-3. Select the "Inversa" device from the list
+3. Select the "BrewPilot" device from the list
 
 ### Manual Control
 
@@ -402,7 +402,7 @@ bench-validation checklist.
 ## Architecture
 
 ```
-inversa/
+brewpilot/
 ├── firmware/           # ESP32 code (PlatformIO + Arduino)
 │   ├── src/
 │   │   ├── core/       # EventBus, NVS, Recovery, ThermalCalc

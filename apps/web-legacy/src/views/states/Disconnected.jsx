@@ -20,13 +20,13 @@ export function Disconnected() {
                 </div>
                 <div>
                     <h2 class="text-xl font-semibold">
-                        {simMode ? 'Conectar ao simulador' : 'Conectar Inversa'}
+                        {simMode ? 'Conectar ao simulador' : 'Conectar BrewPilot'}
                     </h2>
                     <p class="text-sm text-base-content/60 mt-1 max-w-sm">
                         {simMode
                             ? 'O simulador está rodando em ws://localhost:8765. Clique abaixo para abrir a sessão virtual.'
                             : supported
-                                ? 'Aproxime o dispositivo Inversa e clique abaixo para parear via Bluetooth.'
+                                ? 'Aproxime o dispositivo BrewPilot e clique abaixo para parear via Bluetooth.'
                                 : 'Este navegador não suporta Web Bluetooth. Tente Chrome ou Edge em desktop, ou Bluefy no iOS.'}
                     </p>
                 </div>

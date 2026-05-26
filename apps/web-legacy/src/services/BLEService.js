@@ -1,4 +1,4 @@
-// BLEService.js — Web Bluetooth connection to Inversa controller
+// BLEService.js — Web Bluetooth connection to BrewPilot controller
 // Uses Nordic UART Service (NUS) for bidirectional JSON communication
 
 const NUS_SERVICE_UUID    = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -31,7 +31,7 @@ class BLEServiceClass {
     return new URLSearchParams(location.search).get('sim');
   }
 
-  // Connect to the Inversa device (real BLE) or the simulator (WebSocket).
+  // Connect to the BrewPilot device (real BLE) or the simulator (WebSocket).
   async connect() {
     const simUrl = this._simUrl();
     if (simUrl) return this._connectSim(simUrl);
