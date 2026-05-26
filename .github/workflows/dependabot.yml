@@ -1,5 +1,9 @@
 name: PlatformIO Dependabot
 
+# `platformio.ini` lives in `firmware/`, not at the repo root, so the
+# action has to be pointed at that subdirectory explicitly. Without
+# `project_path` it exits with `[E] No valid file: platformio.ini`.
+
 on:
   workflow_dispatch: # option to manually trigger the workflow
   schedule:
@@ -12,8 +16,9 @@ jobs:
     name: run PlatformIO Dependabot
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: run PlatformIO Dependabot
         uses: peterus/platformio_dependabot@v1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          project_path: firmware
