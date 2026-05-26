@@ -113,6 +113,11 @@ namespace Protocol {
     // burst_window applies at runtime; freq requires reboot.
     constexpr const char* REQ_HEATER_CONFIG   = "req:heater:config";
 
+    // Device identity. { "name": "<label>" } sets the user-visible BLE
+    // advertisement name and mDNS hostname; persists to NVS and reboots
+    // so the new name takes effect on the next adv frame.
+    constexpr const char* REQ_DEVICE_RENAME   = "req:device:rename";
+
     // LossTune — auto-tune of heat-loss coefficient
     constexpr const char* REQ_LOSSTUNE_START  = "req:losstune:start";   // {mode:"lidOn"|"lidOff"}
     constexpr const char* REQ_LOSSTUNE_CANCEL = "req:losstune:cancel";
