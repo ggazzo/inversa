@@ -57,6 +57,21 @@ public:
         DEBUG_PRINTF("[WiFi] Credentials saved for: %s\n", ssid.c_str());
     }
 
+    // Partial updates: callers that only know one of the two fields
+    // (e.g. the user typed a new SSID but didn't re-enter the
+    // password) must use these instead of `configure()` so the other
+    // field stays untouched in NVS.
+    void configureSSID(const String& ssid) {
+        NVSStorage::instance().saveWiFiSSID(ssid);
+        setStr(_state.wifiConfiguredSSID, ssid);
+        DEBUG_PRINTF("[WiFi] SSID updated: %s\n", ssid.c_str());
+    }
+
+    void configurePassword(const String& password) {
+        NVSStorage::instance().saveWiFiPassword(password);
+        DEBUG_PRINTLN("[WiFi] Password updated");
+    }
+
     void connect() {
         if (_state.wifiConnected) {
             DEBUG_PRINTLN("[WiFi] Already connected");
