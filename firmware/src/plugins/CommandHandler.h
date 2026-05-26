@@ -301,12 +301,20 @@ public:
             sendOk(rid);
         }
         // ── WiFi: Configure ─────────────────────────────────
+        // Partial update: `ssid` is required, `pwd` is optional. When the
+        // field is absent we keep whatever NVS already had — fixes the
+        // case where the user reopens the WiFi sheet, re-saves an SSID
+        // and the empty password input wipes out the stored credential.
+        // Sending `pwd: ""` explicitly still clears it (for open
+        // networks).
         else if (strcmp(type, Protocol::REQ_WIFI_CONFIG) == 0) {
             if (!_wifi) { sendError(rid, "WiFi not available"); return; }
             String ssid = doc["ssid"] | "";
-            String pwd = doc["pwd"] | "";
             if (ssid.isEmpty()) { sendError(rid, "SSID required"); return; }
-            _wifi->configure(ssid, pwd);
+            _wifi->configureSSID(ssid);
+            if (doc["pwd"].is<const char*>()) {
+                _wifi->configurePassword(doc["pwd"].as<const char*>());
+            }
             sendOk(rid);
         }
         // ── WiFi: Connect ───────────────────────────────────

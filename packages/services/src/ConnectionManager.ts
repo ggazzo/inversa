@@ -223,9 +223,20 @@ class ConnectionManagerClass {
     return BleClient.request('req:device:rename', { name });
   }
 
-  // WiFi
-  async configureWiFi(ssid, password) {
-    return BleClient.request('req:wifi:config', { ssid, pwd: password });
+  // WiFi credentials. Partial update on the firmware side: a missing
+  // `pwd` field keeps the stored password as-is. Callers that leave
+  // `password` empty get the field stripped, so re-saving an SSID
+  // without re-typing the password is safe. Pass an explicit empty
+  // string by setting `clearPassword: true` for open networks.
+  async configureWiFi(
+    ssid: string,
+    password: string,
+    opts: { clearPassword?: boolean } = {},
+  ) {
+    const payload: Record<string, string> = { ssid };
+    if (password) payload.pwd = password;
+    else if (opts.clearPassword) payload.pwd = '';
+    return BleClient.request('req:wifi:config', payload);
   }
 
   async connectWiFi() {

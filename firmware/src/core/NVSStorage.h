@@ -57,10 +57,24 @@ bool ok = _prefs.begin("inversa", false);  // false = read/write mode
     }
 
     // ── WiFi Credentials ─────────────────────────────────────
+    // Atomic save of both fields. Use this only when the caller has
+    // *both* values; the partial-update helpers below let SSID and
+    // password be saved independently so we don't clobber a stored
+    // password when the user only types a new SSID.
     void saveWiFiCredentials(const String& ssid, const String& password) {
         _prefs.putString("wifi_ssid", ssid);
         _prefs.putString("wifi_pwd", password);
-        DEBUG_PRINTF("[NVS] Saved WiFi SSID: %s\n", ssid.c_str());
+        DEBUG_PRINTF("[NVS] Saved WiFi SSID: %s (with password)\n", ssid.c_str());
+    }
+
+    void saveWiFiSSID(const String& ssid) {
+        _prefs.putString("wifi_ssid", ssid);
+        DEBUG_PRINTF("[NVS] Saved WiFi SSID: %s (password unchanged)\n", ssid.c_str());
+    }
+
+    void saveWiFiPassword(const String& password) {
+        _prefs.putString("wifi_pwd", password);
+        DEBUG_PRINTLN("[NVS] Saved WiFi password (SSID unchanged)");
     }
 
     String getWiFiSSID() {
