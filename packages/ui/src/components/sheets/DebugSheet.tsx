@@ -7,8 +7,8 @@
 import { useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { debugMessages, showToast, signalRssi, isConnected, deviceName } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { debugMessages, showToast, signalRssi, isConnected, deviceName } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from '../wizards/WizardSheet';
 
 interface Props { open: boolean; onClose: () => void }
@@ -66,7 +66,7 @@ export function DebugSheet({ open, onClose }: Props) {
                 <XStack gap="$2" ai="center" jc="space-between">
                     <Text fontSize="$1" opacity={0.6}>
                         {isConnected.value
-                            ? `Conectado: ${deviceName.value || 'Inversa'}`
+                            ? `Conectado: ${deviceName.value || 'BrewPilot'}`
                             : 'Desconectado'}
                     </Text>
                     <Text fontSize="$1" fontFamily="$mono" opacity={0.5}>

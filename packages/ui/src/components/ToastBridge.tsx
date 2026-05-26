@@ -5,7 +5,7 @@
 
 import { useEffect } from 'react';
 import { useToastController } from '@tamagui/toast';
-import { toastMessage, toastType } from '@inversa/stores';
+import { toastMessage, toastType } from '@brewpilot/stores';
 
 export function ToastBridge() {
     const controller = useToastController();

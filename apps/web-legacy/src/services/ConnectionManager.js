@@ -48,7 +48,7 @@ class ConnectionManagerClass {
 
     BLEService.onConnect(() => {
       isConnected.value = true;
-      deviceName.value = BLEService.device?.name || 'Inversa';
+      deviceName.value = BLEService.device?.name || 'BrewPilot';
       showToast('Conectado!', 'success');
     });
 
@@ -498,7 +498,7 @@ class ConnectionManagerClass {
         body,
         icon: '/icon-192.png',
         badge: '/icon-192.png',
-        tag: 'inversa-notification',
+        tag: 'brewpilot-notification',
         renotify: true
       });
     } catch (e) {

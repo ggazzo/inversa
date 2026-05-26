@@ -7,7 +7,7 @@ import { signal } from '@preact/signals-react';
 
 export type Theme = 'dark' | 'light';
 
-const KEY = 'inversa.theme';
+const KEY = 'brewpilot.theme';
 const VALID: readonly Theme[] = ['dark', 'light'];
 
 function readInitial(): Theme {

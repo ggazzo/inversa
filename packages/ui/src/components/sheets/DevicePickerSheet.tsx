@@ -1,4 +1,4 @@
-// DevicePickerSheet.tsx — lists nearby Inversa devices for RN real BLE.
+// DevicePickerSheet.tsx — lists nearby BrewPilot devices for RN real BLE.
 //
 // Web's `navigator.bluetooth.requestDevice` ships its own picker; sim
 // mode hard-wires the WebSocket URL — neither case needs this sheet.
@@ -9,8 +9,8 @@
 import { useEffect, useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { devicePickerOpen, showToast } from '@inversa/stores';
-import { ConnectionManager, type BleScanDevice } from '@inversa/services';
+import { devicePickerOpen, showToast } from '@brewpilot/stores';
+import { ConnectionManager, type BleScanDevice } from '@brewpilot/services';
 import { WizardSheet } from '../wizards/WizardSheet';
 
 export function DevicePickerSheet() {
@@ -69,7 +69,7 @@ export function DevicePickerSheet() {
                 <YStack ai="center" jc="center" paddingVertical="$6" gap="$2">
                     <Text fontSize={28}>📡</Text>
                     <Paragraph fontSize="$2" opacity={0.7} textAlign="center">
-                        Buscando dispositivos Inversa…
+                        Buscando dispositivos BrewPilot…
                     </Paragraph>
                     <Paragraph fontSize="$1" opacity={0.4} textAlign="center" maxWidth={300}>
                         Certifique-se que o controlador está ligado e o

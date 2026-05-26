@@ -1,8 +1,8 @@
 // Mash.tsx — generic "recipe is running, calm middle" view.
 import { Button, Card, Progress, Text, XStack, YStack } from 'tamagui';
 import { useSignals } from '@preact/signals-react/runtime';
-import { recipeName, recipeStep, recipeTotalSteps, brewingStepName, showToast } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { recipeName, recipeStep, recipeTotalSteps, brewingStepName, showToast } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { confirm } from '../../platform';
 
 export function Mash() {

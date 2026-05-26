@@ -8,7 +8,7 @@
 import { config } from '@tamagui/config/v3';
 import { createTamagui } from 'tamagui';
 
-const inversa = createTamagui({
+const brewpilot = createTamagui({
     ...config,
     themes: {
         ...config.themes,
@@ -43,10 +43,10 @@ const inversa = createTamagui({
     },
 });
 
-type InversaConf = typeof inversa;
+type BrewPilotConf = typeof brewpilot;
 
 declare module 'tamagui' {
-    interface TamaguiCustomConfig extends InversaConf {}
+    interface TamaguiCustomConfig extends BrewPilotConf {}
 }
 
-export default inversa;
+export default brewpilot;

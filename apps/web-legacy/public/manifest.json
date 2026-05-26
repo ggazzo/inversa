@@ -1,6 +1,6 @@
 {
-  "name": "Inversa",
-  "short_name": "Inversa",
+  "name": "BrewPilot",
+  "short_name": "BrewPilot",
   "description": "Homebrewing Temperature Controller",
   "start_url": "/",
   "display": "standalone",

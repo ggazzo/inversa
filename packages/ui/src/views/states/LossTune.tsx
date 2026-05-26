@@ -9,8 +9,8 @@ import {
   lossTuneFittedCoeff, lossTuneR2, lossTuneTau, lossTuneSampleCount,
   lossTuneAmbientSource, lossTuneError,
   showToast,
-} from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+} from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 
 const PHASE_COPY: Record<string, { title: string; hint: string }> = {
   PREFLIGHT: {

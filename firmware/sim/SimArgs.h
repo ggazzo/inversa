@@ -20,8 +20,8 @@ struct SimArgs {
 
 inline void printSimUsage() {
     std::fprintf(stderr,
-        "Inversa brewing simulator\n"
-        "Usage: inversa_sim [opts]\n"
+        "BrewPilot brewing simulator\n"
+        "Usage: brewpilot_sim [opts]\n"
         "  --recipe <path>        Auto-load + start this recipe at boot\n"
         "  --scale <N>            Time scale (default 60; 0 = no throttle)\n"
         "  --max-sim-time <sec>   Abort after N simulated seconds (default 21600)\n"

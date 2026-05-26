@@ -1,8 +1,8 @@
 // AutoTune.tsx — progress + cancel during a relay-feedback tune.
 import { Button, Card, Paragraph, Progress, Text, YStack } from 'tamagui';
 import { useSignals } from '@preact/signals-react/runtime';
-import { autoTuneActive, autoTuneProgress, targetTemp, showToast } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { autoTuneActive, autoTuneProgress, targetTemp, showToast } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 
 export function AutoTune() {
     useSignals();

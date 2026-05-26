@@ -73,7 +73,7 @@ public:
                      GITHUB_REPO_OWNER + "/" + GITHUB_REPO_NAME + "/releases/latest";
 
         http.begin(client, url);
-        http.addHeader("User-Agent", "ESP32-Inversa");
+        http.addHeader("User-Agent", "ESP32-BrewPilot");
         http.setTimeout(OTA_CHECK_TIMEOUT_MS);
 
         int httpCode = http.GET();

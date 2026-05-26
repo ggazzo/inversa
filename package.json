@@ -1,5 +1,5 @@
 {
-  "name": "inversa-monorepo",
+  "name": "brewpilot-monorepo",
   "version": "0.0.0",
   "private": true,
   "description": "Inversa homebrewing controller — firmware, web PWA, and (soon) native app",

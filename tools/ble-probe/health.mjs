@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// health.mjs — board health battery for the Inversa controller.
+// health.mjs — board health battery for the BrewPilot controller.
 //
 // Connects over real BLE, runs a structured set of probes against the
 // firmware's req:* surface, and reports per-test pass/fail. Designed
@@ -388,12 +388,12 @@ noble.on('stateChange', async (state) => {
         }
         process.exit(2);
     }
-    console.log(`[health] scanning for Inversa (NUS service, ${scanTimeoutMs / 1000}s)…`);
+    console.log(`[health] scanning for BrewPilot (NUS service, ${scanTimeoutMs / 1000}s)…`);
     await noble.startScanningAsync([NUS_SERVICE_UUID], false);
     setTimeout(async () => {
         if (!peripheral) {
             await noble.stopScanningAsync();
-            console.error('[health] no Inversa device found.');
+            console.error('[health] no BrewPilot device found.');
             process.exit(2);
         }
     }, scanTimeoutMs);

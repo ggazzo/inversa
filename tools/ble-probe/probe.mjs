@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// ble-probe — real-BLE roundtrip check against the Inversa controller.
+// ble-probe — real-BLE roundtrip check against the BrewPilot controller.
 //
 // Uses @abandonware/noble to drive macOS CoreBluetooth from Node. The
 // firmware exposes a Nordic UART Service; we scan filtered by that
@@ -104,7 +104,7 @@ noble.on('stateChange', async (state) => {
     setTimeout(async () => {
         if (!peripheral) {
             await noble.stopScanningAsync();
-            console.error('[ble-probe] no Inversa device found.');
+            console.error('[ble-probe] no BrewPilot device found.');
             process.exit(2);
         }
     }, scanTimeoutMs);

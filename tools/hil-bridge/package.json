@@ -1,7 +1,7 @@
 {
-  "name": "inversa-hil-bridge",
+  "name": "brewpilot-hil-bridge",
   "version": "0.1.0",
-  "description": "Host bridge for the Inversa hardware-in-the-loop test harness. Drives sensor inputs over USB CDC and analyzes telemetry against safety/PID invariants.",
+  "description": "Host bridge for the BrewPilot hardware-in-the-loop test harness. Drives sensor inputs over USB CDC and analyzes telemetry against safety/PID invariants.",
   "private": true,
   "type": "module",
   "main": "dist/cli.js",

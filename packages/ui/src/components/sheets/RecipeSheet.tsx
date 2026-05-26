@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { showToast, loadedRecipeContent } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { showToast, loadedRecipeContent } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from '../wizards/WizardSheet';
 import { confirm } from '../../platform';
 

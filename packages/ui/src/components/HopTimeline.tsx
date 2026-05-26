@@ -1,7 +1,7 @@
 // HopTimeline.tsx — horizontal strip of triggered hops along the boil.
 import { Text, XStack, YStack } from 'tamagui';
 import { useSignals } from '@preact/signals-react/runtime';
-import { boilAlerts, boilTotal, boilRemaining, boilAdditions } from '@inversa/stores';
+import { boilAlerts, boilTotal, boilRemaining, boilAdditions } from '@brewpilot/stores';
 import { fmtMmSs } from './util';
 
 export function HopTimeline() {

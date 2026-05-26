@@ -1,5 +1,5 @@
 {
-    "name": "@inversa/web",
+    "name": "@brewpilot/web",
     "version": "0.1.0",
     "private": true,
     "type": "module",
@@ -8,7 +8,7 @@
         "build": "tsc -b && vite build",
         "preview": "vite preview",
         "build:firmware": "tsc -b && vite build --outDir ../../firmware/data --emptyOutDir",
-        "build:pages": "tsc -b && cross-env VITE_BASE=/inversa/app/ vite build --outDir ../../docs/app --emptyOutDir",
+        "build:pages": "tsc -b && cross-env VITE_BASE=/brewpilot/app/ vite build --outDir ../../docs/app --emptyOutDir",
         "prebuild:pages": "node scripts/generate-icons.mjs",
         "icons": "node scripts/generate-icons.mjs",
         "prebuild": "node scripts/generate-icons.mjs",
@@ -16,10 +16,10 @@
         "typecheck": "tsc -b --noEmit"
     },
     "dependencies": {
-        "@inversa/services": "*",
-        "@inversa/stores": "*",
-        "@inversa/ui": "*",
-        "@inversa/utils": "*",
+        "@brewpilot/services": "*",
+        "@brewpilot/stores": "*",
+        "@brewpilot/ui": "*",
+        "@brewpilot/utils": "*",
         "@preact/signals-react": "^3.0.0",
         "@tamagui/config": "^1.121.0",
         "@tamagui/toast": "^1.121.0",

@@ -1,7 +1,7 @@
-// Service Worker for Inversa PWA
+// Service Worker for BrewPilot PWA
 // Lightweight caching strategy for offline support
 
-const CACHE_NAME = 'inversa-v1';
+const CACHE_NAME = 'brewpilot-v1';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

@@ -118,15 +118,15 @@ async function ensureAndroidPermissions(): Promise<boolean> {
     return perms.every((p) => granted[p] === PermissionsAndroid.RESULTS.GRANTED);
 }
 
-// Sim bridge URL. Set via `EXPO_PUBLIC_INVERSA_SIM_URL` when starting
-// the dev server (e.g. `EXPO_PUBLIC_INVERSA_SIM_URL=ws://192.168.1.10:8765
+// Sim bridge URL. Set via `EXPO_PUBLIC_BREWPILOT_SIM_URL` when starting
+// the dev server (e.g. `EXPO_PUBLIC_BREWPILOT_SIM_URL=ws://192.168.1.10:8765
 // npx expo start`). When the variable is set, connect() opens a
 // WebSocket to that URL instead of scanning for BLE — the only way to
 // exercise the app on iOS Simulator (no Bluetooth radio) or test
 // against the brewing simulator from a physical device on the same
 // LAN. Leave unset for real BLE.
 function getSimUrl(): string | null {
-    const url = process.env.EXPO_PUBLIC_INVERSA_SIM_URL;
+    const url = process.env.EXPO_PUBLIC_BREWPILOT_SIM_URL;
     return typeof url === 'string' && url.length > 0 ? url : null;
 }
 
@@ -188,7 +188,7 @@ class NativeBleAdapter implements BleAdapter {
         const device = await new Promise<any>((resolve, reject) => {
             const timer = setTimeout(() => {
                 manager.stopDeviceScan();
-                reject(new Error('Nenhum Inversa encontrado em 10s'));
+                reject(new Error('Nenhum BrewPilot encontrado em 10s'));
             }, 10_000);
 
             manager.startDeviceScan([NUS_SERVICE_UUID], null, (error: any, d: any) => {

@@ -1,12 +1,12 @@
 // WizardEquipment.tsx — P13 thermal params editor.
 import { useEffect, useState } from 'react';
 import { Button, Card, Input, Label, Paragraph, Text, XStack, YStack } from 'tamagui';
-import { ConnectionManager } from '@inversa/services';
+import { ConnectionManager } from '@brewpilot/services';
 import {
     showToast,
     ambientEffectiveC, ambientSource, ambientSensorOk,
     lidState, lossTuneActive,
-} from '@inversa/stores';
+} from '@brewpilot/stores';
 import { useSignals } from '@preact/signals-react/runtime';
 import { WizardSheet } from './WizardSheet';
 

@@ -18,7 +18,7 @@ def get_build_timestamp():
 
 version = get_firmware_version()
 timestamp = get_build_timestamp()
-firmware_name = env.get("PIOENV", "inversa")
+firmware_name = env.get("PIOENV", "brewpilot")
 
 env.Append(
     BUILD_FLAGS=[

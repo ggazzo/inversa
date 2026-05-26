@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
-"""Inversa BLE debug CLI.
+"""BrewPilot BLE debug CLI.
 
 Single entrypoint with subcommands for scanning the brewer, querying its
 state over the Nordic UART Service (NUS) characteristics, pushing WiFi
 credentials, and live-monitoring sensor / watchdog transitions.
 
 Examples:
-  ./inversa_ble.py scan
-  ./inversa_ble.py info
-  ./inversa_ble.py temp
-  ./inversa_ble.py wifi-status
-  ./inversa_ble.py wifi-config MyNet hunter2
-  ./inversa_ble.py wifi-reconnect
-  ./inversa_ble.py watchdog-reset
-  ./inversa_ble.py monitor --secs 90
-  ./inversa_ble.py adc-monitor --secs 30
+  ./brewpilot_ble.py scan
+  ./brewpilot_ble.py info
+  ./brewpilot_ble.py temp
+  ./brewpilot_ble.py wifi-status
+  ./brewpilot_ble.py wifi-config MyNet hunter2
+  ./brewpilot_ble.py wifi-reconnect
+  ./brewpilot_ble.py watchdog-reset
+  ./brewpilot_ble.py monitor --secs 90
+  ./brewpilot_ble.py adc-monitor --secs 30
 """
 from __future__ import annotations
 
@@ -33,13 +33,13 @@ RX_UUID = "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  # host → device (write)
 TX_UUID = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  # device → host (notify)
 
 DEFAULT_SCAN_SECS = 8.0
-DEFAULT_NAME_HINTS = ("Inversa", "inversa")
+DEFAULT_NAME_HINTS = ("BrewPilot", "Inversa")
 
 
 # ─── Connection helpers ──────────────────────────────────────────────
 
 async def find_device(scan_secs: float = DEFAULT_SCAN_SECS, hints=DEFAULT_NAME_HINTS):
-    """Discover the first BLE peripheral whose name contains an Inversa hint."""
+    """Discover the first BLE peripheral whose name contains an BrewPilot hint."""
     devs = await BleakScanner.discover(timeout=scan_secs)
     for d in devs:
         name = (d.name or "").lower()
@@ -143,7 +143,7 @@ async def cmd_scan(args):
     matches = [d for d in devs if any(h.lower() in (d.name or "").lower()
                                        for h in DEFAULT_NAME_HINTS)]
     if not matches:
-        print("[!] No Inversa device found.")
+        print("[!] No BrewPilot device found.")
         return 1
     return 0
 
@@ -151,7 +151,7 @@ async def cmd_scan(args):
 async def with_session(coro):
     sess = await Session.open()
     if not sess:
-        print("[!] No Inversa device advertising.")
+        print("[!] No BrewPilot device advertising.")
         return 1
     try:
         return await coro(sess)
@@ -341,7 +341,7 @@ async def cmd_adc_monitor(args):
 # ─── argparse wiring ─────────────────────────────────────────────────
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Inversa BLE debug CLI")
+    p = argparse.ArgumentParser(description="BrewPilot BLE debug CLI")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s_scan = sub.add_parser("scan", help="BLE scan, list peripherals")

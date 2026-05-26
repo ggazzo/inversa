@@ -1,4 +1,4 @@
-// App.tsx — web shell. Imports the cross-platform UI from `@inversa/ui`
+// App.tsx — web shell. Imports the cross-platform UI from `@brewpilot/ui`
 // and only handles things that are DOM-specific (the Chart.js
 // TemperatureChart, the TamaguiProvider, the ToastProvider config).
 
@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react';
 import { useSignals } from '@preact/signals-react/runtime';
 import { Toast, ToastProvider, ToastViewport } from '@tamagui/toast';
 import { Theme, YStack } from 'tamagui';
-import { ConnectionManager } from '@inversa/services';
-import { theme, manualIntent } from '@inversa/stores';
+import { ConnectionManager } from '@brewpilot/services';
+import { theme, manualIntent } from '@brewpilot/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet, DebugSheet, WatchdogSheet,
@@ -16,7 +16,7 @@ import {
     WizardEquipment, WizardConnectivity, WizardTuning,
     WizardNotifications, WizardAbout,
     type MenuId,
-} from '@inversa/ui';
+} from '@brewpilot/ui';
 import { TemperatureChart } from './components.web/TemperatureChart';
 
 export function App() {

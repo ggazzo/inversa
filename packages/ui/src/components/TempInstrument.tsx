@@ -11,8 +11,8 @@ import { useSignals } from '@preact/signals-react/runtime';
 import { Card, H1, Text, XStack, YStack } from 'tamagui';
 import {
     currentTemp, targetTemp, pidOutput, heaterOn, pumpOn, mode,
-} from '@inversa/stores';
-import { isStale } from '@inversa/stores';
+} from '@brewpilot/stores';
+import { isStale } from '@brewpilot/stores';
 import { tempStatus } from './util';
 
 function Stat({ label, value, highlight }: { label: string; value: string; highlight?: string }) {

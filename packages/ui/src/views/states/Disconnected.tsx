@@ -1,9 +1,9 @@
 // Disconnected.tsx — single CTA card; adapts text for sim mode.
 import { useSignals } from '@preact/signals-react/runtime';
 import { Button, Card, H2, Paragraph, Text, YStack } from 'tamagui';
-import { showToast, devicePickerOpen } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
-import { BleClient } from '@inversa/services';
+import { showToast, devicePickerOpen } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
+import { BleClient } from '@brewpilot/services';
 
 export function Disconnected() {
     useSignals();
@@ -37,13 +37,13 @@ export function Disconnected() {
                 </YStack>
                 <YStack alignItems="center" gap="$1" maxWidth={420}>
                     <H2 size="$8">
-                        {simMode ? 'Conectar ao simulador' : 'Conectar Inversa'}
+                        {simMode ? 'Conectar ao simulador' : 'Conectar BrewPilot'}
                     </H2>
                     <Paragraph theme="alt2" textAlign="center">
                         {simMode
                             ? 'O simulador está rodando em ws://localhost:8765. Clique abaixo para abrir a sessão virtual.'
                             : supported
-                                ? 'Aproxime o dispositivo Inversa e clique abaixo para parear via Bluetooth.'
+                                ? 'Aproxime o dispositivo BrewPilot e clique abaixo para parear via Bluetooth.'
                                 : 'Este navegador não suporta Web Bluetooth. Tente Chrome ou Edge em desktop, ou Bluefy no iOS.'}
                     </Paragraph>
                 </YStack>

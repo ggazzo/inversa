@@ -3,7 +3,7 @@
 // Two non-default tweaks:
 //
 //   1. `watchFolders` points at the monorepo root so Metro indexes the
-//      sibling packages (`@inversa/ui`, `@inversa/stores`, ...). Without
+//      sibling packages (`@brewpilot/ui`, `@brewpilot/stores`, ...). Without
 //      this Metro only watches `apps/native/` and errors on resolve.
 //
 //   2. `disableHierarchicalLookup: true` + explicit `nodeModulesPaths`

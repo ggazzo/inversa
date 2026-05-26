@@ -4,7 +4,7 @@
 
 import { signal } from '@preact/signals';
 
-const KEY = 'inversa.theme';
+const KEY = 'brewpilot.theme';
 const VALID = ['dark', 'light'];
 
 function readInitial() {

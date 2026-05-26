@@ -7,11 +7,11 @@ import { BleClient } from './BleClient';
 import { Notifications } from './notifications';
 import { kvStore } from './kvStore';
 
-const LAST_DEVICE_KEY = 'inversa.lastDeviceId';
+const LAST_DEVICE_KEY = 'brewpilot.lastDeviceId';
 // Note: prior versions imported `BLEService` from './BLEService` — the
 // rename to BleClient is the only public-API delta from Phase D.
 
-import { lastTelemetryMs } from '@inversa/stores';
+import { lastTelemetryMs } from '@brewpilot/stores';
 import {
   isConnected, deviceName, signalRssi, manualIntent, updateFromTelemetry, showToast, pushDebug,
   hasRecovery, recoveryRecipeName,
@@ -32,7 +32,7 @@ import {
   lossTuneAmbientStart, lossTuneAmbientEnd, lossTuneAmbientSource,
   lossTuneSampleCount, lossTuneFittedCoeff, lossTuneR2, lossTuneTau,
   lossTuneError, lossTuneSamples,
-} from '@inversa/stores';
+} from '@brewpilot/stores';
 
 class ConnectionManagerClass {
   constructor() {
@@ -58,7 +58,7 @@ class ConnectionManagerClass {
 
     BleClient.onConnect(() => {
       isConnected.value = true;
-      deviceName.value = BleClient.getDeviceName() || 'Inversa';
+      deviceName.value = BleClient.getDeviceName() || 'BrewPilot';
       showToast('Conectado!', 'success');
     });
 
@@ -106,7 +106,7 @@ class ConnectionManagerClass {
     return BleClient.needsPicker();
   }
 
-  /** Start scanning for nearby Inversa devices. UI must call the
+  /** Start scanning for nearby BrewPilot devices. UI must call the
    *  returned stop function when the picker is dismissed. */
   scanForDevices(onDevice, onError) {
     this.init();
@@ -586,7 +586,7 @@ class ConnectionManagerClass {
         watchdogTripCount.value = watchdogTripCount.value + 1;
         showToast(`Watchdog: corte automático (${data.cause})`, 'error', 15000);
         this._sendNotification(
-          'Inversa: corte automático',
+          'BrewPilot: corte automático',
           `Causa: ${data.cause}. Temperatura: ${(data.temp ?? 0).toFixed(1)}°C`
         );
         break;

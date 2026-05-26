@@ -33,9 +33,9 @@ if [[ -z "${PORT}" || ! -e "${PORT}" ]]; then
     exit 1
 fi
 
-LOG_DIR="${INVERSA_LOG_DIR:-/tmp}"
+LOG_DIR="${BREWPILOT_LOG_DIR:-/tmp}"
 TS="$(date +%Y%m%d-%H%M%S)"
-LOG="${LOG_DIR}/inversa-serial-${TS}.log"
+LOG="${LOG_DIR}/brewpilot-serial-${TS}.log"
 
 echo "[serial-capture] port : ${PORT}"
 echo "[serial-capture] log  : ${LOG}"

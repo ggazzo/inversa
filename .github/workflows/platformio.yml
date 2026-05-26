@@ -131,8 +131,8 @@ jobs:
       - name: Prepare release files
         run: |
           # Versioned files (for users to download manually)
-          cp release/s3/firmware.bin release/inversa-s3-mini-${{ github.ref_name }}.bin
-          cp release/c3/firmware.bin release/inversa-c3-mini-${{ github.ref_name }}.bin
+          cp release/s3/firmware.bin release/brewpilot-s3-mini-${{ github.ref_name }}.bin
+          cp release/c3/firmware.bin release/brewpilot-c3-mini-${{ github.ref_name }}.bin
           # Unversioned files (for OTA auto-update lookup)
           cp release/s3/firmware.bin release/wemos_s3_mini.bin
           cp release/c3/firmware.bin release/wemos_c3_mini.bin
@@ -183,8 +183,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/inversa-s3-mini-${{ github.ref_name }}.bin
-            release/inversa-c3-mini-${{ github.ref_name }}.bin
+            release/brewpilot-s3-mini-${{ github.ref_name }}.bin
+            release/brewpilot-c3-mini-${{ github.ref_name }}.bin
             release/wemos_s3_mini.bin
             release/wemos_s3_mini.bin.sig
             release/wemos_c3_mini.bin

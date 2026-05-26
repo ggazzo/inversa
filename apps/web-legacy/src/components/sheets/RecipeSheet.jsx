@@ -90,7 +90,7 @@ export function RecipeSheet({ onClose }) {
                 <div class="text-sm text-base-content/60">
                     {error.value
                         ? <>Erro: {error.value}</>
-                        : 'Nenhuma receita no SD. Carregue uma via app/Inversa.'}
+                        : 'Nenhuma receita no SD. Carregue uma via app/BrewPilot.'}
                 </div>
             )}
             {recipes.value?.map((file) => (

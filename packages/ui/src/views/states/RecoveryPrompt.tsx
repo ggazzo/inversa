@@ -1,8 +1,8 @@
 // RecoveryPrompt.tsx — yellow warning card with Retomar/Descartar.
 import { Button, Card, Paragraph, Text, XStack, YStack } from 'tamagui';
 import { useSignals } from '@preact/signals-react/runtime';
-import { recoveryRecipeName, showToast } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { recoveryRecipeName, showToast } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 
 export function RecoveryPrompt() {
     useSignals();
@@ -20,7 +20,7 @@ export function RecoveryPrompt() {
                     </Text>
                 </XStack>
                 <Paragraph color="black">
-                    O Inversa detectou uma receita interrompida no SD:
+                    O BrewPilot detectou uma receita interrompida no SD:
                     {' '}<Text fontFamily="$mono" fontWeight="700" color="black">
                         {recoveryRecipeName.value || '?'}
                     </Text>. Deseja retomar do passo onde parou?

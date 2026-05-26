@@ -26,8 +26,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useSignals } from '@preact/signals-react/runtime';
 import { ToastProvider, ToastViewport } from '@tamagui/toast';
 import { PortalProvider, ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
-import { ConnectionManager } from '@inversa/services';
-import { isConnected, theme, manualIntent } from '@inversa/stores';
+import { ConnectionManager } from '@brewpilot/services';
+import { isConnected, theme, manualIntent } from '@brewpilot/stores';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet, DebugSheet, WatchdogSheet,
@@ -36,7 +36,7 @@ import {
     WizardEquipment, WizardConnectivity, WizardTuning,
     WizardNotifications, WizardAbout,
     type MenuId,
-} from '@inversa/ui';
+} from '@brewpilot/ui';
 import { TemperatureChart } from './src/components.native/TemperatureChart';
 import config from './tamagui.config';
 

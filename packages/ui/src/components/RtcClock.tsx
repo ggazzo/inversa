@@ -16,7 +16,7 @@ import {
     rtcAvailable,
     rtcTimestamp,
     rtcNtpSynced,
-} from '@inversa/stores';
+} from '@brewpilot/stores';
 
 function fmtHHMM(unix: number): string {
     if (!unix || unix <= 0) return '--:--';

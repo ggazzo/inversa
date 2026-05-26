@@ -3,8 +3,8 @@ import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { useSignals } from '@preact/signals-react/runtime';
 import {
     timerLeft, recipeName, brewingStepName, recipeStep, recipeTotalSteps,
-} from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+} from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { fmtMmSs } from '../../components/util';
 import { confirm } from '../../platform';
 

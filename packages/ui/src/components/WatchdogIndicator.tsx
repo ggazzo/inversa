@@ -9,7 +9,7 @@ import {
     watchdogSupported,
     watchdogTripped,
     watchdogLastCause,
-} from '@inversa/stores';
+} from '@brewpilot/stores';
 
 interface Props {
     onPress?: () => void;

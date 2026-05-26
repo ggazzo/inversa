@@ -9,7 +9,7 @@ import { Platform, Vibration } from '../platform';
 import { useSignals } from '@preact/signals-react/runtime';
 import { signal as createSignal } from '@preact/signals-react';
 import { Button, Text, YStack } from 'tamagui';
-import { boilAlerts } from '@inversa/stores';
+import { boilAlerts } from '@brewpilot/stores';
 
 // Index of the next alert in `boilAlerts` that the operator still has
 // to acknowledge. When confirmedCount === boilAlerts.length the overlay

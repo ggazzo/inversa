@@ -15,7 +15,7 @@ export function RecoveryPrompt() {
                     <h2 class="font-semibold">Recuperação encontrada</h2>
                 </div>
                 <p class="text-sm">
-                    O Inversa detectou uma receita interrompida no SD:
+                    O BrewPilot detectou uma receita interrompida no SD:
                     <span class="font-mono font-semibold ml-1">
                         {recoveryRecipeName.value || '?'}
                     </span>.

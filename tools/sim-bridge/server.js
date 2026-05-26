@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Inversa simulator ↔ WebSocket bridge.
+// BrewPilot simulator ↔ WebSocket bridge.
 //
 // Spawns one `firmware_sim` child per connected WebSocket client and pipes
 // stdin/stdout between them. The PWA (with `?sim=ws://host:port`) speaks

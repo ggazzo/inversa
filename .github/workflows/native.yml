@@ -6,7 +6,7 @@ name: Native App CI
 #   1. TypeScript across the workspace still compiles after a fresh install.
 #   2. Metro can resolve every import and bundle the app to Hermes
 #      bytecode. This catches missing peer deps, broken babel plugin
-#      chains, and `@inversa/*` workspace resolution problems before
+#      chains, and `@brewpilot/*` workspace resolution problems before
 #      they surface on someone's laptop.
 
 on:

@@ -1,8 +1,8 @@
 // WaitConfirm.tsx — big single CTA (the WAIT_CONFIRM message).
 import { Button, Card, Text, XStack, YStack } from 'tamagui';
 import { useSignals } from '@preact/signals-react/runtime';
-import { confirmMessage, recipeName, brewingStepName, showToast } from '@inversa/stores';
-import { ConnectionManager } from '@inversa/services';
+import { confirmMessage, recipeName, brewingStepName, showToast } from '@brewpilot/stores';
+import { ConnectionManager } from '@brewpilot/services';
 import { confirm } from '../../platform';
 
 export function WaitConfirm() {

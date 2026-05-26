@@ -1,5 +1,5 @@
 {
-    "name": "@inversa/ui",
+    "name": "@brewpilot/ui",
     "version": "0.0.0",
     "private": true,
     "main": "./src/index.ts",

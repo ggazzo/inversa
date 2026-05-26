@@ -27,7 +27,7 @@ class WebNotifications implements NotificationsApi {
                 body,
                 icon:  '/icon-192.png',
                 badge: '/icon-192.png',
-                tag:   'inversa-notification',
+                tag:   'brewpilot-notification',
                 renotify: true,
             } as any);
         } catch (e) {
