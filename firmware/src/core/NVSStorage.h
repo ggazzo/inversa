@@ -252,6 +252,16 @@ bool ok = _prefs.begin("inversa", false);  // false = read/write mode
         return true;
     }
 
+    // ── Device identity ─────────────────────────────────────
+    // User-configurable label that overrides the default BLE adv name
+    // and the mDNS hostname. Empty string = use compile-time defaults.
+    void saveDeviceName(const String& name) {
+        _prefs.putString("dev_name", name);
+    }
+    String loadDeviceName(const String& defaultVal) {
+        return _prefs.getString("dev_name", defaultVal);
+    }
+
     // ── Heater Driver Config (burst-fire / zero-cross) ──────
     // Persists mains frequency and burst-fire window so the same firmware
     // image can serve 50 Hz and 60 Hz markets without a rebuild.

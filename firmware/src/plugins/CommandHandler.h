@@ -804,6 +804,27 @@ public:
 
             sendOk(rid);
         }
+        // ── Device rename ────────────────────────────────────
+        // { "name": "MyBrewer" } sets the user-visible BLE adv name and
+        // mDNS hostname. Persists to NVS and reboots so the new label
+        // is on the air the next time the device comes up. Empty name
+        // clears the override and reverts to BLE_DEVICE_NAME.
+        else if (strcmp(type, Protocol::REQ_DEVICE_RENAME) == 0) {
+            String name = doc["name"] | "";
+            if (name.length() > 31) { sendError(rid, "name_too_long"); return; }
+            for (size_t i = 0; i < name.length(); ++i) {
+                char c = name[i];
+                bool ok = (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+                          (c >= '0' && c <= '9') || c == ' ' || c == '-' || c == '_';
+                if (!ok) { sendError(rid, "name_invalid_char"); return; }
+            }
+            NVSStorage::instance().saveDeviceName(name);
+            sendOk(rid);
+            // Tiny delay so the notify makes it onto the air before the
+            // radio shuts down for the restart.
+            delay(200);
+            ESP.restart();
+        }
         // ── Factory Reset (P7, guarded) ─────────────────────
         // Requires {confirm: "ERASE_ALL"} to wipe the NVS namespace.
         else if (strcmp(type, Protocol::REQ_FACTORY_RESET) == 0) {

@@ -23,6 +23,7 @@
 #include "plugins/RecipePlugin.h"
 #include "plugins/BLEPlugin.h"
 #include "plugins/WiFiPlugin.h"
+#include "plugins/MDNSPlugin.h"
 #include "plugins/OTAPlugin.h"
 #include "plugins/RampPlugin.h"
 #include "plugins/BrewLogPlugin.h"
@@ -122,6 +123,7 @@ void setup() {
     auto* recipe   = pm.add<RecipePlugin>();
     auto* ble      = pm.add<BLEPlugin>();
     auto* wifi     = pm.add<WiFiPlugin>(gState);
+    pm.add<MDNSPlugin>();
     auto* ota      = pm.add<OTAPlugin>(gState, *wifi);
     auto* ramp      = pm.add<RampPlugin>();
     auto* brewLog   = pm.add<BrewLogPlugin>();

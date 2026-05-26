@@ -10,6 +10,7 @@
 #include "../core/constants.h"
 #include "../models/MachineState.h"
 #include "../protocol/protocol.h"
+#include "../core/NVSStorage.h"
 
 class BLEPlugin : public Plugin,
                   public NimBLECharacteristicCallbacks,
@@ -18,7 +19,13 @@ public:
     const char* getName() const override { return "BLE"; }
 
     bool setup() override {
-        NimBLEDevice::init(BLE_DEVICE_NAME);
+        // User-configurable device name overrides the compile-time default
+        // (saved via `req:device:rename`). Empty → fall back to the
+        // BLE_DEVICE_NAME constant so virgin devices still advertise as
+        // "BrewPilot" before anyone renames them.
+        String name = NVSStorage::instance().loadDeviceName(String(BLE_DEVICE_NAME));
+        if (name.length() == 0) name = BLE_DEVICE_NAME;
+        NimBLEDevice::init(name.c_str());
         NimBLEDevice::setMTU(
 #ifdef BLE_MTU_SIZE
             BLE_MTU_SIZE
@@ -51,7 +58,7 @@ public:
         // Advertising
         NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
         advertising->addServiceUUID(BLE_SERVICE_UUID);
-        advertising->setName(BLE_DEVICE_NAME);
+        advertising->setName(name.c_str());
         advertising->start();
 
         // Subscribe to BLESend events from other plugins

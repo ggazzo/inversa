@@ -20,6 +20,7 @@
 #include <ESPmDNS.h>
 #include "../core/Plugin.h"
 #include "../core/constants.h"
+#include "../core/NVSStorage.h"
 
 class ArduinoOTAPlugin : public Plugin {
 public:
@@ -49,13 +50,18 @@ private:
     void startServer() {
         if (_running) return;
 
-        // Hostname uses the chip MAC suffix so multiple devices on the same
-        // LAN don't collide on `brewpilot.local`.
-        uint64_t mac = ESP.getEfuseMac();
-        char host[32];
-        snprintf(host, sizeof(host), "brewpilot-%04x",
-                 (uint16_t)((mac >> 32) & 0xFFFF));
-        ArduinoOTA.setHostname(host);
+        // Share the hostname with MDNSPlugin so `req:device:rename`
+        // applies to ArduinoOTA discovery as well. Empty NVS entry →
+        // fall back to the per-chip default.
+        String host = NVSStorage::instance().loadDeviceName(String());
+        if (host.length() == 0) {
+            uint64_t mac = ESP.getEfuseMac();
+            char fallback[32];
+            snprintf(fallback, sizeof(fallback), "brewpilot-%04x",
+                     (uint16_t)((mac >> 32) & 0xFFFF));
+            host = fallback;
+        }
+        ArduinoOTA.setHostname(host.c_str());
         ArduinoOTA.setPassword(DEV_OTA_PASSWORD);
 
         ArduinoOTA.onStart([]() {
