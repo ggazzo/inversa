@@ -5,6 +5,7 @@ import { Button, Input, Label, Paragraph, Progress, Separator, Text, XStack, YSt
 import {
     wifiConnected, wifiSSID, wifiIP, wifiConfiguredSSID,
     otaStatus, otaLatestVersion, otaProgress, otaError, firmwareVersion, showToast,
+    deviceName,
 } from '@brewpilot/stores';
 import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from './WizardSheet';
@@ -12,11 +13,16 @@ import { confirm } from '../../platform';
 
 interface Props { open: boolean; onClose: () => void }
 
+// Same set the firmware validates in CommandHandler::REQ_DEVICE_RENAME.
+const VALID_NAME_RE = /^[A-Za-z0-9 _-]*$/;
+const MAX_NAME_LEN  = 31;
+
 export function WizardConnectivity({ open, onClose }: Props) {
     useSignals();
     const [ssid, setSsid]       = useState(wifiConfiguredSSID.value || '');
     const [pwd, setPwd]         = useState('');
     const [showPwd, setShowPwd] = useState(false);
+    const [name, setName]       = useState(deviceName.value || '');
 
     function saveAndConnect() {
         if (!ssid) { showToast('SSID obrigatório', 'error'); return; }
@@ -26,9 +32,60 @@ export function WizardConnectivity({ open, onClose }: Props) {
             .catch((e: any) => showToast(e?.message || 'Falha', 'error'));
     }
 
+    async function saveName() {
+        const next = name.trim();
+        if (next.length > MAX_NAME_LEN) {
+            showToast(`Máx ${MAX_NAME_LEN} caracteres`, 'error');
+            return;
+        }
+        if (!VALID_NAME_RE.test(next)) {
+            showToast('Use só letras, números, espaço, "-" ou "_"', 'error');
+            return;
+        }
+        if (!(await confirm(
+            'O dispositivo vai reiniciar para aplicar o novo nome. Continuar?'
+        ))) return;
+        try {
+            await ConnectionManager.renameDevice(next);
+            showToast('Reiniciando com novo nome…', 'info');
+        } catch (e: any) {
+            // `name_too_long` / `name_invalid_char` come from the firmware.
+            // The disconnect that follows ESP.restart() also bubbles up as
+            // a rejection — surface it but don't treat it as an error.
+            const msg = e?.message || '';
+            if (msg.includes('disconnect') || msg.includes('Disconnected')) {
+                showToast('Reiniciando com novo nome…', 'info');
+            } else {
+                showToast(msg || 'Falha ao renomear', 'error');
+            }
+        }
+    }
+
     return (
-        <WizardSheet title="WiFi & OTA" open={open} onClose={onClose}
+        <WizardSheet title="Conectividade" open={open} onClose={onClose}
             footer={<Button size="$3" onPress={onClose}>Fechar</Button>}>
+            {/* Device name */}
+            <YStack gap="$2">
+                <XStack ai="center" gap="$2">
+                    <Text fontWeight="700">Nome do equipamento</Text>
+                </XStack>
+                <Paragraph fontSize="$1" opacity={0.6}>
+                    Aparece no Bluetooth e no <Text fontFamily="$mono">.local</Text> da rede.
+                    Letras, números, espaço, <Text fontFamily="$mono">-</Text> ou <Text fontFamily="$mono">_</Text>; até {MAX_NAME_LEN} chars.
+                </Paragraph>
+                <Input size="$3"
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="BrewPilot" />
+                <Button size="$3" theme="active"
+                    disabled={name.trim() === (deviceName.value || '')}
+                    onPress={saveName}>
+                    Salvar & Reiniciar
+                </Button>
+            </YStack>
+
+            <Separator marginVertical="$2" />
+
             {/* WiFi */}
             <YStack gap="$2">
                 <XStack ai="center" gap="$2">
