@@ -45,6 +45,15 @@
     "experiments": {
       "tsconfigPaths": true
     },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 5000,
+      "url": "https://u.expo.dev/6816366e-b327-41f6-9f3b-5a0fb7a5074d"
+    },
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
     "extra": {
       "eas": {
         "projectId": "6816366e-b327-41f6-9f3b-5a0fb7a5074d"
