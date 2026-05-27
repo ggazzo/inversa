@@ -2,6 +2,7 @@
   "expo": {
     "name": "BrewPilot",
     "slug": "brewpilot",
+    "owner": "ggazzo",
     "version": "0.1.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
@@ -49,14 +50,14 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 5000,
-      "url": "https://u.expo.dev/6816366e-b327-41f6-9f3b-5a0fb7a5074d"
+      "url": "https://u.expo.dev/0754be71-5229-4862-8d43-538f33ffe4fd"
     },
     "runtimeVersion": {
       "policy": "fingerprint"
     },
     "extra": {
       "eas": {
-        "projectId": "6816366e-b327-41f6-9f3b-5a0fb7a5074d"
+        "projectId": "0754be71-5229-4862-8d43-538f33ffe4fd"
       }
     }
   }
