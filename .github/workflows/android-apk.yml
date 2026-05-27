@@ -5,12 +5,21 @@ name: Build Android APK
 # because firmware and app rebuilds happen on different cadences and we
 # don't want a JS change to gate a firmware release (or vice-versa).
 #
+# Caching: a SHA-256 fingerprint of every file that can affect the APK
+# bytes (app sources, shared packages, lockfile, Expo/Gradle configs,
+# the workflow itself, and the keystore secrets when present) gates
+# whether we actually re-run Gradle. When the fingerprint matches a
+# previous run we restore the cached APK and rename it for the current
+# tag — typically <5 s instead of the full ~7-12 min build.
+#
 # Signing strategy: starts out with the standard Android debug keystore
 # so anyone can sideload the APK for testing without provisioning a
 # release keystore. When the project is ready to ship through stores,
 # wire in `ANDROID_KEYSTORE_BASE64` + `ANDROID_KEYSTORE_PASSWORD` +
 # `ANDROID_KEY_ALIAS` + `ANDROID_KEY_PASSWORD` Secrets and the workflow
-# will pick those up automatically (see the conditional below).
+# will pick those up automatically. Provisioning the keystore changes
+# the fingerprint, so the first release-signed run rebuilds from
+# scratch and is cached separately from the debug-signed builds.
 
 on:
   push:
@@ -32,28 +41,83 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Compute APK fingerprint
+        id: fp
+        env:
+          # Hashing a presence flag (not the secret itself) so the
+          # cache key changes the moment the project starts producing
+          # release-signed APKs instead of debug-signed ones.
+          HAS_RELEASE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          # Files that *materially* change the APK contents. Keep this
+          # list narrow — every irrelevant file in here causes spurious
+          # cache misses.
+          INPUTS=$(
+            find \
+              apps/native \
+              packages \
+              -type f \
+              \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \
+                 -o -name '*.json' -o -name '*.svg' -o -name '*.png' \
+                 -o -name 'app.json' -o -name 'eas.json' -o -name 'tsconfig*.json' \) \
+              -not -path '*/node_modules/*' \
+              -not -path '*/.expo/*' \
+              -not -path '*/dist/*' \
+              -not -path '*/build/*' \
+            | sort
+          )
+          HASH=$(
+            { echo "$INPUTS" | xargs sha256sum;
+              sha256sum package.json package-lock.json .github/workflows/android-apk.yml;
+              echo "release-keystore=$HAS_RELEASE_KEYSTORE";
+            } | sha256sum | cut -d' ' -f1
+          )
+          echo "hash=$HASH" >> "$GITHUB_OUTPUT"
+          # Folder where we'll copy the produced APK so actions/cache
+          # can pick it up. Predictable path → easy restore.
+          echo "cache-dir=.cache/apk/$HASH" >> "$GITHUB_OUTPUT"
+          mkdir -p ".cache/apk/$HASH"
+          echo "Fingerprint: $HASH"
+          echo "Inputs counted: $(echo "$INPUTS" | wc -l)"
+
+      - name: Restore cached APK
+        id: apk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.fp.outputs.cache-dir }}
+          key: apk-v1-${{ steps.fp.outputs.hash }}
+
+      # Everything below is gated on a cache miss so we only pay the
+      # ~10 min toolchain bootstrap when the fingerprint actually
+      # changes.
       - name: Set up Node
+        if: steps.apk-cache.outputs.cache-hit != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "20"
           cache: "npm"
 
       - name: Set up Java 17
+        if: steps.apk-cache.outputs.cache-hit != 'true'
         uses: actions/setup-java@v4
         with:
           java-version: "17"
           distribution: "temurin"
 
       - name: Set up Android SDK
+        if: steps.apk-cache.outputs.cache-hit != 'true'
         uses: android-actions/setup-android@v3
 
       - name: Install workspace
+        if: steps.apk-cache.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Expo prebuild
         # Generates the `android/` Gradle project from app.json. Run with
         # `--clean` so a fresh tag always rebuilds the native shell from
         # the current Expo config (versionCode/manifest changes etc.).
+        if: steps.apk-cache.outputs.cache-hit != 'true'
         run: |
           cd apps/native
           npx expo prebuild --platform android --clean
@@ -62,6 +126,7 @@ jobs:
       # configure Gradle. Without secrets the build falls through to the
       # debug keystore — still installable, just not store-grade.
       - name: Decode release keystore (optional)
+        if: steps.apk-cache.outputs.cache-hit != 'true'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
@@ -74,6 +139,7 @@ jobs:
           fi
 
       - name: Build APK
+        if: steps.apk-cache.outputs.cache-hit != 'true'
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -91,17 +157,42 @@ jobs:
             ./gradlew assembleDebug
             FLAVOR=debug
           fi
-          echo "FLAVOR=$FLAVOR" >> $GITHUB_ENV
+          echo "FLAVOR=$FLAVOR" >> "$GITHUB_ENV"
 
-      - name: Locate APK
-        id: apk
+      - name: Stage APK into cache dir (miss path)
+        if: steps.apk-cache.outputs.cache-hit != 'true'
+        env:
+          CACHE_DIR: ${{ steps.fp.outputs.cache-dir }}
         run: |
           APK=$(find apps/native/android/app/build/outputs/apk -name "*.apk" | head -n 1)
           test -n "$APK"
-          # Rename to a stable, ref-aware filename so the release listing
-          # is readable instead of `app-release.apk`.
+          cp "$APK" "$CACHE_DIR/app.apk"
+          echo "$FLAVOR" > "$CACHE_DIR/flavor"
+          sha256sum "$CACHE_DIR/app.apk" | tee "$CACHE_DIR/sha256"
+
+      - name: Recover APK from cache (hit path)
+        if: steps.apk-cache.outputs.cache-hit == 'true'
+        env:
+          CACHE_DIR: ${{ steps.fp.outputs.cache-dir }}
+        run: |
+          test -f "$CACHE_DIR/app.apk"
+          test -f "$CACHE_DIR/flavor"
+          echo "FLAVOR=$(cat "$CACHE_DIR/flavor")" >> "$GITHUB_ENV"
+          # Print the recorded sha256 next to a live re-hash so a
+          # corrupted cache shows up loudly in the log instead of
+          # silently shipping the wrong bytes.
+          echo "Recorded:"
+          cat "$CACHE_DIR/sha256"
+          echo "Live:"
+          sha256sum "$CACHE_DIR/app.apk"
+
+      - name: Locate APK for upload
+        id: apk
+        env:
+          CACHE_DIR: ${{ steps.fp.outputs.cache-dir }}
+        run: |
           DEST="brewpilot-${{ github.ref_name }}-android-${FLAVOR}.apk"
-          cp "$APK" "$DEST"
+          cp "$CACHE_DIR/app.apk" "$DEST"
           echo "path=$DEST" >> "$GITHUB_OUTPUT"
 
       - name: Upload to GitHub release
