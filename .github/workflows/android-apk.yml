@@ -138,12 +138,40 @@ jobs:
             echo "No ANDROID_KEYSTORE_BASE64 secret — debug-keystore APK will be produced."
           fi
 
+      - name: Ensure Android debug keystore exists
+        # `assembleDebug` (used as a fallback signing identity when no
+        # production keystore is provisioned) needs ~/.android/debug.keystore
+        # to exist. The runner usually has it, but a fresh image
+        # occasionally doesn't — generate it ourselves with the standard
+        # debug credentials so the release-mode build always finds a key.
+        if: steps.apk-cache.outputs.cache-hit != 'true'
+        run: |
+          KS=~/.android/debug.keystore
+          if [ ! -f "$KS" ]; then
+            mkdir -p ~/.android
+            keytool -genkeypair \
+              -keystore "$KS" \
+              -alias androiddebugkey \
+              -storepass android \
+              -keypass android \
+              -keyalg RSA -keysize 2048 -validity 36500 \
+              -dname "CN=Android Debug,O=Android,C=US"
+            echo "Generated debug keystore at $KS"
+          fi
+
       - name: Build APK
         if: steps.apk-cache.outputs.cache-hit != 'true'
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD:      ${{ secrets.ANDROID_KEY_PASSWORD }}
+        # Always `assembleRelease` so the JS bundle is baked into the
+        # APK — `assembleDebug` would emit an APK that expects to find
+        # Metro on localhost:8081, which a sideloaded user obviously
+        # cannot satisfy. When the production keystore secrets are not
+        # set we sign with the Android debug keystore instead, which
+        # still produces a standalone, installable APK; it just won't
+        # be accepted by Play Store / Amazon.
         run: |
           cd apps/native/android
           if [ -f app/release.keystore ]; then
@@ -154,8 +182,12 @@ jobs:
               -PRELEASE_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
             FLAVOR=release
           else
-            ./gradlew assembleDebug
-            FLAVOR=debug
+            ./gradlew assembleRelease \
+              -PRELEASE_STORE_FILE=$HOME/.android/debug.keystore \
+              -PRELEASE_STORE_PASSWORD=android \
+              -PRELEASE_KEY_ALIAS=androiddebugkey \
+              -PRELEASE_KEY_PASSWORD=android
+            FLAVOR=release-debugsigned
           fi
           echo "FLAVOR=$FLAVOR" >> "$GITHUB_ENV"
 
