@@ -1,0 +1,75 @@
+name: Publish EAS Update
+
+# Ships JS-only updates of the React Native app via EAS Update on every
+# tag push. Users with a compatible runtime (same native build) get the
+# new bundle silently on the next launch — no APK reinstall, no Play
+# Store roundtrip. Native-code changes (new BLE permission, lib bump)
+# bump the runtime fingerprint, so the OTA channel is automatically
+# skipped for clients that need a fresh APK first.
+#
+# Requires the EXPO_TOKEN repository Secret. Generate one at
+# https://expo.dev/accounts/<owner>/settings/access-tokens, then:
+#   gh secret set EXPO_TOKEN -R ggazzo/brewpilot --body "<token>"
+# Without it the workflow no-ops with a warning so the rest of CI keeps
+# working.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: eas-update-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: eas update --auto
+    runs-on: ubuntu-latest
+    steps:
+      - name: Guard on EXPO_TOKEN
+        id: guard
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::warning::EXPO_TOKEN secret not configured — skipping EAS Update publish. Generate a token at https://expo.dev/accounts/<owner>/settings/access-tokens and set it with 'gh secret set EXPO_TOKEN'."
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=0" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.guard.outputs.skip == '0'
+
+      - name: Set up Node
+        if: steps.guard.outputs.skip == '0'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install workspace
+        if: steps.guard.outputs.skip == '0'
+        run: npm ci
+
+      - name: Install EAS CLI
+        if: steps.guard.outputs.skip == '0'
+        run: npm install -g eas-cli
+
+      - name: Publish update
+        if: steps.guard.outputs.skip == '0'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        # `--branch production` is the EAS Update branch that maps to
+        # the `production` channel in eas.json. `--auto` derives the
+        # update message and the branch name from git context.
+        # `--non-interactive` makes the CLI bail instead of prompting.
+        run: |
+          cd apps/native
+          eas update \
+            --branch production \
+            --auto \
+            --non-interactive \
+            --message "Tag ${GITHUB_REF_NAME}"

@@ -27,7 +27,8 @@ import { useSignals } from '@preact/signals-react/runtime';
 import { ToastProvider, ToastViewport } from '@tamagui/toast';
 import { PortalProvider, ScrollView, TamaguiProvider, Theme, YStack } from 'tamagui';
 import { ConnectionManager } from '@brewpilot/services';
-import { isConnected, theme, manualIntent } from '@brewpilot/stores';
+import { isConnected, theme, manualIntent, showToast } from '@brewpilot/stores';
+import * as Updates from 'expo-updates';
 import {
     TopBar, BrewView, HopAlertOverlay, ToastBridge,
     RecipeSheet, BrewLogSheet, DevicePickerSheet, DebugSheet, WatchdogSheet,
@@ -45,6 +46,34 @@ export default function App() {
     const [openSheet, setOpenSheet] = useState<MenuId | null>(null);
 
     useEffect(() => { ConnectionManager.init(); }, []);
+
+    // JS bundle OTA via EAS Update. Only runs in production builds —
+    // `Updates.isEnabled` is false during `expo start` / dev client so we
+    // don't spam dev runs with update checks. The flow is non-blocking:
+    // app boots with whatever bundle is on disk, and if a newer one is
+    // available we silently download it and reload on the next launch.
+    // Triggering reload immediately would surprise the user mid-brew, so
+    // we just toast them.
+    useEffect(() => {
+        if (!Updates.isEnabled) return;
+        let cancelled = false;
+        (async () => {
+            try {
+                const check = await Updates.checkForUpdateAsync();
+                if (cancelled || !check.isAvailable) return;
+                const fetched = await Updates.fetchUpdateAsync();
+                if (cancelled || !fetched.isNew) return;
+                showToast(
+                    'Atualização do app baixada — reinicie para aplicar',
+                    'info',
+                );
+            } catch {
+                // Network down, EAS unreachable, manifest mismatch — all
+                // expected during normal use; never block boot.
+            }
+        })();
+        return () => { cancelled = true; };
+    }, []);
 
     // Rotation policy: phones lock to portrait; tablets get full
     // freedom. Detection: Platform.isPad on iOS, screen min-edge
