@@ -138,6 +138,29 @@ jobs:
             echo "No ANDROID_KEYSTORE_BASE64 secret — debug-keystore APK will be produced."
           fi
 
+      - name: Bump Gradle / Kotlin daemon memory
+        # `expo prebuild` writes `apps/native/android/gradle.properties`
+        # from scratch on every run, so we patch the generated file
+        # rather than carrying our own copy in git. The defaults from
+        # `expo prebuild` (Xmx2g / no metaspace cap) make the KSP
+        # daemon flood the build with `OutOfMemoryError: Metaspace`
+        # once Kotlin compilation hits expo-updates + reanimated +
+        # worklets simultaneously. GitHub hosted Linux runners have
+        # 14 GB RAM, so giving Gradle 6 GB heap + 2 GB metaspace and
+        # Kotlin its own 2 GB daemon is well within budget.
+        if: steps.apk-cache.outputs.cache-hit != 'true'
+        run: |
+          GP=apps/native/android/gradle.properties
+          {
+            echo ""
+            echo "# Bumped from the CI workflow — see android-apk.yml"
+            echo "org.gradle.jvmargs=-Xmx6g -XX:MaxMetaspaceSize=2g -Dfile.encoding=UTF-8"
+            echo "kotlin.daemon.jvmargs=-Xmx2g -XX:MaxMetaspaceSize=1g"
+            echo "org.gradle.workers.max=4"
+          } >> "$GP"
+          echo "Final $GP:"
+          tail -20 "$GP"
+
       - name: Ensure Android debug keystore exists
         # `assembleDebug` (used as a fallback signing identity when no
         # production keystore is provisioned) needs ~/.android/debug.keystore
