@@ -1,0 +1,122 @@
+name: Build Android APK
+
+# Builds the React Native app as a sideloadable APK and attaches it to
+# the GitHub Release for the same tag. Decoupled from `platformio.yml`
+# because firmware and app rebuilds happen on different cadences and we
+# don't want a JS change to gate a firmware release (or vice-versa).
+#
+# Signing strategy: starts out with the standard Android debug keystore
+# so anyone can sideload the APK for testing without provisioning a
+# release keystore. When the project is ready to ship through stores,
+# wire in `ANDROID_KEYSTORE_BASE64` + `ANDROID_KEYSTORE_PASSWORD` +
+# `ANDROID_KEY_ALIAS` + `ANDROID_KEY_PASSWORD` Secrets and the workflow
+# will pick those up automatically (see the conditional below).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install workspace
+        run: npm ci
+
+      - name: Expo prebuild
+        # Generates the `android/` Gradle project from app.json. Run with
+        # `--clean` so a fresh tag always rebuilds the native shell from
+        # the current Expo config (versionCode/manifest changes etc.).
+        run: |
+          cd apps/native
+          npx expo prebuild --platform android --clean
+
+      # If a release keystore is provisioned in Secrets, decode it and
+      # configure Gradle. Without secrets the build falls through to the
+      # debug keystore — still installable, just not store-grade.
+      - name: Decode release keystore (optional)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$ANDROID_KEYSTORE_BASE64" ]; then
+            mkdir -p apps/native/android/app
+            echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > apps/native/android/app/release.keystore
+            echo "Release keystore decoded ($(stat -c %s apps/native/android/app/release.keystore || stat -f %z apps/native/android/app/release.keystore) bytes)"
+          else
+            echo "No ANDROID_KEYSTORE_BASE64 secret — debug-keystore APK will be produced."
+          fi
+
+      - name: Build APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS:         ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD:      ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          cd apps/native/android
+          if [ -f app/release.keystore ]; then
+            ./gradlew assembleRelease \
+              -PRELEASE_STORE_FILE=app/release.keystore \
+              -PRELEASE_STORE_PASSWORD="$ANDROID_KEYSTORE_PASSWORD" \
+              -PRELEASE_KEY_ALIAS="$ANDROID_KEY_ALIAS" \
+              -PRELEASE_KEY_PASSWORD="$ANDROID_KEY_PASSWORD"
+            FLAVOR=release
+          else
+            ./gradlew assembleDebug
+            FLAVOR=debug
+          fi
+          echo "FLAVOR=$FLAVOR" >> $GITHUB_ENV
+
+      - name: Locate APK
+        id: apk
+        run: |
+          APK=$(find apps/native/android/app/build/outputs/apk -name "*.apk" | head -n 1)
+          test -n "$APK"
+          # Rename to a stable, ref-aware filename so the release listing
+          # is readable instead of `app-release.apk`.
+          DEST="brewpilot-${{ github.ref_name }}-android-${FLAVOR}.apk"
+          cp "$APK" "$DEST"
+          echo "path=$DEST" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.path }}
+          # Don't overwrite the firmware notes — append the APK.
+          append_body: true
+
+      - name: Upload as workflow artifact
+        # Always uploaded as a workflow run artifact so the manual
+        # `workflow_dispatch` flow has something to download even when
+        # there is no tag to attach the file to.
+        uses: actions/upload-artifact@v4
+        with:
+          name: brewpilot-android-apk
+          path: ${{ steps.apk.outputs.path }}
