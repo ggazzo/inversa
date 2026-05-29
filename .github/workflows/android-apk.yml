@@ -48,38 +48,50 @@ jobs:
           # cache key changes the moment the project starts producing
           # release-signed APKs instead of debug-signed ones.
           HAS_RELEASE_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' && '1' || '0' }}
+        # Only files that change the native APK contents go into the
+        # hash. JS source under `apps/native/src/`, `packages/**` etc
+        # ships through the EAS Update bundle channel — the APK
+        # doesn't have to be rebuilt for those, and including them
+        # would cause every release to bust the cache for no benefit.
+        # The Expo runtime fingerprint policy uses essentially this
+        # same input set; staying narrow keeps APK cache hits aligned
+        # with EAS Update's "runtime compatibility" semantics.
         run: |
           set -euo pipefail
-          # Files that *materially* change the APK contents. Keep this
-          # list narrow — every irrelevant file in here causes spurious
-          # cache misses.
+          # Anything that bumps the native binary:
+          #   - app.json: package id, permissions, plugins, native config
+          #   - eas.json: build profile / channel mapping
+          #   - package.json + lockfile: native dep versions (RN, BLE plx,
+          #     Tamagui native modules, expo plugins)
+          #   - this workflow file: gradle args, keystore flow
+          # `apps/native/plugins/**` and `apps/native/android/**`
+          # (when committed) feed the prebuild too — include them if
+          # they exist.
           INPUTS=$(
-            find \
-              apps/native \
-              packages \
-              -type f \
-              \( -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.jsx' \
-                 -o -name '*.json' -o -name '*.svg' -o -name '*.png' \
-                 -o -name 'app.json' -o -name 'eas.json' -o -name 'tsconfig*.json' \) \
-              -not -path '*/node_modules/*' \
-              -not -path '*/.expo/*' \
-              -not -path '*/dist/*' \
+            ls -1 \
+              apps/native/app.json \
+              apps/native/eas.json \
+              package.json \
+              package-lock.json \
+              .github/workflows/android-apk.yml \
+              2>/dev/null
+            find apps/native/plugins -type f 2>/dev/null || true
+            find apps/native/android -type f \
               -not -path '*/build/*' \
-            | sort
+              -not -path '*/.gradle/*' \
+              -not -path '*/.cxx/*' \
+              2>/dev/null || true
           )
           HASH=$(
-            { echo "$INPUTS" | xargs sha256sum;
-              sha256sum package.json package-lock.json .github/workflows/android-apk.yml;
+            { echo "$INPUTS" | sort -u | xargs sha256sum 2>/dev/null;
               echo "release-keystore=$HAS_RELEASE_KEYSTORE";
             } | sha256sum | cut -d' ' -f1
           )
           echo "hash=$HASH" >> "$GITHUB_OUTPUT"
-          # Folder where we'll copy the produced APK so actions/cache
-          # can pick it up. Predictable path → easy restore.
           echo "cache-dir=.cache/apk/$HASH" >> "$GITHUB_OUTPUT"
           mkdir -p ".cache/apk/$HASH"
           echo "Fingerprint: $HASH"
-          echo "Inputs counted: $(echo "$INPUTS" | wc -l)"
+          echo "Inputs counted: $(echo "$INPUTS" | sort -u | wc -l)"
 
       - name: Restore cached APK
         id: apk-cache
