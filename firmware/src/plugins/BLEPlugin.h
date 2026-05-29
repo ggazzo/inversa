@@ -55,10 +55,31 @@ public:
 
         service->start();
 
-        // Advertising
+        // Advertising. Split the payload deliberately because BLE caps
+        // the primary adv packet at 31 bytes total: 3 bytes for the
+        // flags + 18 bytes for one 128-bit service UUID + ~10 bytes
+        // for everything else. The user-configurable BLE name
+        // ("brewpilot-<mac>" by default, or whatever
+        // `req:device:rename` set) is up to 31 chars and routinely
+        // exceeds that 10-byte budget, which makes NimBLE quietly
+        // demote the name to the scan response. Web Bluetooth and
+        // active-scanning natives still see it, but
+        // `react-native-ble-plx` on Android only reads the primary
+        // packet by default and the picker shows the device with no
+        // name. Fix: primary packet carries the device name only,
+        // and the service UUID is published in the scan response —
+        // app filters by UUID via the scan response and renders the
+        // name from the primary.
         NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
-        advertising->addServiceUUID(BLE_SERVICE_UUID);
-        advertising->setName(name.c_str());
+        NimBLEAdvertisementData advData;
+        advData.setFlags(BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP);
+        advData.setName(name.c_str());
+        advertising->setAdvertisementData(advData);
+
+        NimBLEAdvertisementData scanResp;
+        scanResp.setCompleteServices(NimBLEUUID(BLE_SERVICE_UUID));
+        advertising->setScanResponseData(scanResp);
+
         advertising->start();
 
         // Subscribe to BLESend events from other plugins
