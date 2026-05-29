@@ -301,6 +301,29 @@ class NativeBleAdapter implements BleAdapter {
             this._onDisconnect?.();
         });
 
+        // MTU negotiation MUST happen before we subscribe to the TX
+        // characteristic. Several Android stacks (and some peripheral
+        // firmwares) tear down or fail to re-arm the notification
+        // descriptor when the MTU changes mid-session — observable
+        // here as "first frame works, then nothing": the central
+        // accepts the initial chunked status payload at MTU=23,
+        // ble-plx requests MTU=185, the peripheral re-runs the GATT
+        // exchange, and the CCCD subscription quietly stops firing.
+        // Doing the request first means the link sits at 185 the
+        // whole time the descriptor is bound.
+        //
+        // Skipped on iOS — CoreBluetooth negotiates the MTU
+        // automatically at link setup and ble-plx doesn't expose a
+        // requestMTU on iOS.
+        if (Platform.OS === 'android') {
+            try {
+                const after = await connected.requestMTU(185);
+                console.log(`[BLE] MTU negotiated: ${after.mtu ?? after}`);
+            } catch (e: any) {
+                console.warn(`[BLE] requestMTU failed: ${e?.message}`);
+            }
+        }
+
         // Subscribe to the TX characteristic. Each notification is a
         // chunk of the device's JSON response; we accumulate until
         // JSON.parse succeeds, matching the web adapter.
@@ -329,28 +352,6 @@ class NativeBleAdapter implements BleAdapter {
             );
         };
         subscribe();
-
-        // Android often needs a longer settle than iOS — the firmware
-        // writes the CCCD descriptor in response to our subscribe and
-        // that round-trip can take a beat. Bump to 1500ms. Removed
-        // the previous retry: doing remove() + re-subscribe on Android
-        // toggles the CCCD off then on, which can leave the descriptor
-        // in a disabled state if the writes race.
-        await new Promise((r) => setTimeout(r, 1500));
-
-        // Android: request a larger MTU so firmware can send bigger
-        // chunks. Default is 23 (20-byte payload), which works but
-        // amplifies the issue if any chunk is lost. Request 185
-        // (firmware ceiling). Skipped on iOS — ble-plx negotiates
-        // automatically there.
-        if (Platform.OS === 'android') {
-            try {
-                const after = await connected.requestMTU(185);
-                console.log(`[BLE] MTU negotiated: ${after.mtu ?? after}`);
-            } catch (e: any) {
-                console.warn(`[BLE] requestMTU failed: ${e?.message}`);
-            }
-        }
 
         this.device = connected;
         this.connected = true;
