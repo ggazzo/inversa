@@ -6,6 +6,7 @@ import { firmwareVersion, showToast } from '@brewpilot/stores';
 import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from './WizardSheet';
 import { confirm } from '../../platform';
+import { getAppBundleInfo, type AppBundleInfo } from '../../appInfo';
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -34,9 +35,29 @@ export function WizardAbout({ open, onClose }: Props) {
             .catch((e: any) => showToast(e?.message || 'Falha (confirme exato)', 'error'));
     }
 
+    const bundle: AppBundleInfo | null = getAppBundleInfo();
+
     return (
         <WizardSheet title="Sobre" open={open} onClose={onClose}
             footer={<Button size="$3" onPress={onClose}>Fechar</Button>}>
+            {bundle && (
+                <>
+                    <YStack>
+                        <Text fontWeight="700">App</Text>
+                        <YStack mt="$2" gap={2}>
+                            <Row k="bundle"   v={shortId(bundle.updateId) || 'embedded'} />
+                            <Row k="publicado" v={formatDate(bundle.createdAt)} />
+                            <Row k="runtime"  v={shortId(bundle.runtimeVersion)} />
+                            <Row k="canal"    v={bundle.channel} />
+                            <Row k="origem"
+                                v={bundle.isEmbeddedLaunch ? 'APK embarcado' : 'EAS Update'} />
+                            <Row k="ota ativo"
+                                v={bundle.isEnabled ? 'sim' : 'não'} />
+                        </YStack>
+                    </YStack>
+                    <Separator marginVertical="$2" />
+                </>
+            )}
             <YStack>
                 <Text fontWeight="700">Dispositivo</Text>
                 {info ? (
@@ -77,11 +98,30 @@ export function WizardAbout({ open, onClose }: Props) {
     );
 }
 
-function Row({ k, v }: { k: string; v?: string }) {
+function Row({ k, v }: { k: string; v?: string | null }) {
     return (
         <XStack gap="$2">
             <Text fontSize="$1" fontFamily="$mono" opacity={0.5} width={112}>{k}</Text>
             <Text fontSize="$1" fontFamily="$mono" numberOfLines={1} flex={1}>{v ?? '—'}</Text>
         </XStack>
     );
+}
+
+// Truncate long hashes to a glanceable prefix. `null` → "—" via Row.
+function shortId(id: string | null): string | null {
+    if (!id) return null;
+    return id.length > 12 ? id.slice(0, 12) + '…' : id;
+}
+
+// EAS Update gives us an ISO timestamp; render in the user's locale
+// so it lines up with when they actually published / received it.
+function formatDate(iso: string | null): string | null {
+    if (!iso) return null;
+    try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return iso;
+        return d.toLocaleString();
+    } catch {
+        return iso;
+    }
 }
