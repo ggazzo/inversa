@@ -71,6 +71,15 @@ public:
         // app filters by UUID via the scan response and renders the
         // name from the primary.
         NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
+#ifdef SIM_BUILD
+        // Sim build links against a header-only NimBLE shim that
+        // doesn't expose NimBLEAdvertisementData / the HS adv flag
+        // constants. Telemetry is delivered over stdout in the sim,
+        // so the actual advertising payload doesn't matter — keep
+        // the original single-call form to compile.
+        advertising->addServiceUUID(BLE_SERVICE_UUID);
+        advertising->setName(name.c_str());
+#else
         NimBLEAdvertisementData advData;
         advData.setFlags(BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP);
         advData.setName(name.c_str());
@@ -79,7 +88,7 @@ public:
         NimBLEAdvertisementData scanResp;
         scanResp.setCompleteServices(NimBLEUUID(BLE_SERVICE_UUID));
         advertising->setScanResponseData(scanResp);
-
+#endif
         advertising->start();
 
         // Subscribe to BLESend events from other plugins
