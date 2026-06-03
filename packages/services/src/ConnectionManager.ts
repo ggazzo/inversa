@@ -280,6 +280,10 @@ class ConnectionManagerClass {
   // the UI lists; each entry's url/sig feed installBuild().
   async fetchBuildCatalog(board: string) {
     const REPO = 'ggazzo/brewpilot';
+    // FIRMWARE_NAME is the PlatformIO env (e.g. "wemos_s3_mini_devota"), but
+    // release assets are named by the base board ("wemos_s3_mini.bin"). Strip
+    // the build variant so a dev/debug device still sees its board's catalog.
+    const baseBoard = board.replace(/_(devota|debug)$/, '');
     const res = await fetch(
       `https://api.github.com/repos/${REPO}/releases?per_page=30`,
       { headers: { Accept: 'application/vnd.github+json' } },
@@ -289,8 +293,8 @@ class ConnectionManagerClass {
     const builds = [];
     for (const r of releases) {
       const assets = r.assets || [];
-      const bin = assets.find((a: any) => a.name === `${board}.bin`);
-      const sig = assets.find((a: any) => a.name === `${board}.bin.sig`);
+      const bin = assets.find((a: any) => a.name === `${baseBoard}.bin`);
+      const sig = assets.find((a: any) => a.name === `${baseBoard}.bin.sig`);
       if (!bin || !sig) continue;  // skip unsigned or other-board releases
       builds.push({
         version: r.tag_name,
