@@ -38,31 +38,47 @@
 
 class CommandHandler {
 public:
-    void init(BLEPlugin* ble, SDCardPlugin* sd, RecipePlugin* recipe, PIDPlugin* pid,
-              WiFiPlugin* wifi = nullptr, OTAPlugin* ota = nullptr,
-              RampPlugin* ramp = nullptr, BrewLogPlugin* brewLog = nullptr,
-              BoilTimerPlugin* boilTimer = nullptr, RTCPlugin* rtc = nullptr,
-              TimerPlugin* timer = nullptr, AutoTunePlugin* autoTune = nullptr,
-              SchedulerPlugin* scheduler = nullptr,
-              ThermalWatchdogPlugin* watchdog = nullptr,
-              LossTunePlugin* lossTune = nullptr,
-              IHeaterDriver* heater = nullptr) {
-        _ble = ble;
-        _sd = sd;
-        _recipe = recipe;
-        _pid = pid;
-        _wifi = wifi;
-        _ota = ota;
-        _ramp = ramp;
-        _brewLog = brewLog;
-        _boilTimer = boilTimer;
-        _rtc = rtc;
-        _timer = timer;
-        _autoTune = autoTune;
-        _scheduler = scheduler;
-        _watchdog = watchdog;
-        _lossTune = lossTune;
-        _heater = heater;
+    // Plugin dependencies, passed to init() as a named aggregate. Designated
+    // initializers at the call site make the wiring self-documenting and
+    // transposition-proof — 16 bare positional pointers were easy to misorder.
+    // All optional except the first four (ble/sd/recipe/pid); a null pointer
+    // means the feature is absent and its commands return "… not available".
+    struct Deps {
+        BLEPlugin* ble = nullptr;
+        SDCardPlugin* sd = nullptr;
+        RecipePlugin* recipe = nullptr;
+        PIDPlugin* pid = nullptr;
+        WiFiPlugin* wifi = nullptr;
+        OTAPlugin* ota = nullptr;
+        RampPlugin* ramp = nullptr;
+        BrewLogPlugin* brewLog = nullptr;
+        BoilTimerPlugin* boilTimer = nullptr;
+        RTCPlugin* rtc = nullptr;
+        TimerPlugin* timer = nullptr;
+        AutoTunePlugin* autoTune = nullptr;
+        SchedulerPlugin* scheduler = nullptr;
+        ThermalWatchdogPlugin* watchdog = nullptr;
+        LossTunePlugin* lossTune = nullptr;
+        IHeaterDriver* heater = nullptr;
+    };
+
+    void init(const Deps& d) {
+        _ble = d.ble;
+        _sd = d.sd;
+        _recipe = d.recipe;
+        _pid = d.pid;
+        _wifi = d.wifi;
+        _ota = d.ota;
+        _ramp = d.ramp;
+        _brewLog = d.brewLog;
+        _boilTimer = d.boilTimer;
+        _rtc = d.rtc;
+        _timer = d.timer;
+        _autoTune = d.autoTune;
+        _scheduler = d.scheduler;
+        _watchdog = d.watchdog;
+        _lossTune = d.lossTune;
+        _heater = d.heater;
 
         EventBus::instance().subscribe(EventType::BLECommandReceived, [this](const Event& e) {
             // Reuse the same JsonDocument for every inbound command. BLE
