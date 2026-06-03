@@ -87,6 +87,42 @@ jobs:
       - name: Build firmware
         run: pio run -e ${{ matrix.env }}
 
+      # Surface flash usage in the run summary so size regressions are visible
+      # per build/PR, and fail if the app image crosses 90% of the partition —
+      # an early warning before a release build overflows min_spiffs.
+      #
+      # We parse the GNU `size` row (text/data/bss) rather than PlatformIO's
+      # "Flash:" line: the latter is emitted by esp-idf-size, whose CLI drifts
+      # across versions, while the `size` row is stable. `-t size` re-emits it
+      # even on a cache hit (a plain `pio run` stays silent then).
+      #
+      # App image = text + data (code + initialized data flashed to the app
+      # partition). bss is ignored on purpose: with PSRAM mapped it counts a
+      # 32 MB virtual range and is not a real internal-RAM figure.
+      - name: Report flash usage
+        run: |
+          pio run -e ${{ matrix.env }} -t size | tee size.log
+          row=$(awk '/firmware\.elf/ && $1 ~ /^[0-9]+$/ {print}' size.log | tail -1)
+          text=$(echo "$row" | awk '{print $1}')
+          data=$(echo "$row" | awk '{print $2}')
+          app=$((text + data))
+          part=1966080   # min_spiffs.csv app partition (0x1E0000)
+          # Integer math only — no float/locale pitfalls. pct rounded to 0.1%.
+          pct=$(( app * 1000 / part ))
+          {
+            echo "### Flash size — ${{ matrix.env }}"
+            echo ""
+            echo "| segment | bytes |"
+            echo "|---|---|"
+            echo "| .text (code) | $text |"
+            echo "| .data (init) | $data |"
+            echo "| **app image** | **$app / $part ($((pct/10)).$((pct%10))%)** |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$app" -gt $(( part * 90 / 100 )) ]; then
+            echo "::error::App image $((pct/10)).$((pct%10))% of partition exceeds 90%"
+            exit 1
+          fi
+
       # Copy boot_app0.bin out of the arduino-esp32 framework tools dir so the
       # release job can run esptool merge_bin without pulling the full toolchain.
       - name: Stage boot_app0 partition
