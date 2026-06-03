@@ -276,6 +276,16 @@ bool ok = _prefs.begin("inversa", false);  // false = read/write mode
         return _prefs.getString("dev_name", defaultVal);
     }
 
+    // ── Dev push-OTA password (ArduinoOTA/espota) ───────────
+    // Stored per device instead of baked into the binary, so a publicly
+    // flashable dev build carries no secret. Empty = listener stays closed.
+    void saveDevOtaPassword(const String& pwd) {
+        _prefs.putString("devota_pwd", pwd);
+    }
+    String loadDevOtaPassword(const String& defaultVal) {
+        return _prefs.getString("devota_pwd", defaultVal);
+    }
+
     // ── Heater Driver Config (burst-fire / zero-cross) ──────
     // Persists mains frequency and burst-fire window so the same firmware
     // image can serve 50 Hz and 60 Hz markets without a rebuild.

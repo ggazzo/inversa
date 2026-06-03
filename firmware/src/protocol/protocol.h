@@ -64,6 +64,11 @@ namespace Protocol {
     // OTA (app → device)
     constexpr const char* REQ_OTA_CHECK       = "req:ota:check";
     constexpr const char* REQ_OTA_INSTALL     = "req:ota:install";
+    // Install a specific build chosen from the catalog (not just latest).
+    // { "url": "<bin>", "sig": "<bin.sig>", "ver": "<label>" }. The ECDSA
+    // signature is still verified against the embedded pubkey, so an arbitrary
+    // URL is safe; the semver "is newer" gate is skipped for an explicit pick.
+    constexpr const char* REQ_OTA_INSTALL_BUILD = "req:ota:install-build";
 
     // Ramp Mode (app → device)
     constexpr const char* REQ_RAMP_SET        = "req:ramp:set";     // {rate: float} °C/min, 0 = disabled
@@ -117,6 +122,12 @@ namespace Protocol {
     // advertisement name and mDNS hostname; persists to NVS and reboots
     // so the new name takes effect on the next adv frame.
     constexpr const char* REQ_DEVICE_RENAME   = "req:device:rename";
+
+    // Dev push-OTA (ArduinoOTA/espota) config. { "pwd": "<password>" } sets the
+    // per-device upload password in NVS and (re)opens the listener; an empty
+    // pwd closes it. Only has effect on DEV_OTA_ENABLED builds — keeps the
+    // secret out of the published binary (set it once over BLE instead).
+    constexpr const char* REQ_DEVOTA_CONFIG   = "req:devota:config";
 
     // LossTune — auto-tune of heat-loss coefficient
     constexpr const char* REQ_LOSSTUNE_START  = "req:losstune:start";   // {mode:"lidOn"|"lidOff"}

@@ -135,6 +135,24 @@ public:
         DEBUG_PRINTF("[OTA] Update available: %s (%u bytes, signed)\n", tagName, (unsigned)binSize);
     }
 
+    // Install a specific build chosen from the catalog. Unlike checkForUpdate
+    // + installUpdate (which only ever targets releases/latest and refuses a
+    // non-newer tag), this installs whatever signed build the user picks —
+    // older, dev, or a different channel. Safe because installUpdate() still
+    // verifies the ECDSA signature against the embedded pubkey (P8): only a
+    // build signed with the project key installs, regardless of the URL.
+    void installBuild(const String& binUrl, const String& sigUrl, const String& version) {
+        if (binUrl.length() == 0 || sigUrl.length() == 0) {
+            setError("install-build needs url + sig");
+            return;
+        }
+        _downloadUrl  = binUrl;
+        _signatureUrl = sigUrl;
+        _downloadSize = 0;  // unknown up front; installUpdate uses Content-Length
+        setStr(_state.otaLatestVersion, version.c_str());
+        installUpdate();
+    }
+
     void installUpdate() {
         if (!_wifi.isConnected())          { setError("WiFi not connected"); return; }
         if (_downloadUrl.length() == 0)    { setError("No update available"); return; }
