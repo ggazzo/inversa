@@ -260,6 +260,49 @@ class ConnectionManagerClass {
     return BleClient.request('req:ota:install');
   }
 
+  // Install a specific build chosen from the catalog. The device still
+  // ECDSA-verifies it against the embedded pubkey before committing, so any
+  // signed build (dev/rolling, older tag, any URL) is safe to offer.
+  async installBuild(url: string, sig: string, ver: string) {
+    return BleClient.request('req:ota:install-build', { url, sig, ver });
+  }
+
+  // Set the per-device dev push-OTA (ArduinoOTA) password. Stored in NVS on
+  // the device and used to (re)open the upload listener; empty closes it.
+  // Only effective on DEV_OTA_ENABLED builds.
+  async setDevOtaPassword(pwd: string) {
+    return BleClient.request('req:devota:config', { pwd });
+  }
+
+  // Build catalog. The GitHub Releases API is the source of truth: tagged
+  // releases plus the rolling `dev` prerelease both carry `<board>.bin` and
+  // `<board>.bin.sig` assets. Filter to the connected board and return a list
+  // the UI lists; each entry's url/sig feed installBuild().
+  async fetchBuildCatalog(board: string) {
+    const REPO = 'ggazzo/brewpilot';
+    const res = await fetch(
+      `https://api.github.com/repos/${REPO}/releases?per_page=30`,
+      { headers: { Accept: 'application/vnd.github+json' } },
+    );
+    if (!res.ok) throw new Error(`GitHub releases HTTP ${res.status}`);
+    const releases = await res.json();
+    const builds = [];
+    for (const r of releases) {
+      const assets = r.assets || [];
+      const bin = assets.find((a: any) => a.name === `${board}.bin`);
+      const sig = assets.find((a: any) => a.name === `${board}.bin.sig`);
+      if (!bin || !sig) continue;  // skip unsigned or other-board releases
+      builds.push({
+        version: r.tag_name,
+        channel: r.prerelease ? 'dev' : 'release',
+        published: r.published_at,
+        url: bin.browser_download_url,
+        sig: sig.browser_download_url,
+      });
+    }
+    return builds;
+  }
+
   // Thermal Watchdog (001-thermal-watchdog). Rejects with the firmware's
   // error string (wd_still_unsafe / wd_not_tripped / wd_range:<field>) so
   // the UI can render a precise message.
