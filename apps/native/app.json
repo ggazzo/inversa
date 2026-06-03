@@ -50,7 +50,10 @@
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
       "fallbackToCacheTimeout": 5000,
-      "url": "https://u.expo.dev/0754be71-5229-4862-8d43-538f33ffe4fd"
+      "url": "https://u.expo.dev/0754be71-5229-4862-8d43-538f33ffe4fd",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     },
     "runtimeVersion": {
       "policy": "fingerprint"
