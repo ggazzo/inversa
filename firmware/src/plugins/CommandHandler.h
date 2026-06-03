@@ -8,6 +8,7 @@
 #include "../core/RecoveryManager.h"
 #include "../models/MachineState.h"
 #include "../protocol/protocol.h"
+#include "../protocol/fnv1a.h"
 #include "BLEPlugin.h"
 #include "SDCardPlugin.h"
 #include "RecipePlugin.h"
@@ -76,100 +77,30 @@ public:
         DEBUG_PRINTLN("[CommandHandler] Initialized");
     }
 
-    // FNV-1a (32-bit). constexpr so command-string hashes fold into switch
-    // case labels at compile time.
-    static constexpr uint32_t fnv1a(const char* s) {
-        uint32_t h = 0x811c9dc5u;
-        while (*s) { h ^= (uint8_t)*s++; h *= 0x01000193u; }
-        return h;
-    }
-
     void handle(JsonDocument& doc) {
         const char* type = doc[Protocol::FIELD_TYPE] | "";
         String rid = doc[Protocol::FIELD_REQUEST_ID] | "";
 
         // Hash-then-verify dispatch. fnv1a(type) selects a candidate command
         // via a compiler-built switch (sparse 32-bit cases → balanced compare
-        // tree, far cheaper than a 67-deep strcmp chain). FNV-1a over the 67
-        // command strings is collision-free (verified at design time), but we
-        // still strcmp-verify the matched case so a crafted hash collision on
-        // a malformed `type` can never misfire a real command (e.g. factory
-        // reset / watchdog) — safety over the ~1 strcmp it costs on a hit.
-        #define CH_CASE(REQ, FN) \
-            case fnv1a(Protocol::REQ): \
+        // tree, far cheaper than a 67-deep strcmp chain). FNV-1a over the
+        // command strings is collision-free (enforced by test_command_table),
+        // but we still strcmp-verify the matched case so a crafted hash
+        // collision on a malformed `type` can never misfire a real command
+        // (e.g. factory reset / watchdog) — safety over the ~1 strcmp on a hit.
+        //
+        // The cases are generated from command_table.def — the single source
+        // of truth shared with the collision test. A CMD line whose handler
+        // doesn't exist fails to compile, so the switch can't drift.
+        #define CMD(REQ, FN) \
+            case hashing::fnv1a(Protocol::REQ): \
                 if (strcmp(type, Protocol::REQ) == 0) { FN(rid, doc); return; } \
                 break;
-        switch (fnv1a(type)) {
-            CH_CASE(REQ_SET_TEMP,            cmdSetTemp)
-            CH_CASE(REQ_HEATER_ON,           cmdHeaterOn)
-            CH_CASE(REQ_HEATER_OFF,          cmdHeaterOff)
-            CH_CASE(REQ_PUMP_ON,             cmdPumpOn)
-            CH_CASE(REQ_PUMP_OFF,            cmdPumpOff)
-            CH_CASE(REQ_SET_PID,             cmdSetPid)
-            CH_CASE(REQ_RECIPE_LIST,         cmdRecipeList)
-            CH_CASE(REQ_RECIPE_LOAD,         cmdRecipeLoad)
-            CH_CASE(REQ_RECIPE_SAVE,         cmdRecipeSave)
-            CH_CASE(REQ_RECIPE_DELETE,       cmdRecipeDelete)
-            CH_CASE(REQ_RECIPE_START,        cmdRecipeStart)
-            CH_CASE(REQ_RECIPE_STOP,         cmdRecipeStop)
-            CH_CASE(REQ_RECIPE_PAUSE,        cmdRecipePause)
-            CH_CASE(REQ_RECIPE_RESUME,       cmdRecipeResume)
-            CH_CASE(REQ_RECIPE_CONFIRM,      cmdRecipeConfirm)
-            CH_CASE(REQ_SETTINGS_GET,        cmdSettingsGet)
-            CH_CASE(REQ_SETTINGS_SET,        cmdSettingsSet)
-            CH_CASE(REQ_INFO,                cmdInfo)
-            CH_CASE(REQ_STATUS,              cmdStatus)
-            CH_CASE(REQ_RECOVERY_RESUME,     cmdRecoveryResume)
-            CH_CASE(REQ_RECOVERY_DISCARD,    cmdRecoveryDiscard)
-            CH_CASE(REQ_WIFI_CONFIG,         cmdWifiConfig)
-            CH_CASE(REQ_WIFI_CONNECT,        cmdWifiConnect)
-            CH_CASE(REQ_WIFI_DISCONNECT,     cmdWifiDisconnect)
-            CH_CASE(REQ_WIFI_STATUS,         cmdWifiStatus)
-            CH_CASE(REQ_OTA_CHECK,           cmdOtaCheck)
-            CH_CASE(REQ_OTA_INSTALL,         cmdOtaInstall)
-            CH_CASE(REQ_RAMP_SET,            cmdRampSet)
-            CH_CASE(REQ_RAMP_STOP,           cmdRampStop)
-            CH_CASE(REQ_LOG_START,           cmdLogStart)
-            CH_CASE(REQ_LOG_STOP,            cmdLogStop)
-            CH_CASE(REQ_LOG_EXPORT,          cmdLogExport)
-            CH_CASE(REQ_BOIL_START,          cmdBoilStart)
-            CH_CASE(REQ_BOIL_STOP,           cmdBoilStop)
-            CH_CASE(REQ_BOIL_PAUSE,          cmdBoilPause)
-            CH_CASE(REQ_BOIL_RESUME,         cmdBoilResume)
-            CH_CASE(REQ_BOIL_ADD,            cmdBoilAdd)
-            CH_CASE(REQ_MASHOUT_SET,         cmdMashoutSet)
-            CH_CASE(REQ_RTC_GET,             cmdRtcGet)
-            CH_CASE(REQ_RTC_SET,             cmdRtcSet)
-            CH_CASE(REQ_RTC_SYNC,            cmdRtcSync)
-            CH_CASE(REQ_RTC_TZ_GET,          cmdRtcTzGet)
-            CH_CASE(REQ_RTC_TZ_SET,          cmdRtcTzSet)
-            CH_CASE(REQ_TIMER_START,         cmdTimerStart)
-            CH_CASE(REQ_TIMER_STOP,          cmdTimerStop)
-            CH_CASE(REQ_TIMER_PAUSE,         cmdTimerPause)
-            CH_CASE(REQ_TIMER_RESUME,        cmdTimerResume)
-            CH_CASE(REQ_TIMER_ADD,           cmdTimerAdd)
-            CH_CASE(REQ_AUTOTUNE_START,      cmdAutotuneStart)
-            CH_CASE(REQ_AUTOTUNE_STOP,       cmdAutotuneStop)
-            CH_CASE(REQ_TIMER_ALARM,         cmdTimerAlarm)
-            CH_CASE(REQ_SCHEDULER_SET,       cmdSchedulerSet)
-            CH_CASE(REQ_SCHEDULER_STOP,      cmdSchedulerStop)
-            CH_CASE(REQ_SETTINGS_THERMAL_GET, cmdSettingsThermalGet)
-            CH_CASE(REQ_SETTINGS_THERMAL_SET, cmdSettingsThermalSet)
-            CH_CASE(REQ_LID_STATE_SET,       cmdLidStateSet)
-            CH_CASE(REQ_LOSSTUNE_START,      cmdLosstuneStart)
-            CH_CASE(REQ_LOSSTUNE_CANCEL,     cmdLosstuneCancel)
-            CH_CASE(REQ_LOSSTUNE_ACCEPT,     cmdLosstuneAccept)
-            CH_CASE(REQ_LOSSTUNE_REJECT,     cmdLosstuneReject)
-            CH_CASE(REQ_SETTINGS_CAL_GET,    cmdSettingsCalGet)
-            CH_CASE(REQ_SETTINGS_CAL_SET,    cmdSettingsCalSet)
-            CH_CASE(REQ_WATCHDOG_RESET,      cmdWatchdogReset)
-            CH_CASE(REQ_WATCHDOG_CONFIG,     cmdWatchdogConfig)
-            CH_CASE(REQ_HEATER_CONFIG,       cmdHeaterConfig)
-            CH_CASE(REQ_DEVICE_RENAME,       cmdDeviceRename)
-            CH_CASE(REQ_FACTORY_RESET,       cmdFactoryReset)
+        switch (hashing::fnv1a(type)) {
+            #include "../protocol/command_table.def"
             default: break;
         }
-        #undef CH_CASE
+        #undef CMD
         sendError(rid, "Unknown command");
     }
 
