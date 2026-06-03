@@ -151,8 +151,7 @@ private:
         if (!_sd) { sendError(rid, "No SD card"); return; }
         auto recipes = _sd->listRecipes();
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::RES_RECIPE_LIST;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::RES_RECIPE_LIST, rid);
         JsonArray arr = res["recipes"].to<JsonArray>();
         for (auto& r : recipes) arr.add(r);
         _ble->sendJson(res);
@@ -172,8 +171,7 @@ private:
         if (content.isEmpty()) { sendError(rid, "File not found"); return; }
 
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::RES_RECIPE_LOAD;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::RES_RECIPE_LOAD, rid);
         res["file"] = filename;
         res["content"] = content;
         _ble->sendJson(res);
@@ -249,8 +247,7 @@ private:
     // ── Settings: Get ───────────────────────────────────
     void cmdSettingsGet(const String& rid, JsonDocument& doc) {
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::RES_SETTINGS;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::RES_SETTINGS, rid);
         res["kp"] = gState.pidKp;
         res["ki"] = gState.pidKi;
         res["kd"] = gState.pidKd;
@@ -275,8 +272,7 @@ private:
     // ── Info ────────────────────────────────────────────
     void cmdInfo(const String& rid, JsonDocument& doc) {
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::RES_INFO;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::RES_INFO, rid);
         res["fw"] = BUILD_GIT_VERSION;
         res["build"] = BUILD_TIMESTAMP;
         res["name"] = FIRMWARE_NAME;
@@ -417,8 +413,7 @@ private:
         uint16_t totalChunks = _brewLog->getTotalChunks(chunkSize);
 
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::EVT_LOG_DATA;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::EVT_LOG_DATA, rid);
         res["chunk"] = chunk;
         res["total"] = totalChunks;
         res["entries"] = total;
@@ -496,8 +491,7 @@ private:
     // ── RTC: Get ────────────────────────────────────────
     void cmdRtcGet(const String& rid, JsonDocument& doc) {
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::EVT_RTC_STATUS;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::EVT_RTC_STATUS, rid);
         res["avail"] = gState.rtcAvailable;
         res["ts"] = gState.rtcTimestamp;
         res["ntp"] = gState.rtcNtpSynced;
@@ -535,8 +529,7 @@ private:
     void cmdRtcTzGet(const String& rid, JsonDocument& doc) {
         if (!_rtc) { sendError(rid, "RTC not available"); return; }
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::RES_OK;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::RES_OK, rid);
         res["min"] = _rtc->getTimezoneOffsetMin();
         _ble->sendJson(res);
     }
@@ -670,8 +663,7 @@ private:
     // ── Thermal Settings: Get (P13 + dual-coeff) ────────
     void cmdSettingsThermalGet(const String& rid, JsonDocument& doc) {
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::RES_SETTINGS_THERMAL;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::RES_SETTINGS_THERMAL, rid);
         res["volumeL"]        = gState.volumeLiters;
         res["powerW"]         = gState.heaterPowerWatts;
         res["ambientC"]       = gState.ambientTemp;
@@ -756,8 +748,7 @@ private:
     // ── Temperature Calibration: Get ────────────────────
     void cmdSettingsCalGet(const String& rid, JsonDocument& doc) {
         JsonDocument res;
-        res[Protocol::FIELD_TYPE] = Protocol::RES_SETTINGS_CAL;
-        res[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(res, Protocol::RES_SETTINGS_CAL, rid);
         res["slope"]     = gState.tempCalSlope;
         res["offset"]    = gState.tempCalOffset;
         res["persisted"] = NVSStorage::instance().hasTempCalibration();
@@ -893,11 +884,19 @@ private:
     LossTunePlugin* _lossTune = nullptr;
     IHeaterDriver* _heater = nullptr;
 
+    // Stamp the common response envelope (type + request id) onto `res`.
+    // Used by every handler that builds a multi-field reply, so the two
+    // ArduinoJson operator[] writes are instantiated once instead of per
+    // handler.
+    void beginResponse(JsonDocument& res, const char* type, const String& rid) {
+        res[Protocol::FIELD_TYPE] = type;
+        res[Protocol::FIELD_REQUEST_ID] = rid;
+    }
+
     void sendOk(const String& rid) {
         if (!_ble || rid.isEmpty()) return;
         _replyDoc.clear();
-        _replyDoc[Protocol::FIELD_TYPE] = Protocol::RES_OK;
-        _replyDoc[Protocol::FIELD_REQUEST_ID] = rid;
+        beginResponse(_replyDoc, Protocol::RES_OK, rid);
         _ble->sendJson(_replyDoc);
     }
 
