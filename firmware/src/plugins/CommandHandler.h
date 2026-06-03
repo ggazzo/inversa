@@ -900,6 +900,18 @@ private:
         _ble->sendJson(_replyDoc);
     }
 
+    // Most callers pass a string literal. Binding it to `const char*` keeps
+    // the Arduino String temporary out of every call site — it's built once,
+    // here, in an out-of-line body (noinline) shared by all ~37 literal
+    // error returns, instead of inlined ~37 times.
+    __attribute__((noinline))
+    void sendError(const String& rid, const char* msg) {
+        if (!_ble) return;
+        _ble->sendError(rid, String(msg));
+    }
+
+    // Overload for callers that already hold a String (e.g. a dynamically
+    // built "wd_range:<field>" message).
     void sendError(const String& rid, const String& msg) {
         if (!_ble) return;
         _ble->sendError(rid, msg);
