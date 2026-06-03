@@ -71,6 +71,16 @@ jobs:
             fi
           done
 
+          # Dev push-OTA factory bin from the rolling `dev` prerelease, for the
+          # installer's "Dev (OTA upload)" entry. Best-effort like the above.
+          if gh release download dev --repo ${{ github.repository }} \
+               --pattern "wemos_s3_mini_devota.factory.bin" \
+               --dir docs/firmware --clobber; then
+            echo "✓ staged wemos_s3_mini_devota.factory.bin"
+          else
+            echo "::warning::No dev-OTA factory bin in the dev prerelease yet; dev installer entry will 404 until publish-dev runs."
+          fi
+
       - name: Assemble site
         # docs/ already contains the installer index.html + manifests;
         # the web app was just emitted into docs/app/, and the factory

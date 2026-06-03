@@ -126,6 +126,22 @@
       </section>
 
       <section class="card">
+        <h2>ESP32-S3 Mini <span class="pill">dev / OTA upload</span></h2>
+        <p>
+          Development build with WiFi push-OTA (espota) enabled. Flash this once
+          over USB, then set an upload password from the web app
+          (Connectivity → "OTA de desenvolvimento") to push later builds over
+          WiFi without a cable. The OTA port stays closed until you set that
+          password — the binary ships no secret. Not for production.
+        </p>
+        <esp-web-install-button manifest="manifest-s3-dev.json">
+          <button slot="activate" class="secondary">Install dev firmware</button>
+          <span slot="unsupported">This browser does not support Web Serial.</span>
+          <span slot="not-allowed">Serial port access was denied.</span>
+        </esp-web-install-button>
+      </section>
+
+      <section class="card">
         <h2>Already flashed?</h2>
         <p>Connect to the controller over Bluetooth to configure WiFi, run recipes and stream telemetry in real time.</p>
         <div class="row">

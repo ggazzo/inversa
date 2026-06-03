@@ -176,6 +176,35 @@ jobs:
       - name: Install esptool
         run: pip install esptool
 
+      # The dev push-OTA (espota) build isn't in the build matrix — it's only
+      # needed for the USB installer's "Dev (OTA upload)" entry, so build it
+      # here on develop pushes. Carries no baked password (per-device, set over
+      # BLE), so the published factory bin holds no secret.
+      - name: Set up Python (PlatformIO)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio
+          key: ${{ runner.os }}-pio-devota-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-devota-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build dev-OTA firmware (USB installer)
+        working-directory: firmware
+        run: |
+          pio run -e wemos_s3_mini_devota
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+             .pio/build/wemos_s3_mini_devota/boot_app0.bin
+
       # Sign each app image (.bin → .bin.sig) and build a flashable factory
       # image (.factory.bin) for the USB installer's dev entry. Same key and
       # offsets the release job uses, so the device verifies dev builds with
@@ -207,6 +236,17 @@ jobs:
           sign_board wemos_s3_mini esp32s3 dev/s3
           sign_board wemos_c3_mini esp32c3 dev/c3
           shred -u /tmp/ota_priv.pem
+
+          # Dev push-OTA factory bin for the USB installer (NOT signed — the
+          # espota path is gated by the per-device password, not a signature).
+          dv=firmware/.pio/build/wemos_s3_mini_devota
+          esptool.py --chip esp32s3 merge_bin \
+            -o out/wemos_s3_mini_devota.factory.bin \
+            --flash_mode dio --flash_freq 80m --flash_size 4MB \
+            0x0     "$dv/bootloader.bin" \
+            0x8000  "$dv/partitions.bin" \
+            0xe000  "$dv/boot_app0.bin" \
+            0x10000 "$dv/firmware.bin"
 
       - name: Generate builds.json manifest
         run: |
