@@ -60,6 +60,16 @@ class ConnectionManagerClass {
       isConnected.value = true;
       deviceName.value = BleClient.getDeviceName() || 'BrewPilot';
       showToast('Conectado!', 'success');
+
+      // Hydrate state the device only emits on change, not periodically.
+      // WiFi status fires on connect/disconnect transitions (which already
+      // happened at boot, before this BLE session existed) and firmware info
+      // is request-only — without this they'd stay blank until the next
+      // transition. Telemetry (evt:status) is periodic, so it needs no kick.
+      this.getWiFiStatus().catch(() => {});
+      this.getInfo()
+        .then((i: any) => { if (i?.fw) firmwareVersion.value = i.fw; })
+        .catch(() => {});
     });
 
     // Best-effort auto-reconnect: if the user paired with a device
