@@ -23,6 +23,38 @@ export function WizardConnectivity({ open, onClose }: Props) {
     const [pwd, setPwd]         = useState('');
     const [showPwd, setShowPwd] = useState(false);
     const [name, setName]       = useState(deviceName.value || '');
+    const [builds, setBuilds]           = useState<any[]>([]);
+    const [loadingBuilds, setLoading]   = useState(false);
+    const [devPwd, setDevPwd]           = useState('');
+
+    // List the build catalog (tagged releases + rolling dev) for the connected
+    // board. The board name comes from req:info (FIRMWARE_NAME), so we only
+    // ever offer binaries that match this device.
+    async function loadBuilds() {
+        setLoading(true);
+        try {
+            const info = await ConnectionManager.getInfo();
+            const board = info?.name;
+            if (!board) throw new Error('Board desconhecido');
+            setBuilds(await ConnectionManager.fetchBuildCatalog(board));
+        } catch (e: any) {
+            showToast(e?.message || 'Falha ao listar builds', 'error');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function installBuild(b: any) {
+        if (!(await confirm(`Instalar ${b.version} (${b.channel})? O dispositivo reinicia.`))) return;
+        ConnectionManager.installBuild(b.url, b.sig, b.version)
+            .catch((e: any) => showToast(e?.message || 'Falha', 'error'));
+    }
+
+    function saveDevPwd() {
+        ConnectionManager.setDevOtaPassword(devPwd)
+            .then(() => showToast(devPwd ? 'Senha de OTA dev salva' : 'OTA dev desativado', 'success'))
+            .catch((e: any) => showToast(e?.message || 'Falha', 'error'));
+    }
 
     function saveAndConnect() {
         if (!ssid) { showToast('SSID obrigatório', 'error'); return; }
@@ -186,6 +218,55 @@ export function WizardConnectivity({ open, onClose }: Props) {
                 <Paragraph fontSize="$1" opacity={0.4}>
                     Binários OTA são verificados via ECDSA antes da instalação.
                     Releases sem `.bin.sig` são recusados.
+                </Paragraph>
+            </YStack>
+
+            <Separator marginVertical="$2" />
+
+            {/* Build catalog — install a specific build (release or dev rolling) */}
+            <YStack gap="$2">
+                <Text fontWeight="700">Builds disponíveis</Text>
+                <Button size="$3" variant="outlined"
+                    disabled={!wifiConnected.value || loadingBuilds}
+                    onPress={loadBuilds}>
+                    {loadingBuilds ? 'Carregando…' : 'Listar builds'}
+                </Button>
+                {builds.map((b) => (
+                    <XStack key={b.url} ai="center" jc="space-between" gap="$2">
+                        <YStack flex={1}>
+                            <Text fontFamily="$mono" fontSize="$2">{b.version}</Text>
+                            <Text fontSize="$1" opacity={0.5}>
+                                {b.channel === 'dev' ? 'desenvolvimento' : 'release'}
+                            </Text>
+                        </YStack>
+                        <Button size="$2" theme="orange"
+                            disabled={!wifiConnected.value}
+                            onPress={() => installBuild(b)}>
+                            Instalar
+                        </Button>
+                    </XStack>
+                ))}
+                <Paragraph fontSize="$1" opacity={0.4}>
+                    Inclui releases e o build rolling de desenvolvimento. Todos
+                    verificados via ECDSA antes da instalação.
+                </Paragraph>
+            </YStack>
+
+            <Separator marginVertical="$2" />
+
+            {/* Dev push-OTA password (per-device). Only effective on dev builds;
+                opens the espota upload listener so you can push from the CLI. */}
+            <YStack gap="$2">
+                <Text fontWeight="700">OTA de desenvolvimento (avançado)</Text>
+                <Label fontSize="$2">Senha de upload (espota)</Label>
+                <XStack gap="$2">
+                    <Input flex={1} value={devPwd} onChangeText={setDevPwd}
+                        secureTextEntry placeholder="vazio = listener fechado" />
+                    <Button size="$3" onPress={saveDevPwd}>Salvar</Button>
+                </XStack>
+                <Paragraph fontSize="$1" opacity={0.4}>
+                    Define a senha do listener ArduinoOTA gravada no dispositivo.
+                    Sem efeito em firmware de produção. Vazio fecha a porta.
                 </Paragraph>
             </YStack>
         </WizardSheet>

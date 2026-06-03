@@ -391,6 +391,18 @@ private:
         // Note: if successful, device will restart and won't send response
         sendOk(rid);
     }
+    // ── OTA: Install a specific build from the catalog ──────────
+    void cmdOtaInstallBuild(const String& rid, JsonDocument& doc) {
+        if (!_ota) { sendError(rid, "OTA not available"); return; }
+        String url = doc["url"] | "";
+        String sig = doc["sig"] | "";
+        String ver = doc["ver"] | "";
+        if (url.isEmpty() || sig.isEmpty()) { sendError(rid, "url and sig required"); return; }
+        _ota->installBuild(url, sig, ver);
+        // Signature verified against the embedded pubkey before commit.
+        // On success the device restarts and won't send a response.
+        sendOk(rid);
+    }
     // ── Ramp: Set Rate ──────────────────────────────────
     void cmdRampSet(const String& rid, JsonDocument& doc) {
         if (!_ramp) { sendError(rid, "Ramp not available"); return; }
@@ -870,6 +882,17 @@ private:
         // radio shuts down for the restart.
         delay(200);
         ESP.restart();
+    }
+    // ── Dev push-OTA config (per-device ArduinoOTA password) ────
+    // { "pwd": "<password>" } persists the upload password to NVS and signals
+    // ArduinoOTAPlugin to (re)open its listener; an empty pwd closes it. Only
+    // DEV_OTA_ENABLED builds carry that plugin — on production this just
+    // stores an unused key, keeping the secret out of the published binary.
+    void cmdDevotaConfig(const String& rid, JsonDocument& doc) {
+        String pwd = doc["pwd"] | "";
+        NVSStorage::instance().saveDevOtaPassword(pwd);
+        EventBus::instance().publish(EventType::DevOtaConfigChanged);
+        sendOk(rid);
     }
     // ── Factory Reset (P7, guarded) ─────────────────────
     // Requires {confirm: "ERASE_ALL"} to wipe the NVS namespace.

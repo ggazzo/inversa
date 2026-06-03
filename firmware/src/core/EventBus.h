@@ -63,6 +63,9 @@ enum class EventType : uint8_t {
     WiFiConnected,
     WiFiDisconnected,
 
+    // Dev push-OTA (ArduinoOTA) — per-device password set/cleared via BLE
+    DevOtaConfigChanged,    // —
+
     // RTC
     RTCTimeUpdated,         // float: unix timestamp
 

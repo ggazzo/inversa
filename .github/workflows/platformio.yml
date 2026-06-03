@@ -142,6 +142,157 @@ jobs:
             firmware/.pio/build/${{ matrix.env }}/partitions.bin
             firmware/.pio/build/${{ matrix.env }}/boot_app0.bin
 
+  # ── Rolling dev catalog ──────────────────────────────────────
+  # On every develop push, sign the freshly built binaries and publish them
+  # to a single rolling "dev" prerelease alongside a builds.json manifest.
+  # The web app and the device install-build path consume these — a build
+  # the device installs is still ECDSA-verified, so exposing dev builds is
+  # safe. The official tagged releases are published by the `release` job;
+  # the app lists both (tagged via the Releases API + this prerelease).
+  publish-dev:
+    name: Publish dev catalog
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # need tags for `git describe`
+
+      - name: Download S3 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-wemos_s3_mini
+          path: dev/s3
+
+      - name: Download C3 artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: firmware-wemos_c3_mini
+          path: dev/c3
+
+      - name: Install esptool
+        run: pip install esptool
+
+      # The dev push-OTA (espota) build isn't in the build matrix — it's only
+      # needed for the USB installer's "Dev (OTA upload)" entry, so build it
+      # here on develop pushes. Carries no baked password (per-device, set over
+      # BLE), so the published factory bin holds no secret.
+      - name: Set up Python (PlatformIO)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            firmware/.pio
+          key: ${{ runner.os }}-pio-devota-${{ hashFiles('firmware/platformio.ini') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-devota-
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Build dev-OTA firmware (USB installer)
+        working-directory: firmware
+        run: |
+          pio run -e wemos_s3_mini_devota
+          cp ~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_app0.bin \
+             .pio/build/wemos_s3_mini_devota/boot_app0.bin
+
+      # Sign each app image (.bin → .bin.sig) and build a flashable factory
+      # image (.factory.bin) for the USB installer's dev entry. Same key and
+      # offsets the release job uses, so the device verifies dev builds with
+      # the exact path it verifies tagged releases.
+      - name: Sign + assemble dev binaries
+        env:
+          OTA_SIGNING_KEY: ${{ secrets.OTA_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "$OTA_SIGNING_KEY" ]; then
+            echo "::error::OTA_SIGNING_KEY secret is not set — cannot sign dev builds"
+            exit 1
+          fi
+          printf '%s' "$OTA_SIGNING_KEY" > /tmp/ota_priv.pem
+          mkdir -p out
+
+          sign_board() {
+            board="$1"; chip="$2"; src="$3"
+            cp "$src/firmware.bin" "out/${board}.bin"
+            openssl dgst -sha256 -sign /tmp/ota_priv.pem -out "out/${board}.bin.sig" "out/${board}.bin"
+            esptool.py --chip "$chip" merge_bin \
+              -o "out/${board}.factory.bin" \
+              --flash_mode dio --flash_freq 80m --flash_size 4MB \
+              0x0     "$src/bootloader.bin" \
+              0x8000  "$src/partitions.bin" \
+              0xe000  "$src/boot_app0.bin" \
+              0x10000 "$src/firmware.bin"
+          }
+          sign_board wemos_s3_mini esp32s3 dev/s3
+          sign_board wemos_c3_mini esp32c3 dev/c3
+          shred -u /tmp/ota_priv.pem
+
+          # Dev push-OTA factory bin for the USB installer (NOT signed — the
+          # espota path is gated by the per-device password, not a signature).
+          dv=firmware/.pio/build/wemos_s3_mini_devota
+          esptool.py --chip esp32s3 merge_bin \
+            -o out/wemos_s3_mini_devota.factory.bin \
+            --flash_mode dio --flash_freq 80m --flash_size 4MB \
+            0x0     "$dv/bootloader.bin" \
+            0x8000  "$dv/partitions.bin" \
+            0xe000  "$dv/boot_app0.bin" \
+            0x10000 "$dv/firmware.bin"
+
+      - name: Generate builds.json manifest
+        run: |
+          set -euo pipefail
+          ver="$(git describe --tags --always 2>/dev/null || echo dev)"
+          base="https://github.com/${{ github.repository }}/releases/download/dev"
+          ts="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > out/builds.json <<JSON
+          {
+            "channel": "dev",
+            "version": "${ver}",
+            "commit": "${{ github.sha }}",
+            "updated": "${ts}",
+            "builds": [
+              { "board": "wemos_s3_mini", "chipFamily": "ESP32-S3",
+                "bin": "${base}/wemos_s3_mini.bin",
+                "sig": "${base}/wemos_s3_mini.bin.sig",
+                "factory": "${base}/wemos_s3_mini.factory.bin" },
+              { "board": "wemos_c3_mini", "chipFamily": "ESP32-C3",
+                "bin": "${base}/wemos_c3_mini.bin",
+                "sig": "${base}/wemos_c3_mini.bin.sig",
+                "factory": "${base}/wemos_c3_mini.factory.bin" }
+            ]
+          }
+          JSON
+          cat out/builds.json
+
+      # Upsert a single rolling prerelease tagged `dev`; --clobber overwrites
+      # the assets in place so the browser_download_url stays stable.
+      - name: Publish to rolling dev prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ver="$(git describe --tags --always 2>/dev/null || echo dev)"
+          notes="Rolling development build — auto-published from develop.
+          Version: ${ver}
+          Commit: ${{ github.sha }}
+          Signed with the project OTA key; the device verifies the signature before installing."
+          if ! gh release view dev >/dev/null 2>&1; then
+            gh release create dev --prerelease --title "Dev (rolling)" --notes "$notes" --target develop
+          else
+            gh release edit dev --notes "$notes" --prerelease
+          fi
+          gh release upload dev out/* --clobber
+
   release:
     name: Create Release
     runs-on: ubuntu-latest
