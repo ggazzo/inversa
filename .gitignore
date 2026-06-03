@@ -9,8 +9,7 @@ compile_commands.json
 .DS_Store
 .qodo
 
-# Workspaces — apps/web/, apps/web-legacy/, apps/native/ (when it lands),
-# plus packages/* for their own build artifacts.
+# Workspaces — apps/web/, apps/native/, plus packages/* build artifacts.
 node_modules/
 apps/*/node_modules/
 apps/*/dist/
@@ -37,10 +36,6 @@ tools/sim-bridge/node_modules/
 
 # OS
 Thumbs.db
-
-# Reversa
-.reversa/config.user.toml
-_reversa_sdd/
 
 # OTA signing keys (P8) — NEVER commit private keys
 firmware/secrets/
