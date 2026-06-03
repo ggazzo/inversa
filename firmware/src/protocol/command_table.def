@@ -1,0 +1,84 @@
+// X-macro command table — single source of truth for BLE command dispatch.
+//
+//   CMD(REQ_CONST, handlerMethod)
+//
+// REQ_CONST is a Protocol::REQ_* identifier; handlerMethod is the
+// CommandHandler member invoked for it. This file is #included in two places:
+//
+//   1. CommandHandler::handle()  — expands each CMD into a hash-then-verify
+//      switch case. Adding a CMD line with no matching method is a compile
+//      error, so the switch can never drift out of sync with this list.
+//   2. test_command_table.cpp    — iterates the same list to assert the 67
+//      command strings are FNV-1a collision-free (the dispatch correctness
+//      precondition).
+//
+// No include guard on purpose: this is an X-macro fragment, included multiple
+// times with different CMD definitions.
+
+CMD(REQ_SET_TEMP,             cmdSetTemp)
+CMD(REQ_HEATER_ON,            cmdHeaterOn)
+CMD(REQ_HEATER_OFF,           cmdHeaterOff)
+CMD(REQ_PUMP_ON,              cmdPumpOn)
+CMD(REQ_PUMP_OFF,             cmdPumpOff)
+CMD(REQ_SET_PID,              cmdSetPid)
+CMD(REQ_RECIPE_LIST,          cmdRecipeList)
+CMD(REQ_RECIPE_LOAD,          cmdRecipeLoad)
+CMD(REQ_RECIPE_SAVE,          cmdRecipeSave)
+CMD(REQ_RECIPE_DELETE,        cmdRecipeDelete)
+CMD(REQ_RECIPE_START,         cmdRecipeStart)
+CMD(REQ_RECIPE_STOP,          cmdRecipeStop)
+CMD(REQ_RECIPE_PAUSE,         cmdRecipePause)
+CMD(REQ_RECIPE_RESUME,        cmdRecipeResume)
+CMD(REQ_RECIPE_CONFIRM,       cmdRecipeConfirm)
+CMD(REQ_SETTINGS_GET,         cmdSettingsGet)
+CMD(REQ_SETTINGS_SET,         cmdSettingsSet)
+CMD(REQ_INFO,                 cmdInfo)
+CMD(REQ_STATUS,               cmdStatus)
+CMD(REQ_RECOVERY_RESUME,      cmdRecoveryResume)
+CMD(REQ_RECOVERY_DISCARD,     cmdRecoveryDiscard)
+CMD(REQ_WIFI_CONFIG,          cmdWifiConfig)
+CMD(REQ_WIFI_CONNECT,         cmdWifiConnect)
+CMD(REQ_WIFI_DISCONNECT,      cmdWifiDisconnect)
+CMD(REQ_WIFI_STATUS,          cmdWifiStatus)
+CMD(REQ_OTA_CHECK,            cmdOtaCheck)
+CMD(REQ_OTA_INSTALL,          cmdOtaInstall)
+CMD(REQ_RAMP_SET,             cmdRampSet)
+CMD(REQ_RAMP_STOP,            cmdRampStop)
+CMD(REQ_LOG_START,            cmdLogStart)
+CMD(REQ_LOG_STOP,             cmdLogStop)
+CMD(REQ_LOG_EXPORT,           cmdLogExport)
+CMD(REQ_BOIL_START,           cmdBoilStart)
+CMD(REQ_BOIL_STOP,            cmdBoilStop)
+CMD(REQ_BOIL_PAUSE,           cmdBoilPause)
+CMD(REQ_BOIL_RESUME,          cmdBoilResume)
+CMD(REQ_BOIL_ADD,             cmdBoilAdd)
+CMD(REQ_MASHOUT_SET,          cmdMashoutSet)
+CMD(REQ_RTC_GET,              cmdRtcGet)
+CMD(REQ_RTC_SET,              cmdRtcSet)
+CMD(REQ_RTC_SYNC,             cmdRtcSync)
+CMD(REQ_RTC_TZ_GET,           cmdRtcTzGet)
+CMD(REQ_RTC_TZ_SET,           cmdRtcTzSet)
+CMD(REQ_TIMER_START,          cmdTimerStart)
+CMD(REQ_TIMER_STOP,           cmdTimerStop)
+CMD(REQ_TIMER_PAUSE,          cmdTimerPause)
+CMD(REQ_TIMER_RESUME,         cmdTimerResume)
+CMD(REQ_TIMER_ADD,            cmdTimerAdd)
+CMD(REQ_AUTOTUNE_START,       cmdAutotuneStart)
+CMD(REQ_AUTOTUNE_STOP,        cmdAutotuneStop)
+CMD(REQ_TIMER_ALARM,          cmdTimerAlarm)
+CMD(REQ_SCHEDULER_SET,        cmdSchedulerSet)
+CMD(REQ_SCHEDULER_STOP,       cmdSchedulerStop)
+CMD(REQ_SETTINGS_THERMAL_GET, cmdSettingsThermalGet)
+CMD(REQ_SETTINGS_THERMAL_SET, cmdSettingsThermalSet)
+CMD(REQ_LID_STATE_SET,        cmdLidStateSet)
+CMD(REQ_LOSSTUNE_START,       cmdLosstuneStart)
+CMD(REQ_LOSSTUNE_CANCEL,      cmdLosstuneCancel)
+CMD(REQ_LOSSTUNE_ACCEPT,      cmdLosstuneAccept)
+CMD(REQ_LOSSTUNE_REJECT,      cmdLosstuneReject)
+CMD(REQ_SETTINGS_CAL_GET,     cmdSettingsCalGet)
+CMD(REQ_SETTINGS_CAL_SET,     cmdSettingsCalSet)
+CMD(REQ_WATCHDOG_RESET,       cmdWatchdogReset)
+CMD(REQ_WATCHDOG_CONFIG,      cmdWatchdogConfig)
+CMD(REQ_HEATER_CONFIG,        cmdHeaterConfig)
+CMD(REQ_DEVICE_RENAME,        cmdDeviceRename)
+CMD(REQ_FACTORY_RESET,        cmdFactoryReset)

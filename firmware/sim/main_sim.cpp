@@ -169,9 +169,13 @@ int main(int argc, char** argv) {
     brewLog->setSDCard(sd);
     RecoveryManager::instance().init(sd);
 
-    // CommandHandler — pass nullptr for OTA since the sim doesn't include it.
-    commandHandler.init(ble, sd, recipe, pid, wifi, /*ota*/ nullptr,
-                        ramp, brewLog, boilTimer, rtc, timer, autoTune, scheduler);
+    // CommandHandler — OTA/watchdog/lossTune/heater are absent in the sim, so
+    // their fields stay null (their commands return "… not available").
+    commandHandler.init({
+        .ble = ble, .sd = sd, .recipe = recipe, .pid = pid,
+        .wifi = wifi, .ramp = ramp, .brewLog = brewLog, .boilTimer = boilTimer,
+        .rtc = rtc, .timer = timer, .autoTune = autoTune, .scheduler = scheduler,
+    });
 
     EventBus::instance().publish(EventType::SystemReady);
 
