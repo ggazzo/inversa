@@ -16,7 +16,8 @@
     "native:start": "npm run start --workspace apps/native",
     "native:ios": "npm run ios --workspace apps/native",
     "native:android": "npm run android --workspace apps/native",
-    "native:typecheck": "npm run typecheck --workspace apps/native"
+    "native:typecheck": "npm run typecheck --workspace apps/native",
+    "test": "node --test --experimental-strip-types \"packages/**/*.test.ts\""
   },
   "engines": {
     "node": ">=20"
