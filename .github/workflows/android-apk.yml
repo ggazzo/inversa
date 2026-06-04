@@ -26,6 +26,12 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      channel:
+        description: "EAS Update channel to bake into the APK (dev builds use this)"
+        type: choice
+        default: dev
+        options: [dev, rc, production]
 
 permissions:
   contents: write
@@ -70,6 +76,7 @@ jobs:
           INPUTS=$(
             ls -1 \
               apps/native/app.json \
+              apps/native/app.config.js \
               apps/native/eas.json \
               package.json \
               package-lock.json \
@@ -93,12 +100,30 @@ jobs:
           echo "Fingerprint: $HASH"
           echo "Inputs counted: $(echo "$INPUTS" | sort -u | wc -l)"
 
+      # The APK bakes the EAS Update channel it listens to (app.config.js reads
+      # EXPO_CHANNEL). Tag pushes derive it from the tag (pre-release → rc,
+      # stable → production); a manual run uses the workflow input (default dev).
+      # Resolved before the cache so the channel is part of the cache key —
+      # otherwise a dev build could be served a cached production APK.
+      - name: Resolve EAS channel
+        id: channel
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            c="${{ github.event.inputs.channel }}"
+          elif [[ "${GITHUB_REF}" == refs/tags/* && "${GITHUB_REF}" == *-* ]]; then
+            c=rc
+          else
+            c=production
+          fi
+          echo "name=$c" >> "$GITHUB_OUTPUT"
+          echo "APK channel: $c"
+
       - name: Restore cached APK
         id: apk-cache
         uses: actions/cache@v4
         with:
           path: ${{ steps.fp.outputs.cache-dir }}
-          key: apk-v1-${{ steps.fp.outputs.hash }}
+          key: apk-v1-${{ steps.channel.outputs.name }}-${{ steps.fp.outputs.hash }}
 
       # Everything below is gated on a cache miss so we only pay the
       # ~10 min toolchain bootstrap when the fingerprint actually
@@ -126,10 +151,13 @@ jobs:
         run: npm ci
 
       - name: Expo prebuild
-        # Generates the `android/` Gradle project from app.json. Run with
-        # `--clean` so a fresh tag always rebuilds the native shell from
-        # the current Expo config (versionCode/manifest changes etc.).
+        # Generates the `android/` Gradle project from app.json + app.config.js.
+        # Run with `--clean` so a fresh build always regenerates the native
+        # shell (versionCode/manifest/channel changes etc.). EXPO_CHANNEL is
+        # baked into AndroidManifest via app.config.js.
         if: steps.apk-cache.outputs.cache-hit != 'true'
+        env:
+          EXPO_CHANNEL: ${{ steps.channel.outputs.name }}
         run: |
           cd apps/native
           npx expo prebuild --platform android --clean
