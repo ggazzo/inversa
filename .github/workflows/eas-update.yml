@@ -15,8 +15,10 @@ name: Publish EAS Update
 
 on:
   push:
+    branches:
+      - develop        # → `dev` channel (latest develop JS)
     tags:
-      - "v*"
+      - "v*"           # rc tag → `rc`, stable tag → `production`
   workflow_dispatch:
 
 concurrency:
@@ -58,18 +60,38 @@ jobs:
         if: steps.guard.outputs.skip == '0'
         run: npm install -g eas-cli
 
+      # Map the git context to the EAS Update branch (= channel of the same
+      # name that builds listen to):
+      #   develop push        → dev
+      #   tag *-rc.* / -beta   → rc
+      #   tag vX.Y.Z (stable)  → production
+      - name: Resolve update branch
+        if: steps.guard.outputs.skip == '0'
+        id: branch
+        run: |
+          ref="${GITHUB_REF}"
+          if [[ "$ref" == "refs/heads/develop" ]]; then
+            b=dev
+          elif [[ "$ref" == refs/tags/* && "$ref" == *-* ]]; then
+            b=rc            # any pre-release tag (vX.Y.Z-rc.N, -beta, …)
+          else
+            b=production    # clean stable tag
+          fi
+          echo "name=$b" >> "$GITHUB_OUTPUT"
+          echo "Publishing to EAS branch: $b"
+
       - name: Publish update
         if: steps.guard.outputs.skip == '0'
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
-        # `--branch production` is the EAS Update branch that maps to
-        # the `production` channel in eas.json. `--auto` derives the
-        # update message and the branch name from git context.
-        # `--non-interactive` makes the CLI bail instead of prompting.
+        # The branch resolved above maps 1:1 to the channel of the same name
+        # that the matching build listens to. `--auto` derives the update
+        # message/branch from git; `--non-interactive` bails instead of
+        # prompting.
         run: |
           cd apps/native
           eas update \
-            --branch production \
+            --branch "${{ steps.branch.outputs.name }}" \
             --auto \
             --non-interactive \
-            --message "Tag ${GITHUB_REF_NAME}"
+            --message "${GITHUB_REF_NAME}"
