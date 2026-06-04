@@ -7,6 +7,7 @@ import { ConnectionManager } from '@brewpilot/services';
 import { WizardSheet } from './WizardSheet';
 import { confirm } from '../../platform';
 import { getAppBundleInfo, type AppBundleInfo } from '../../appInfo';
+import { KNOWN_CHANNELS, isChannelOverrideSupported, currentChannel, applyChannel } from '../../updateChannel';
 
 interface Props { open: boolean; onClose: () => void }
 
@@ -14,6 +15,17 @@ export function WizardAbout({ open, onClose }: Props) {
     useSignals();
     const [info, setInfo] = useState<any | null>(null);
     const [confirmText, setConfirmText] = useState('');
+    const [advanced, setAdvanced] = useState(false);
+    const [customCh, setCustomCh] = useState('');
+    const channelSupported = isChannelOverrideSupported();
+
+    async function switchChannel(ch: string) {
+        const name = ch.trim();
+        if (!name) return;
+        if (!(await confirm(`Trocar para o canal "${name}"? O app reinicia para aplicar.`))) return;
+        // applyChannel reloads the app on success; we only return here on failure.
+        applyChannel(name).catch((e: any) => showToast(e?.message || 'Falha ao trocar canal', 'error'));
+    }
 
     useEffect(() => {
         if (!open) return;
@@ -58,6 +70,51 @@ export function WizardAbout({ open, onClose }: Props) {
                     <Separator marginVertical="$2" />
                 </>
             )}
+            {channelSupported && (
+                <>
+                    <YStack gap="$2">
+                        <XStack ai="center" jc="space-between">
+                            <Text fontWeight="700">Canal de atualização</Text>
+                            <Button size="$2" chromeless onPress={() => setAdvanced((a) => !a)}>
+                                {advanced ? 'ocultar' : 'avançado'}
+                            </Button>
+                        </XStack>
+                        <Text fontSize="$1" opacity={0.6}>
+                            Canal atual: <Text fontFamily="$mono">{currentChannel() || '—'}</Text>
+                        </Text>
+                        {advanced && (
+                            <YStack gap="$2">
+                                <XStack gap="$2" flexWrap="wrap">
+                                    {KNOWN_CHANNELS.map((ch) => (
+                                        <Button key={ch} size="$2"
+                                            theme={ch === currentChannel() ? 'orange' : undefined}
+                                            onPress={() => switchChannel(ch)}>
+                                            {ch}
+                                        </Button>
+                                    ))}
+                                </XStack>
+                                <XStack gap="$2">
+                                    <Input flex={1} size="$3" autoCapitalize="none"
+                                        placeholder="canal customizado (ex: pr-123)"
+                                        value={customCh} onChangeText={setCustomCh} />
+                                    <Button size="$3" disabled={!customCh.trim()}
+                                        onPress={() => switchChannel(customCh)}>
+                                        Aplicar
+                                    </Button>
+                                </XStack>
+                                <Paragraph fontSize="$1" opacity={0.4}>
+                                    Troca o canal em runtime e baixa o último bundle dele. Só
+                                    aplica se o fingerprint nativo bater com este APK. Anti-brick
+                                    desativado neste build — use com cuidado.
+                                </Paragraph>
+                            </YStack>
+                        )}
+                    </YStack>
+
+                    <Separator marginVertical="$2" />
+                </>
+            )}
+
             <YStack>
                 <Text fontWeight="700">Dispositivo</Text>
                 {info ? (
