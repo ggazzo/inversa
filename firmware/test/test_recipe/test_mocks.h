@@ -21,6 +21,7 @@ public:
     const char* c_str() const { return _str.c_str(); }
     size_t length() const { return _str.length(); }
     bool isEmpty() const { return _str.empty(); }
+    void concat(const char* s, size_t n) { _str.append(s, n); }  // used by RecipeParser::extractQuoted
     
     String& operator=(const char* s) { _str = s ? s : ""; return *this; }
     String& operator=(const String& s) { _str = s._str; return *this; }

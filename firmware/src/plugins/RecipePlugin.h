@@ -8,51 +8,7 @@
 #include "../core/constants.h"
 #include "../core/RecoveryManager.h"
 #include "../models/MachineState.h"
-
-// ─── Recipe Command Types ───────────────────────────────────
-enum class RecipeCommandType : uint8_t {
-    // Temperature
-    SetTemp,        // SET_TEMP <value>
-    WaitTemp,       // WAIT_TEMP [tolerance]
-    MashOut,        // MASH_OUT [temp]  - go to mash-out temp and wait
-    
-    // Timers
-    WaitTimer,      // WAIT_TIMER <minutes> - internal recipe timer
-    Timer,          // TIMER <minutes> - use TimerPlugin (with notifications)
-    Alarm,          // ALARM <HH:MM> - absolute timer (requires RTC)
-    
-    // Boil
-    Boil,           // BOIL <minutes> - start boil timer
-    AddHop,         // ADD_HOP <minutes> "name" - add hop addition to boil
-    
-    // Ramp mode
-    Ramp,           // RAMP <rate> - enable gradual heating (°C/min)
-    RampOff,        // RAMP_OFF - disable ramp mode
-    
-    // Actuators
-    PumpOn,         // PUMP_ON
-    PumpOff,        // PUMP_OFF
-    HeaterOn,       // HEATER_ON
-    HeaterOff,      // HEATER_OFF
-    
-    // Flow control
-    WaitConfirm,    // WAIT_CONFIRM ["message"]
-    WaitBoil,       // WAIT_BOIL - wait for boil timer to complete
-    
-    // UI/Visualization
-    Step,           // STEP <name> - set brewing step for UI display
-    
-    // Other
-    Comment,        // # comment line (ignored)
-    Unknown
-};
-
-struct RecipeCommand {
-    RecipeCommandType type = RecipeCommandType::Unknown;
-    float value = 0;
-    float value2 = 0;      // Second value (e.g., minute for ADD_HOP)
-    String message = "";
-};
+#include "../core/RecipeParser.h"   // RecipeCommandType, RecipeCommand, parseLine
 
 // ─── Recipe Plugin ──────────────────────────────────────────
 // Extended recipe engine with full automation support.
@@ -170,7 +126,7 @@ public:
                 if (n >= sizeof(line)) n = sizeof(line) - 1;
                 memcpy(line, base + a, n);
                 line[n] = 0;
-                RecipeCommand cmd = parseLine(line);
+                RecipeCommand cmd = RecipeParser::parseLine(line, _waitTempTolerance);
                 if (cmd.type != RecipeCommandType::Comment &&
                     cmd.type != RecipeCommandType::Unknown) {
                     _commands.push_back(cmd);
@@ -388,187 +344,21 @@ private:
     bool _waitingForTimer = false;
     bool _waitingForRamp = false;
 
-    // ── Command Parsing ─────────────────────────────────────
-    //
-    // parseLine works on a NUL-terminated `const char*` and avoids any
-    // intermediate `String` (no substring, no toUpperCase). The previous
-    // implementation allocated 2–3 heap Strings per line; on a 50-step
-    // recipe that meant ~150 transient allocations in a single load,
-    // peaking heap usage right when SD I/O was also active.
-
-    // Compare keyword `kw` (uppercase ASCII) to the beginning of `s`,
-    // case-insensitively. Returns true if matched. Order of callers must
-    // still put longer prefixes first (RAMP_OFF before RAMP, etc.).
-    static bool startsWithI(const char* s, const char* kw) {
-        while (*kw) {
-            char a = *s++;
-            char b = *kw++;
-            if (a >= 'a' && a <= 'z') a = a - 32;
-            if (a != b) return false;
-        }
-        return true;
-    }
-
-    static bool equalsI(const char* a, const char* b) {
-        while (*a && *b) {
-            char ca = *a++, cb = *b++;
-            if (ca >= 'a' && ca <= 'z') ca -= 32;
-            if (cb >= 'a' && cb <= 'z') cb -= 32;
-            if (ca != cb) return false;
-        }
-        return *a == 0 && *b == 0;
-    }
-
-    // strtof_skip — advance past leading ws, parse a float, return value.
-    static float parseFloatAt(const char* s) {
-        while (*s == ' ' || *s == '\t') s++;
-        return (float)strtod(s, nullptr);
-    }
-
-    // Extract the first quoted "..." segment from `s`. If no quote is
-    // present, returns the (trimmed) rest of the line. Trailing whitespace
-    // is stripped. Caller owns the resulting String.
-    static String extractQuoted(const char* s) {
-        while (*s == ' ' || *s == '\t') s++;
-        const char* q1 = strchr(s, '"');
-        if (q1) {
-            const char* q2 = strchr(q1 + 1, '"');
-            if (!q2) return String(q1 + 1);
-            return String(q1 + 1).substring(0, (int)(q2 - q1 - 1));
-        }
-        // No quotes — return the (right-trimmed) rest.
-        size_t n = strlen(s);
-        while (n > 0 && (s[n-1] == ' ' || s[n-1] == '\t')) n--;
-        String out;
-        out.concat(s, n);
-        return out;
-    }
-
-    RecipeCommand parseLine(const char* line) {
-        RecipeCommand cmd;
-        while (*line == ' ' || *line == '\t') line++;
-
-        if (*line == '#' || *line == 0) {
-            cmd.type = RecipeCommandType::Comment;
-            return cmd;
-        }
-
-        if (startsWithI(line, "SET_TEMP")) {
-            cmd.type = RecipeCommandType::SetTemp;
-            cmd.value = parseFloatAt(line + 8);
-        }
-        else if (startsWithI(line, "WAIT_TEMP")) {
-            cmd.type = RecipeCommandType::WaitTemp;
-            float tol = parseFloatAt(line + 9);
-            cmd.value = (tol > 0) ? tol : _waitTempTolerance;
-        }
-        else if (startsWithI(line, "MASH_OUT")) {
-            cmd.type = RecipeCommandType::MashOut;
-            float temp = parseFloatAt(line + 8);
-            cmd.value = (temp > 0) ? temp : 76.0f;  // Default 76°C
-        }
-        else if (startsWithI(line, "WAIT_TIMER")) {
-            cmd.type = RecipeCommandType::WaitTimer;
-            cmd.value = parseFloatAt(line + 10);
-        }
-        else if (startsWithI(line, "TIMER")) {
-            cmd.type = RecipeCommandType::Timer;
-            cmd.value = parseFloatAt(line + 5);
-        }
-        else if (startsWithI(line, "ALARM")) {
-            cmd.type = RecipeCommandType::Alarm;
-            const char* p = line + 5;
-            while (*p == ' ' || *p == '\t') p++;
-            char* end = nullptr;
-            long hour = strtol(p, &end, 10);
-            if (end && *end == ':') {
-                long minute = strtol(end + 1, nullptr, 10);
-                cmd.value  = (float)hour;
-                cmd.value2 = (float)minute;
-            }
-        }
-        else if (startsWithI(line, "BOIL")) {
-            cmd.type = RecipeCommandType::Boil;
-            cmd.value = parseFloatAt(line + 4);
-        }
-        else if (startsWithI(line, "ADD_HOP")) {
-            cmd.type = RecipeCommandType::AddHop;
-            const char* rest = line + 7;
-            while (*rest == ' ' || *rest == '\t') rest++;
-            char* end = nullptr;
-            cmd.value = strtof(rest, &end);
-            if (end && end != rest) {
-                cmd.message = extractQuoted(end);
-                if (cmd.message.isEmpty()) cmd.message = "Hop";
-            } else {
-                cmd.message = "Hop";
-            }
-        }
-        else if (startsWithI(line, "WAIT_BOIL")) {
-            cmd.type = RecipeCommandType::WaitBoil;
-        }
-        else if (startsWithI(line, "RAMP_OFF")) {
-            cmd.type = RecipeCommandType::RampOff;
-        }
-        else if (startsWithI(line, "RAMP")) {
-            cmd.type = RecipeCommandType::Ramp;
-            cmd.value = parseFloatAt(line + 4);
-        }
-        else if (startsWithI(line, "PUMP_ON")) {
-            cmd.type = RecipeCommandType::PumpOn;
-        }
-        else if (startsWithI(line, "PUMP_OFF")) {
-            cmd.type = RecipeCommandType::PumpOff;
-        }
-        else if (startsWithI(line, "HEATER_ON")) {
-            cmd.type = RecipeCommandType::HeaterOn;
-        }
-        else if (startsWithI(line, "HEATER_OFF")) {
-            cmd.type = RecipeCommandType::HeaterOff;
-        }
-        else if (startsWithI(line, "WAIT_CONFIRM")) {
-            cmd.type = RecipeCommandType::WaitConfirm;
-            cmd.message = extractQuoted(line + 12);
-            if (cmd.message.isEmpty()) {
-                cmd.message = "Confirmar para continuar";
-            }
-        }
-        else if (startsWithI(line, "STEP")) {
-            cmd.type = RecipeCommandType::Step;
-            cmd.message = extractQuoted(line + 4);
-            const char* m = cmd.message.c_str();
-            if (equalsI(m, "PRE_HEATING") || equalsI(m, "PREHEATING") || equalsI(m, "PRE-AQUECIMENTO")) {
-                cmd.value = (float)BrewingStep::PreHeating;
-            } else if (equalsI(m, "MASHING") || equalsI(m, "MOSTURA")) {
-                cmd.value = (float)BrewingStep::Mashing;
-            } else if (equalsI(m, "MASH_OUT") || equalsI(m, "MASHOUT") || equalsI(m, "MASH-OUT")) {
-                cmd.value = (float)BrewingStep::MashOut;
-            } else if (equalsI(m, "SPARGE") || equalsI(m, "LAVAGEM")) {
-                cmd.value = (float)BrewingStep::Sparge;
-            } else if (equalsI(m, "BOILING") || equalsI(m, "BOIL") || equalsI(m, "FERVURA")) {
-                cmd.value = (float)BrewingStep::Boiling;
-            } else if (equalsI(m, "HOPPING") || equalsI(m, "LUPULAGEM")) {
-                cmd.value = (float)BrewingStep::Hopping;
-            } else if (equalsI(m, "COOLING") || equalsI(m, "RESFRIAMENTO")) {
-                cmd.value = (float)BrewingStep::Cooling;
-            } else if (equalsI(m, "DONE") || equalsI(m, "CONCLUIDO")) {
-                cmd.value = (float)BrewingStep::Done;
-            } else {
-                cmd.value = 0;  // Custom step — UI uses message
-            }
-        }
-        else {
-            cmd.type = RecipeCommandType::Unknown;
-            DEBUG_PRINTF("[Recipe] Unknown command: %s\n", line);
-        }
-
-        return cmd;
-    }
-
-    // Back-compat shim — the native test suite still calls parseLine with a
-    // String. Kept inline so it folds into the char* path.
-    RecipeCommand parseLine(const String& line) {
-        return parseLine(line.c_str());
+    // Command parsing lives in core/RecipeParser.h (shared with the
+    // native conformance test so it exercises the real parser). The
+    // STEP label → BrewingStep mapping stays here because it needs the
+    // BrewingStep enum (which the parser header deliberately doesn't pull).
+    static BrewingStep mapBrewingStep(const char* m) {
+        using RecipeParser::equalsI;
+        if (equalsI(m, "PRE_HEATING") || equalsI(m, "PREHEATING") || equalsI(m, "PRE-AQUECIMENTO")) return BrewingStep::PreHeating;
+        if (equalsI(m, "MASHING")  || equalsI(m, "MOSTURA"))      return BrewingStep::Mashing;
+        if (equalsI(m, "MASH_OUT") || equalsI(m, "MASHOUT") || equalsI(m, "MASH-OUT")) return BrewingStep::MashOut;
+        if (equalsI(m, "SPARGE")   || equalsI(m, "LAVAGEM"))      return BrewingStep::Sparge;
+        if (equalsI(m, "BOILING")  || equalsI(m, "BOIL") || equalsI(m, "FERVURA")) return BrewingStep::Boiling;
+        if (equalsI(m, "HOPPING")  || equalsI(m, "LUPULAGEM"))    return BrewingStep::Hopping;
+        if (equalsI(m, "COOLING")  || equalsI(m, "RESFRIAMENTO")) return BrewingStep::Cooling;
+        if (equalsI(m, "DONE")     || equalsI(m, "CONCLUIDO"))    return BrewingStep::Done;
+        return BrewingStep::None;
     }
 
     // ── Step Execution ──────────────────────────────────────
@@ -728,9 +518,13 @@ private:
                 break;
 
             // ── UI Step ─────────────────────────────────────
-            case RecipeCommandType::Step:
-                if (cmd.value > 0) {
-                    gState.brewingStep = (BrewingStep)(int)cmd.value;
+            case RecipeCommandType::Step: {
+                // The parser only records the label; map it to a known
+                // BrewingStep here (where the enum lives). Unrecognized labels
+                // fall through to a custom step driven by the message.
+                BrewingStep bs = mapBrewingStep(cmd.message.c_str());
+                if (bs != BrewingStep::None) {
+                    gState.brewingStep = bs;
                     gState.brewingStepCustom[0] = 0;
                 } else {
                     gState.brewingStep = BrewingStep::None;
@@ -739,6 +533,7 @@ private:
                 DEBUG_PRINTF("[Recipe] STEP: %s\n", cmd.message.c_str());
                 advanceStep();
                 break;
+            }
 
             default:
                 advanceStep();

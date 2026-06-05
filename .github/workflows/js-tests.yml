@@ -1,0 +1,43 @@
+name: JS unit tests
+
+# Runs the node:test suites under packages/ (frame extractor, recipe DSL
+# conformance, …). The recipe conformance test pins the app parser against the
+# shipped sample recipes — its firmware counterpart lives in
+# firmware/test/test_recipe — so a divergence in either parser fails CI.
+
+on:
+  push:
+    branches: [develop]
+    paths:
+      - "packages/**"
+      - "firmware/samples/**"   # conformance fixtures
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/js-tests.yml"
+  pull_request:
+    paths:
+      - "packages/**"
+      - "firmware/samples/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/js-tests.yml"
+
+jobs:
+  test:
+    name: node --test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # 22+ for --experimental-strip-types (run .test.ts without a build).
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install workspace
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test

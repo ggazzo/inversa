@@ -1,109 +1,44 @@
-// test_recipe_parser.cpp — Unit tests for recipe parsing
+// test_recipe_parser.cpp — unit + conformance tests for the recipe DSL.
+//
+// Exercises the REAL parser in core/RecipeParser.h (shared with RecipePlugin —
+// no copy to drift). The conformance tests pin the same sample recipes the app
+// parser pins (packages/utils/src/parseRecipe.test.ts), so the two
+// implementations can't diverge on the parsed step sequence.
 #include <unity.h>
-#include "test_mocks.h"
+#include "test_mocks.h"          // lightweight String stub
 #include <vector>
+#include <fstream>
+#include <sstream>
+#include "../../src/core/RecipeParser.h"
 
-// Recipe command types (copied from RecipePlugin.h)
-enum class RecipeCommandType : uint8_t {
-    SetTemp,
-    WaitTemp,
-    WaitTimer,
-    WaitConfirm,
-    PumpOn,
-    PumpOff,
-    Comment,
-    Unknown
-};
+using RecipeParser::parseLine;
 
-struct RecipeCommand {
-    RecipeCommandType type = RecipeCommandType::Unknown;
-    float value = 0;
-    String message = "";
-};
-
-// Recipe parser functions (extracted from RecipePlugin)
-float extractFloat(const String& line, int offset) {
-    String rest = line.substring(offset);
-    rest.trim();
-    return rest.toFloat();
-}
-
-String extractQuotedString(const String& line, int offset) {
-    String rest = line.substring(offset);
-    rest.trim();
-    int q1 = rest.indexOf('"');
-    if (q1 < 0) return rest;
-    int q2 = rest.indexOf('"', q1 + 1);
-    if (q2 < 0) return rest.substring(q1 + 1);
-    return rest.substring(q1 + 1, q2);
-}
-
-RecipeCommand parseLine(const String& line) {
-    RecipeCommand cmd;
-
-    if (line.startsWith("#")) {
-        cmd.type = RecipeCommandType::Comment;
-        return cmd;
-    }
-
-    String upper = line;
-    upper.toUpperCase();
-
-    if (upper.startsWith("SET_TEMP")) {
-        cmd.type = RecipeCommandType::SetTemp;
-        cmd.value = extractFloat(line, 8);
-    }
-    else if (upper.startsWith("WAIT_TEMP")) {
-        cmd.type = RecipeCommandType::WaitTemp;
-        float tol = extractFloat(line, 9);
-        cmd.value = (tol > 0) ? tol : 0.5f;
-    }
-    else if (upper.startsWith("WAIT_TIMER")) {
-        cmd.type = RecipeCommandType::WaitTimer;
-        cmd.value = extractFloat(line, 10);
-    }
-    else if (upper.startsWith("WAIT_CONFIRM")) {
-        cmd.type = RecipeCommandType::WaitConfirm;
-        cmd.message = extractQuotedString(line, 12);
-        if (cmd.message.isEmpty()) {
-            cmd.message = "Confirm to continue";
-        }
-    }
-    else if (upper.startsWith("PUMP_ON")) {
-        cmd.type = RecipeCommandType::PumpOn;
-    }
-    else if (upper.startsWith("PUMP_OFF")) {
-        cmd.type = RecipeCommandType::PumpOff;
-    }
-    else {
-        cmd.type = RecipeCommandType::Unknown;
-    }
-
-    return cmd;
-}
-
-std::vector<RecipeCommand> parseRecipe(const String& content) {
+// Mirror of RecipePlugin's load loop: keep non-comment/unknown commands.
+static std::vector<RecipeCommand> parseRecipe(const String& content) {
     std::vector<RecipeCommand> commands;
     int start = 0;
-    
     while (start < (int)content.length()) {
         int end = content.indexOf('\n', start);
-        if (end < 0) end = content.length();
-
+        if (end < 0) end = (int)content.length();
         String line = content.substring(start, end);
         line.trim();
         start = end + 1;
-
         if (line.length() == 0) continue;
-
-        RecipeCommand cmd = parseLine(line);
-        if (cmd.type != RecipeCommandType::Comment && 
+        RecipeCommand cmd = parseLine(line.c_str());
+        if (cmd.type != RecipeCommandType::Comment &&
             cmd.type != RecipeCommandType::Unknown) {
             commands.push_back(cmd);
         }
     }
-    
     return commands;
+}
+
+// Read a sample recipe relative to the firmware/ dir (the pio test cwd).
+static String readSample(const char* path) {
+    std::ifstream f(path);
+    std::stringstream ss;
+    ss << f.rdbuf();
+    return String(ss.str().c_str());
 }
 
 // ─── Tests ──────────────────────────────────────────────────
@@ -154,7 +89,7 @@ void test_parse_wait_confirm_without_message() {
     RecipeCommand cmd = parseLine("WAIT_CONFIRM");
     
     TEST_ASSERT_EQUAL(RecipeCommandType::WaitConfirm, cmd.type);
-    TEST_ASSERT_TRUE(cmd.message == "Confirm to continue");
+    TEST_ASSERT_TRUE(cmd.message == "Confirmar para continuar");  // real parser default (the old copy asserted a stale English string)
 }
 
 void test_parse_pump_on() {
@@ -213,11 +148,62 @@ void test_parse_empty_lines_skipped() {
     TEST_ASSERT_EQUAL(2, commands.size());
 }
 
+// ─── Conformance: shipped sample recipes ────────────────────
+// Pins the same {type, value, message} sequence the app parser pins in
+// packages/utils/src/parseRecipe.test.ts. If the firmware parser drifts from
+// that contract, this fails. (STEP→BrewingStep mapping lives in RecipePlugin,
+// out of the cross-parser contract; STEP here only carries the label.)
+
+void test_conformance_ipa() {
+    String c = readSample("samples/IPA.txt");
+    TEST_ASSERT_TRUE_MESSAGE(c.length() > 0, "samples/IPA.txt not found (run from firmware/)");
+    auto cmd = parseRecipe(c);
+    TEST_ASSERT_EQUAL(19, cmd.size());
+
+    const RecipeCommandType expect[19] = {
+        RecipeCommandType::Step, RecipeCommandType::SetTemp, RecipeCommandType::WaitTemp,
+        RecipeCommandType::Step, RecipeCommandType::WaitTimer, RecipeCommandType::MashOut,
+        RecipeCommandType::WaitTemp, RecipeCommandType::Step, RecipeCommandType::WaitConfirm,
+        RecipeCommandType::Step, RecipeCommandType::SetTemp, RecipeCommandType::WaitTemp,
+        RecipeCommandType::AddHop, RecipeCommandType::AddHop, RecipeCommandType::AddHop,
+        RecipeCommandType::Boil, RecipeCommandType::WaitBoil, RecipeCommandType::Step,
+        RecipeCommandType::HeaterOff,
+    };
+    for (int i = 0; i < 19; i++) TEST_ASSERT_EQUAL(expect[i], cmd[i].type);
+
+    // Spot-check values/messages on the value-bearing steps.
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 67.0, cmd[1].value);
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 60.0, cmd[4].value);
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 76.0, cmd[5].value);
+    TEST_ASSERT_TRUE(cmd[8].message == "Iniciar lavagem com 10L");
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 60.0, cmd[12].value);
+    TEST_ASSERT_TRUE(cmd[12].message == "Magnum 30g");
+    TEST_ASSERT_TRUE(cmd[14].message == "Citra 30g");
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 60.0, cmd[15].value);
+    TEST_ASSERT_TRUE(cmd[0].message == "Pre-aquecimento");
+}
+
+void test_conformance_quick() {
+    String c = readSample("samples/quick.txt");
+    TEST_ASSERT_TRUE_MESSAGE(c.length() > 0, "samples/quick.txt not found");
+    auto cmd = parseRecipe(c);
+    TEST_ASSERT_EQUAL(7, cmd.size());
+    const RecipeCommandType expect[7] = {
+        RecipeCommandType::Step, RecipeCommandType::SetTemp, RecipeCommandType::WaitTemp,
+        RecipeCommandType::Step, RecipeCommandType::WaitTimer, RecipeCommandType::Step,
+        RecipeCommandType::HeaterOff,
+    };
+    for (int i = 0; i < 7; i++) TEST_ASSERT_EQUAL(expect[i], cmd[i].type);
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 60.0, cmd[1].value);
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 1.0, cmd[2].value);
+    TEST_ASSERT_FLOAT_WITHIN(0.1, 1.0, cmd[4].value);
+}
+
 // ─── Main ───────────────────────────────────────────────────
 
 int main() {
     UNITY_BEGIN();
-    
+
     RUN_TEST(test_parse_set_temp);
     RUN_TEST(test_parse_set_temp_lowercase);
     RUN_TEST(test_parse_wait_temp);
@@ -231,6 +217,8 @@ int main() {
     RUN_TEST(test_parse_unknown);
     RUN_TEST(test_parse_full_recipe);
     RUN_TEST(test_parse_empty_lines_skipped);
-    
+    RUN_TEST(test_conformance_ipa);
+    RUN_TEST(test_conformance_quick);
+
     return UNITY_END();
 }
