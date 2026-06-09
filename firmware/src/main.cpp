@@ -217,6 +217,12 @@ void loop() {
         esp_err_t err = esp_ota_mark_app_valid_cancel_rollback();
         if (err == ESP_OK) {
             DEBUG_PRINTLN("[OTA] Firmware marcado como VALID — rollback desabilitado");
+            // This freshly-OTA'd image survived 60s → record it as the
+            // auto-update target that confirmed stable and clear the attempt
+            // counter, so autoCheck() won't re-install or poison it.
+            auto& nvs = NVSStorage::instance();
+            nvs.saveOtaDone(nvs.loadOtaTarget(String()));
+            nvs.saveOtaTries(0);
         } else {
             DEBUG_PRINTF("[OTA] Falha ao marcar app valid (err=%d)\n", err);
         }

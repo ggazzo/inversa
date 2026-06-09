@@ -286,6 +286,28 @@ bool ok = _prefs.begin("inversa", false);  // false = read/write mode
         return _prefs.getString("devota_pwd", defaultVal);
     }
 
+    // ── Auto-OTA (boot-time update by channel/tag) ──────────
+    // channel: "production" → releases/latest; "dev"/"rc" → that rolling
+    // prerelease tag; "vX.Y.Z" → pinned tag. Empty = production.
+    void saveOtaChannel(const String& ch) { _prefs.putString("ota_chan", ch); }
+    String loadOtaChannel(const String& def) { return _prefs.getString("ota_chan", def); }
+
+    // auto-update enable. Tri-state: unset → caller derives the default from
+    // the channel (ON for non-production). Explicit set wins.
+    bool    hasOtaAuto()            { return _prefs.isKey("ota_auto"); }
+    void    saveOtaAuto(bool on)    { _prefs.putBool("ota_auto", on); }
+    bool    loadOtaAuto(bool def)   { return _prefs.getBool("ota_auto", def); }
+
+    // Anti-loop bookkeeping. `iid` ("tag@asset_updated_at") is the install
+    // identity of a build: target = the one being attempted (+ attempt count),
+    // done = the last one confirmed stable. See OTAPlugin::autoCheck.
+    String  loadOtaTarget(const String& def) { return _prefs.getString("ota_tgt", def); }
+    void    saveOtaTarget(const String& iid) { _prefs.putString("ota_tgt", iid); }
+    uint8_t loadOtaTries(uint8_t def)        { return _prefs.getUChar("ota_try", def); }
+    void    saveOtaTries(uint8_t n)          { _prefs.putUChar("ota_try", n); }
+    String  loadOtaDone(const String& def)   { return _prefs.getString("ota_done", def); }
+    void    saveOtaDone(const String& iid)   { _prefs.putString("ota_done", iid); }
+
     // ── Heater Driver Config (burst-fire / zero-cross) ──────
     // Persists mains frequency and burst-fire window so the same firmware
     // image can serve 50 Hz and 60 Hz markets without a rebuild.
