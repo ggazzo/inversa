@@ -10,6 +10,7 @@
 #include "../core/EventBus.h"
 #include "../core/OtaVerify.h"
 #include "../core/Semver.h"
+#include "../core/NVSStorage.h"
 #include "../core/constants.h"
 #include "../models/MachineState.h"
 #include "../protocol/protocol.h"
@@ -35,6 +36,12 @@ public:
 
     const char* getName() const override { return "OTA"; }
 
+    // Auto-update: give up on a target after this many failed attempts
+    // (download/verify fail, or boot-then-rollback) so a bad build can't loop.
+    static constexpr uint8_t AUTO_MAX_TRIES = 3;
+    // Settle delay after WiFi connects before the one-shot auto-check.
+    static constexpr uint32_t AUTO_CHECK_DELAY_MS = 3000;
+
     bool setup() override {
         DEBUG_PRINTLN("[OTA] Plugin initialized");
         DEBUG_PRINTF("[OTA] Current version: %s\n", BUILD_GIT_VERSION);
@@ -45,6 +52,15 @@ public:
         if (strcmp(BUILD_GIT_VERSION, "dev") == 0) {
             DEBUG_PRINTLN("[OTA] WARNING: BUILD_GIT_VERSION=\"dev\" — OTA self-disables. Tag a release to enable.");
         }
+
+        // Arm a one-shot auto-check shortly after the first WiFi connect. Run
+        // from loop() (not inline in the event) so it has a full stack and
+        // doesn't block the EventBus during the blocking HTTPS calls.
+        bus().subscribe(EventType::WiFiConnected, [this](const Event&) {
+            if (!_autoChecked && _autoPendingAt == 0) {
+                _autoPendingAt = millis() + AUTO_CHECK_DELAY_MS;
+            }
+        });
         return true;
     }
 
@@ -55,84 +71,102 @@ public:
             DEBUG_PRINTLN("[OTA] Restarting now");
             ESP.restart();
         }
+
+        if (_autoPendingAt && millis() >= _autoPendingAt) {
+            _autoPendingAt = 0;
+            autoCheck();
+        }
     }
 
     // ── Public API ───────────────────────────────────────────
 
+    // Manual check against the production channel (releases/latest), forward-
+    // only via semver. Sets up an install the user then confirms.
     void checkForUpdate() {
-        if (!_wifi.isConnected()) { setError("WiFi not connected"); return; }
-
         setStatus("checking");
-        DEBUG_PRINTLN("[OTA] Checking for updates...");
+        ReleaseInfo r = resolveRelease(String("production"));
+        if (!r.ok) return;  // resolveRelease already setError'd
 
-        WiFiClientSecure client;
-        client.setInsecure();  // MITM mitigated by ECDSA signature check at install time (P8).
-
-        HTTPClient http;
-        String url = String(GITHUB_API_URL) + "/repos/" +
-                     GITHUB_REPO_OWNER + "/" + GITHUB_REPO_NAME + "/releases/latest";
-
-        http.begin(client, url);
-        http.addHeader("User-Agent", "ESP32-BrewPilot");
-        http.setTimeout(OTA_CHECK_TIMEOUT_MS);
-
-        int httpCode = http.GET();
-        if (httpCode != HTTP_CODE_OK) {
-            http.end();
-            setError("GitHub API error: " + String(httpCode));
-            return;
-        }
-
-        String payload = http.getString();
-        http.end();
-
-        JsonDocument doc;
-        DeserializationError err = deserializeJson(doc, payload);
-        if (err) { setError("JSON parse error"); return; }
-
-        const char* tagName = doc["tag_name"] | "";
-        if (strlen(tagName) == 0) { setError("No version tag in release"); return; }
-
-        setStr(_state.otaLatestVersion, tagName);
-        DEBUG_PRINTF("[OTA] Latest version: %s, Current: %s\n", tagName, BUILD_GIT_VERSION);
-
-        if (!Semver::isNewer(tagName, BUILD_GIT_VERSION)) {
+        setStr(_state.otaLatestVersion, r.tag.c_str());
+        if (!Semver::isNewer(r.tag.c_str(), BUILD_GIT_VERSION)) {
             setStatus("up-to-date");
             DEBUG_PRINTLN("[OTA] Already on latest version");
             return;
         }
+        _downloadUrl  = r.binUrl;
+        _downloadSize = r.binSize;
+        _signatureUrl = r.sigUrl;
+        setStatus("available");
+        DEBUG_PRINTF("[OTA] Update available: %s (%u bytes, signed)\n",
+                     r.tag.c_str(), (unsigned)r.binSize);
+    }
 
-        // Find both `<name>.bin` and `<name>.bin.sig` assets — refuse without sig.
-        String binAsset = String(FIRMWARE_NAME) + ".bin";
-        String sigAsset = binAsset + ".sig";
-        String binUrl = "", sigUrl = "";
-        size_t binSize = 0;
+    // ── Boot-time auto-update (by channel/tag, loop-protected) ───────────
+    // Runs once per boot, ~3s after WiFi connects. Anti-loop layers:
+    //   1. Once per boot (not a poll); the bootloader handles crash-loops via
+    //      rollback (P9) independently.
+    //   2. Skip while this very boot is still PENDING_VERIFY — don't stack a
+    //      second update before the current one proves stable.
+    //   3. Skip if the resolved build's install-identity (tag@asset_updated_at)
+    //      equals the last CONFIRMED one — never reinstall what's running.
+    //   4. Poison a target after AUTO_MAX_TRIES failed attempts (the attempt is
+    //      persisted BEFORE reboot, so a brick/rollback counts too).
+    //   5. production also keeps the forward-only semver gate.
+    void autoCheck() {
+        if (_autoChecked) return;
+        _autoChecked = true;
 
-        JsonArray assets = doc["assets"];
-        for (JsonObject asset : assets) {
-            String name = asset["name"] | "";
-            if (name == binAsset) {
-                binUrl  = asset["browser_download_url"] | "";
-                binSize = asset["size"] | 0;
-            } else if (name == sigAsset) {
-                sigUrl  = asset["browser_download_url"] | "";
-            }
-        }
-
-        if (binUrl.length() == 0) { setError("No firmware for " + binAsset); return; }
-        if (sigUrl.length() == 0) {
-            // P8 — refuse unsigned releases. Better to brick OTA than accept
-            // an unverifiable image.
-            setError("Release missing signature " + sigAsset);
+        // (2) current image not yet confirmed → let it settle first.
+        if (_state.otaVerifyDeadline > 0) {
+            DEBUG_PRINTLN("[OTA] auto: image pending verify — deferring");
             return;
         }
 
-        _downloadUrl  = binUrl;
-        _downloadSize = binSize;
-        _signatureUrl = sigUrl;
+        auto& nvs = NVSStorage::instance();
+        String ch = nvs.loadOtaChannel("production");
+        bool isProd = (ch.length() == 0 || ch == "production");
+        // Default ON for non-production channels (dev/rc/pinned tag); OFF for
+        // production unless the user opted in.
+        bool autoOn = nvs.hasOtaAuto() ? nvs.loadOtaAuto(false) : !isProd;
+        if (!autoOn) {
+            DEBUG_PRINTF("[OTA] auto: disabled (channel=%s)\n", ch.c_str());
+            return;
+        }
 
-        setStatus("available");
-        DEBUG_PRINTF("[OTA] Update available: %s (%u bytes, signed)\n", tagName, (unsigned)binSize);
+        DEBUG_PRINTF("[OTA] auto: checking channel '%s'\n", ch.c_str());
+        ReleaseInfo r = resolveRelease(ch);
+        if (!r.ok) return;  // setError'd
+
+        setStr(_state.otaLatestVersion, r.tag.c_str());
+        String iid = r.tag + "@" + r.assetUpdatedAt;
+
+        // (3) already on this exact build.
+        if (iid == nvs.loadOtaDone(String())) { setStatus("up-to-date"); return; }
+
+        // (5) production: never go backwards.
+        if (isProd && !Semver::isNewer(r.tag.c_str(), BUILD_GIT_VERSION)) {
+            setStatus("up-to-date");
+            return;
+        }
+
+        // (4) poison check — count attempts against this specific iid.
+        uint8_t tries = (iid == nvs.loadOtaTarget(String())) ? nvs.loadOtaTries(0) : 0;
+        if (tries >= AUTO_MAX_TRIES) {
+            setError("auto-update halted for " + iid + " after " + String(tries) + " tries");
+            return;
+        }
+
+        // Persist the attempt BEFORE installing so a brick/rollback still
+        // increments the counter and eventually poisons the bad build.
+        nvs.saveOtaTarget(iid);
+        nvs.saveOtaTries(tries + 1);
+
+        DEBUG_PRINTF("[OTA] auto: installing %s (attempt %u/%u)\n",
+                     iid.c_str(), tries + 1, AUTO_MAX_TRIES);
+        _downloadUrl  = r.binUrl;
+        _downloadSize = r.binSize;
+        _signatureUrl = r.sigUrl;
+        installUpdate();  // reboots on success; verify is enforced (P8)
     }
 
     // Install a specific build chosen from the catalog. Unlike checkForUpdate
@@ -266,8 +300,69 @@ private:
     size_t        _downloadSize = 0;
     String        _signatureUrl = "";
     uint32_t      _restartAt    = 0;
+    bool          _autoChecked  = false;  // one-shot boot auto-check guard
+    uint32_t      _autoPendingAt = 0;     // scheduled autoCheck() time (0 = none)
     JsonDocument  _doc;       // Reused by sendStatus() — avoids per-status heap churn.
     String        _jsonBuf;   // Reused serialize buffer (retains capacity across calls).
+
+    // A release resolved from a channel: the firmware asset + the bits the
+    // auto-updater needs to identify and gate it.
+    struct ReleaseInfo {
+        String tag;
+        String binUrl;
+        String sigUrl;
+        String assetUpdatedAt;   // GitHub asset `updated_at` — bumps on re-upload
+        size_t binSize = 0;
+        bool   ok = false;
+    };
+
+    // Fetch + parse a release for `channel`: "" / "production" → releases/latest,
+    // anything else → releases/tags/<channel> (dev, rc, or a pinned vX.Y.Z).
+    // Refuses a release without the matching signed `<FIRMWARE_NAME>.bin[.sig]`.
+    ReleaseInfo resolveRelease(const String& channel) {
+        ReleaseInfo r;
+        if (!_wifi.isConnected()) { setError("WiFi not connected"); return r; }
+
+        WiFiClientSecure client;
+        client.setInsecure();  // MITM mitigated by ECDSA signature check (P8).
+        HTTPClient http;
+        String path = (channel.length() == 0 || channel == "production")
+                          ? String("/releases/latest")
+                          : ("/releases/tags/" + channel);
+        String url = String(GITHUB_API_URL) + "/repos/" +
+                     GITHUB_REPO_OWNER + "/" + GITHUB_REPO_NAME + path;
+        http.begin(client, url);
+        http.addHeader("User-Agent", "ESP32-BrewPilot");
+        http.setTimeout(OTA_CHECK_TIMEOUT_MS);
+
+        int code = http.GET();
+        if (code != HTTP_CODE_OK) { http.end(); setError("GitHub API error: " + String(code)); return r; }
+        String payload = http.getString();
+        http.end();
+
+        JsonDocument doc;
+        if (deserializeJson(doc, payload)) { setError("JSON parse error"); return r; }
+
+        r.tag = (const char*)(doc["tag_name"] | "");
+        if (r.tag.length() == 0) { setError("No version tag in release"); return r; }
+
+        String binAsset = String(FIRMWARE_NAME) + ".bin";
+        String sigAsset = binAsset + ".sig";
+        for (JsonObject asset : doc["assets"].as<JsonArray>()) {
+            String name = asset["name"] | "";
+            if (name == binAsset) {
+                r.binUrl         = (const char*)(asset["browser_download_url"] | "");
+                r.binSize        = asset["size"] | 0;
+                r.assetUpdatedAt = (const char*)(asset["updated_at"] | "");
+            } else if (name == sigAsset) {
+                r.sigUrl = (const char*)(asset["browser_download_url"] | "");
+            }
+        }
+        if (r.binUrl.length() == 0) { setError("No firmware for " + binAsset); return r; }
+        if (r.sigUrl.length() == 0) { setError("Release missing signature " + sigAsset); return r; }
+        r.ok = true;
+        return r;
+    }
 
     // P8 — download `<bin>.sig` into `out` (ECDSA DER, ≤72 bytes).
     bool downloadSignature(uint8_t* out, size_t maxLen, size_t& outLen) {

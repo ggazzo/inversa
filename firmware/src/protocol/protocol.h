@@ -69,6 +69,10 @@ namespace Protocol {
     // signature is still verified against the embedded pubkey, so an arbitrary
     // URL is safe; the semver "is newer" gate is skipped for an explicit pick.
     constexpr const char* REQ_OTA_INSTALL_BUILD = "req:ota:install-build";
+    // Boot-time auto-update config. { "channel": "production"|"dev"|"rc"|"vX.Y.Z",
+    // "auto": bool }. Both optional; channel picks what the device follows,
+    // auto toggles the on-boot update (defaults ON for non-production channels).
+    constexpr const char* REQ_OTA_CONFIG      = "req:ota:config";
 
     // Ramp Mode (app → device)
     constexpr const char* REQ_RAMP_SET        = "req:ramp:set";     // {rate: float} °C/min, 0 = disabled

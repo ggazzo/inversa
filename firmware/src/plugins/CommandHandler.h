@@ -403,6 +403,21 @@ private:
         // On success the device restarts and won't send a response.
         sendOk(rid);
     }
+    // ── OTA: boot-time auto-update config (channel + auto) ──────
+    void cmdOtaConfig(const String& rid, JsonDocument& doc) {
+        auto& nvs = NVSStorage::instance();
+        if (doc["channel"].is<const char*>()) nvs.saveOtaChannel(doc["channel"].as<const char*>());
+        if (doc["auto"].is<bool>())           nvs.saveOtaAuto(doc["auto"].as<bool>());
+
+        // Echo the effective config (auto default is ON for non-production).
+        String ch = nvs.loadOtaChannel("production");
+        bool isProd = (ch.length() == 0 || ch == "production");
+        JsonDocument res;
+        beginResponse(res, Protocol::RES_OK, rid);
+        res["channel"] = ch;
+        res["auto"]    = nvs.hasOtaAuto() ? nvs.loadOtaAuto(false) : !isProd;
+        _ble->sendJson(res);
+    }
     // ── Ramp: Set Rate ──────────────────────────────────
     void cmdRampSet(const String& rid, JsonDocument& doc) {
         if (!_ramp) { sendError(rid, "Ramp not available"); return; }
